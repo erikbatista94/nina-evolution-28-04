@@ -188,7 +188,7 @@ export const api = {
       const conversionsPeriod = (wonDealsPeriodResult.count || 0) + (appointmentsPeriodResult.count || 0);
       const conversionsPrev = (wonDealsPrevResult.count || 0) + (appointmentsPrevResult.count || 0);
       
-      const responseTimes = avgResponseResult.data?.map(m => m.nina_response_time).filter(Boolean) || [];
+      const responseTimes = avgResponseResult.data?.map(m => m.nina_response_time).filter((v): v is number => v != null) || [];
       const avgResponseMs = responseTimes.length > 0 
         ? responseTimes.reduce((a, b) => a + b, 0) / responseTimes.length 
         : 0;
@@ -382,7 +382,7 @@ export const api = {
       lastActive: m.last_active || undefined,
       team_id: m.team_id,
       function_id: m.function_id,
-      weight: m.weight,
+      weight: m.weight ?? undefined,
       team: m.team as any,
       function: m.function as any
     }));
@@ -430,7 +430,7 @@ export const api = {
       avatar: data.avatar || `https://ui-avatars.com/api/?name=${data.name.replace(' ', '+')}&background=random`,
       team_id: data.team_id,
       function_id: data.function_id,
-      weight: data.weight
+      weight: data.weight ?? undefined
     };
   },
 
@@ -646,9 +646,9 @@ export const api = {
       time: a.time,
       duration: a.duration,
       type: a.type as 'demo' | 'meeting' | 'support' | 'followup',
-      description: a.description,
+      description: a.description ?? undefined,
       attendees: a.attendees || [],
-      contact_id: a.contact_id,
+      contact_id: a.contact_id ?? undefined,
       contact: a.contact ? {
         id: a.contact.id,
         name: a.contact.name,
@@ -704,7 +704,7 @@ export const api = {
       time: data.time,
       duration: data.duration,
       type: data.type as 'demo' | 'meeting' | 'support' | 'followup',
-      description: data.description,
+      description: data.description ?? undefined,
       attendees: data.attendees || []
     };
   },
@@ -769,7 +769,7 @@ export const api = {
     }
 
     // Buscar conversation IDs para cada deal com contact_id
-    const contactIds = data?.filter(d => d.contact_id).map(d => d.contact_id) || [];
+    const contactIds = data?.filter(d => d.contact_id).map(d => d.contact_id).filter((id): id is string => id != null) || [];
     
     const { data: conversations } = await supabase
       .from('conversations')
@@ -799,7 +799,7 @@ export const api = {
       lostAt: d.lost_at,
       lostReason: d.lost_reason,
       clientMemory: d.contact?.client_memory || null,
-      conversationId: convMap.get(d.contact_id) || null,
+      conversationId: convMap.get(d.contact_id) || undefined,
     }));
   },
 
@@ -989,11 +989,11 @@ export const api = {
       title: data.title,
       company: data.company || 'Sem empresa',
       value: Number(data.value) || 0,
-      stage: data.stage,
+      stage: data.stage || '',
       stageId: data.stage_id,
       ownerAvatar: 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
       tags: data.tags || [],
-      dueDate: data.due_date,
+      dueDate: data.due_date ?? undefined,
       priority: data.priority as 'low' | 'medium' | 'high',
     };
   },
