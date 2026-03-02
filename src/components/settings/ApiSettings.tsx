@@ -226,7 +226,7 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           audio_response_enabled: settings.audio_response_enabled,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', settings.id);
+        .eq('id', settings.id!);
 
       if (error) throw error;
 

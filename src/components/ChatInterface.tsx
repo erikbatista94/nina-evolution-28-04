@@ -70,7 +70,7 @@ const ChatInterface: React.FC = () => {
 
   // Mark as read when selecting conversation
   useEffect(() => {
-    if (selectedChatId && activeChat?.unreadCount > 0) {
+    if (selectedChatId && (activeChat?.unreadCount ?? 0) > 0) {
       markAsRead(selectedChatId);
     }
   }, [selectedChatId, activeChat?.unreadCount, markAsRead]);

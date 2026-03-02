@@ -151,7 +151,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
     setEditForm({
       name: item.name,
       description: item.description || '',
-      color: type === 'team' ? (item as Team).color : '#3b82f6'
+      color: type === 'team' ? (item as Team).color || '#3b82f6' : '#3b82f6'
     });
   };
 
@@ -277,7 +277,7 @@ const TeamConfigModal: React.FC<TeamConfigModalProps> = ({ isOpen, onClose, onUp
                   ) : (
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
-                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: team.color }}></div>
+                        <div className="w-4 h-4 rounded-full" style={{ backgroundColor: team.color || '#3b82f6' }}></div>
                         <div>
                           <div className="text-sm font-medium text-white">{team.name}</div>
                           {team.description && (

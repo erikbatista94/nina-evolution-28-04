@@ -145,7 +145,7 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           ai_scheduling_enabled: settings.ai_scheduling_enabled,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', settings.id);
+        .eq('id', settings.id!);
 
       if (error) throw error;
 
