@@ -200,8 +200,8 @@ serve(async (req) => {
           auto_response_enabled: true,
           system_prompt_override: null,
           ai_model_mode: 'flash',
-          response_delay_min: 1000,
-          response_delay_max: 3000,
+          response_delay_min: 500,
+          response_delay_max: 1500,
           message_breaking_enabled: false,
           audio_response_enabled: false,
           elevenlabs_api_key: null,
@@ -897,8 +897,8 @@ async function processQueueItem(
     .eq('id', message.id);
 
   // Add response delay if configured
-  const delayMin = settings?.response_delay_min || 1000;
-  const delayMax = settings?.response_delay_max || 3000;
+  const delayMin = settings?.response_delay_min || 500;
+  const delayMax = settings?.response_delay_max || 1500;
   const delay = Math.random() * (delayMax - delayMin) + delayMin;
 
   // Check if audio response should be sent - pure mirroring: only respond with audio if incoming was audio
