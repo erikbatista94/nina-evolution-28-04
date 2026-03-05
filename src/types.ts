@@ -304,6 +304,8 @@ export interface UIMessage {
   fromType: MessageFromType;
   mediaUrl: string | null;
   whatsappMessageId: string | null;
+  senderUserId: string | null;
+  senderName: string | null;
 }
 
 // ============= Utility Functions =============
