@@ -189,15 +189,72 @@ const ChatInterface: React.FC = () => {
     if (msg.type === MessageType.IMAGE) {
       return (
         <div className="mb-1 group relative">
-          <img 
-            src={msg.mediaUrl || msg.content} 
-            alt="Anexo" 
-            className="rounded-lg max-w-full h-auto max-h-72 object-cover border border-slate-700/50 shadow-lg"
-            loading="lazy"
-            onError={(e) => {
-              (e.target as HTMLImageElement).src = 'https://placehold.co/300x200/1e293b/cbd5e1?text=Erro+Imagem';
-            }}
-          />
+          <a href={msg.mediaUrl || undefined} target="_blank" rel="noopener noreferrer">
+            <img 
+              src={msg.mediaUrl || msg.content} 
+              alt="Anexo" 
+              className="rounded-lg max-w-full h-auto max-h-72 object-cover border border-slate-700/50 shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
+              loading="lazy"
+              onError={(e) => {
+                (e.target as HTMLImageElement).src = 'https://placehold.co/300x200/1e293b/cbd5e1?text=Erro+Imagem';
+              }}
+            />
+          </a>
+          {msg.content && msg.content !== '[imagem recebida]' && (
+            <p className="mt-1 leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (msg.type === MessageType.VIDEO) {
+      return (
+        <div className="mb-1">
+          {msg.mediaUrl ? (
+            <video 
+              src={msg.mediaUrl} 
+              controls 
+              className="rounded-lg max-w-full max-h-72 border border-slate-700/50 shadow-lg"
+              preload="metadata"
+            />
+          ) : (
+            <div className="flex items-center gap-2 py-2 px-3 bg-slate-700/30 rounded-lg border border-slate-700/50">
+              <Play className="w-5 h-5 text-slate-400" />
+              <span className="text-sm text-slate-400">Vídeo (mídia indisponível)</span>
+            </div>
+          )}
+          {msg.content && msg.content !== '[vídeo recebido]' && (
+            <p className="mt-1 leading-relaxed whitespace-pre-wrap text-sm">{msg.content}</p>
+          )}
+        </div>
+      );
+    }
+
+    if (msg.type === MessageType.DOCUMENT) {
+      const fileName = msg.content && msg.content !== '[documento recebido]' ? msg.content : 'Documento';
+      return (
+        <div className="mb-1">
+          {msg.mediaUrl ? (
+            <a 
+              href={msg.mediaUrl} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="flex items-center gap-3 py-3 px-4 bg-slate-700/30 rounded-lg border border-slate-700/50 hover:bg-slate-700/50 transition-colors group"
+            >
+              <div className="w-10 h-10 rounded-lg bg-red-500/20 flex items-center justify-center flex-shrink-0">
+                <Paperclip className="w-5 h-5 text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{fileName}</p>
+                <p className="text-xs text-slate-400 group-hover:text-slate-300">Clique para abrir</p>
+              </div>
+            </a>
+          ) : (
+            <div className="flex items-center gap-2 py-2 px-3 bg-slate-700/30 rounded-lg border border-slate-700/50">
+              <Paperclip className="w-5 h-5 text-slate-400" />
+              <span className="text-sm text-slate-400">{fileName}</span>
+            </div>
+          )}
         </div>
       );
     }
@@ -215,7 +272,6 @@ const ChatInterface: React.FC = () => {
           audio.pause();
           setPlayingAudioId(null);
         } else {
-          // Pause all other audios
           Object.values(audioRefs.current).forEach(a => a.pause());
           audio.play();
           setPlayingAudioId(msg.id);
@@ -224,7 +280,6 @@ const ChatInterface: React.FC = () => {
 
       return (
         <div className="flex items-center gap-3 min-w-[220px] py-1">
-          {/* Hidden audio element */}
           {msg.mediaUrl && (
             <audio
               ref={el => { if (el) audioRefs.current[msg.id] = el; }}
@@ -241,7 +296,6 @@ const ChatInterface: React.FC = () => {
             />
           )}
           
-          {/* Play/Pause button */}
           <button 
             onClick={togglePlay}
             disabled={!msg.mediaUrl}
@@ -258,7 +312,6 @@ const ChatInterface: React.FC = () => {
             )}
           </button>
           
-          {/* Progress bar and duration */}
           <div className="flex-1 flex flex-col gap-1 justify-center h-9">
             <div 
               className={`h-1.5 rounded-full overflow-hidden cursor-pointer ${
@@ -367,6 +420,8 @@ const ChatInterface: React.FC = () => {
                   <p className="text-xs text-slate-500 truncate">
                     {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
                      chat.messages[chat.messages.length - 1]?.type === MessageType.AUDIO ? '🎵 Áudio' : 
+                     chat.messages[chat.messages.length - 1]?.type === MessageType.VIDEO ? '🎬 Vídeo' : 
+                     chat.messages[chat.messages.length - 1]?.type === MessageType.DOCUMENT ? '📎 Documento' : 
                      chat.lastMessage || 'Sem mensagens'}
                   </p>
                   
