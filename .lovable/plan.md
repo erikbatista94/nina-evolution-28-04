@@ -1,46 +1,97 @@
 
 
-## Plano: Rebranding completo para GG (Gesso Gilmar)
+## Plano: Filtro "Geral / Atribuídas a mim" no Chat Ao Vivo
 
-Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
+### Auditoria do Schema (resultado)
 
-### 1. Substituir logos e ícones
-- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
-- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
-- **Favicon**: Atualizar para o selo GG
-- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
+| Campo | Tabela | Status |
+|---|---|---|
+| `assigned_user_id` | `conversations` | Já existe (uuid, nullable) |
+| `assigned_team` | `conversations` | Já existe (enum) |
+| `owner_id` | `deals` | Já existe |
+| Round-robin trigger | `conversations` INSERT | Já preenche `assigned_user_id` |
+| `isAdmin` | `useCompanySettings` hook | Já consulta `user_roles.role === 'admin'` |
+| `auth.uid()` | Disponível via `useAuth` | Já exposto |
 
-### 2. Paleta de cores (index.css)
-Atualizar as CSS variables para refletir o vermelho da GG:
-- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
-- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
-- `--ring`: acompanhar o primary
-- Atualizar sidebar variables correspondentes
+Nenhuma migration necessária. O campo `assigned_user_id` e o round-robin já estão operacionais.
 
-### 3. Referências hardcoded de cores
-Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
-- **Dashboard.tsx**: gradientes, tooltips, glows
-- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
-- **Auth.tsx**: gradient do logo container
-- **index.css**: scrollbar colors
+### Implementação
 
-Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
+#### 1. RLS — Manter como está (sem alteração)
 
-### 4. Textos e título
-- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
-- **Sidebar**: Default company name de "Minha Empresa" para "GG"
-- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
+A RLS atual permite `authenticated` acessar todas as conversas. O filtro será feito no frontend/query level. Razão: alterar RLS para restringir por `assigned_user_id` quebraria o realtime (que precisa ver todas as mensagens para o canal funcionar) e impediria vendedores de ver conversas ainda não atribuídas. O controle de visibilidade será por filtro na UI.
 
-### 5. Corrigir erros de build existentes
-Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
+#### 2. `src/hooks/useConversations.ts` — Nenhuma alteração
 
-### Arquivos a modificar
-- `src/index.css` — paleta de cores
-- `src/components/Sidebar.tsx` — logos + cores
-- `src/components/ui/sidebar.tsx` — cores hardcoded
-- `src/pages/Auth.tsx` — logo + cores
-- `src/components/Dashboard.tsx` — cores hardcoded
-- `index.html` — título
-- Assets novos: logos GG baixados do CDN
-- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
+O hook já carrega todas as conversas. O filtro será aplicado no componente (client-side), pois o volume é limitado (50 conversas max) e isso evita quebrar o realtime.
+
+#### 3. `src/components/ChatInterface.tsx` — Alterações principais
+
+**Novos estados:**
+```typescript
+const [viewFilter, setViewFilter] = useState<'all' | 'mine'>(() => {
+  return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
+});
+const [assignedFilter, setAssignedFilter] = useState<string>('all');
+```
+
+**Importações adicionais:**
+- `useAuth` para obter `user.id`
+- `Select` components do UI
+
+**Lógica de filtragem (substituir `filteredConversations`):**
+```typescript
+const filteredConversations = conversations.filter(chat => {
+  // Filtro de busca textual (existente)
+  if (searchQuery) {
+    const query = searchQuery.toLowerCase();
+    if (!(chat.contactName.toLowerCase().includes(query) ||
+          chat.contactPhone.includes(query) ||
+          chat.lastMessage.toLowerCase().includes(query))) {
+      return false;
+    }
+  }
+  // Filtro "Atribuídas a mim"
+  if (viewFilter === 'mine') {
+    return chat.assignedUserId === user?.id;
+  }
+  // Filtro por vendedor (gestor)
+  if (assignedFilter !== 'all') {
+    if (assignedFilter === 'unassigned') return !chat.assignedUserId;
+    return chat.assignedUserId === assignedFilter;
+  }
+  return true;
+});
+```
+
+**UI do filtro (entre header e search bar):**
+- Dois botões toggle: "Geral" | "Atribuídas a mim (N)"
+- Se `isAdmin`: dropdown `Select` com "Todos" / "Não atribuídas" / lista de `teamMembers` ativos
+- Persistência do `viewFilter` em `localStorage`
+
+**Badge "Não atribuída" na lista de conversas:**
+- Quando `chat.assignedUserId === null` e `isAdmin`, mostrar badge amarelo "Não atribuída"
+
+**Contador dinâmico:**
+- "Atribuídas a mim" mostra `(N)` com count de conversas onde `assignedUserId === user?.id`
+
+#### 4. Arquivos alterados
+
+| Arquivo | Mudança |
+|---|---|
+| `src/components/ChatInterface.tsx` | Filtro toggle + dropdown gestor + badge + contador |
+
+Nenhuma migration. Nenhuma alteração em services/api. Nenhuma alteração em RLS.
+
+### Teste no Preview
+
+1. Logar como admin → ver "Geral" selecionado → todas as conversas visíveis
+2. Clicar "Atribuídas a mim" → só conversas com `assigned_user_id` = seu ID
+3. Usar dropdown "Responsável" → filtrar por vendedor específico ou "Não atribuídas"
+4. Recarregar página → filtro persiste (localStorage)
+5. Realtime continua funcionando em qualquer filtro
+
+### Rollback
+
+Reverter apenas `ChatInterface.tsx` via histórico.
 
