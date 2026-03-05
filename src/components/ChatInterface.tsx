@@ -167,15 +167,37 @@ const ChatInterface: React.FC = () => {
     await updateStatus(activeChat.id, status);
   };
 
+  const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
+
+  const handleViewFilterChange = (filter: 'all' | 'mine') => {
+    setViewFilter(filter);
+    localStorage.setItem('chat-view-filter', filter);
+  };
+
   const filteredConversations = conversations.filter(chat => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      chat.contactName.toLowerCase().includes(query) ||
-      chat.contactPhone.includes(query) ||
-      chat.lastMessage.toLowerCase().includes(query)
-    );
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (!(chat.contactName.toLowerCase().includes(query) ||
+            chat.contactPhone.includes(query) ||
+            chat.lastMessage.toLowerCase().includes(query))) {
+        return false;
+      }
+    }
+    if (viewFilter === 'mine') {
+      return chat.assignedUserId === user?.id;
+    }
+    if (assignedFilter !== 'all') {
+      if (assignedFilter === 'unassigned') return !chat.assignedUserId;
+      return chat.assignedUserId === assignedFilter;
+    }
+    return true;
   });
+
+  const getAssignedMemberName = (userId: string | null) => {
+    if (!userId) return null;
+    const member = teamMembers.find(m => m.user_id === userId);
+    return member?.name || null;
+  };
 
   const renderStatusBadge = (status: ConversationStatus) => {
     const config = {
