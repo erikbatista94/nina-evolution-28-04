@@ -1,86 +1,46 @@
 
 
-## Plano: Salvar e exibir sender_user_id em mensagens humanas
+## Plano: Rebranding completo para GG (Gesso Gilmar)
 
-### Problema
+Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
 
-Quando um agente humano envia mensagem, não há como saber **qual** agente enviou. Todas aparecem iguais. O campo `sender_user_id` não existe em `messages`.
+### 1. Substituir logos e ícones
+- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
+- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
+- **Favicon**: Atualizar para o selo GG
+- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
 
-### Mudanças
+### 2. Paleta de cores (index.css)
+Atualizar as CSS variables para refletir o vermelho da GG:
+- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
+- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
+- `--ring`: acompanhar o primary
+- Atualizar sidebar variables correspondentes
 
-#### 1. Migration: adicionar `sender_user_id` a `messages`
+### 3. Referências hardcoded de cores
+Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
+- **Dashboard.tsx**: gradientes, tooltips, glows
+- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
+- **Auth.tsx**: gradient do logo container
+- **index.css**: scrollbar colors
 
-```sql
-ALTER TABLE public.messages ADD COLUMN sender_user_id uuid NULL;
-CREATE INDEX idx_messages_sender_user_id ON public.messages (sender_user_id);
-```
+Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
 
-Sem FK para `auth.users` (padrão do projeto). Nullable porque mensagens de Nina/user não têm sender.
+### 4. Textos e título
+- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
+- **Sidebar**: Default company name de "Minha Empresa" para "GG"
+- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
 
-#### 2. `src/services/api.ts` — gravar `sender_user_id` no insert
+### 5. Corrigir erros de build existentes
+Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
 
-Na função `sendMessage` (linha 1310), adicionar `sender_user_id` ao insert de `messages`:
-
-```typescript
-// Obter user_id antes do insert
-const { data: { user: currentUser } } = await supabase.auth.getUser();
-
-.insert({
-  conversation_id: conversationId,
-  content: content,
-  type: 'text',
-  from_type: 'human',
-  status: 'processing',
-  sent_at: new Date().toISOString(),
-  sender_user_id: currentUser?.id || null  // NOVO
-})
-```
-
-#### 3. `src/types.ts` — adicionar `senderUserId` e `senderName` ao UIMessage
-
-```typescript
-export interface UIMessage {
-  // ...existente
-  senderUserId: string | null;
-  senderName: string | null;
-}
-```
-
-Em `transformDBToUIMessage`, mapear `msg.sender_user_id` para `senderUserId`. `senderName` será null (populado pelo componente via cache de team_members).
-
-#### 4. `src/components/ChatInterface.tsx` — exibir nome do agente
-
-Na renderização de mensagens (linha 664), quando `msg.fromType === 'human'` e `isOutgoing`:
-
-- Fazer lookup de `msg.senderUserId` no array `teamMembers` (já carregado no state, linha 28)
-- Exibir nome do agente acima da bolha ou ao lado do ícone User
-
-```tsx
-{isOutgoing && msg.fromType === 'human' && (
-  <span className="text-[10px] text-cyan-400 font-medium">
-    {teamMembers.find(m => m.userId === msg.senderUserId)?.name || 'Agente'}
-  </span>
-)}
-```
-
-#### 5. `src/hooks/useConversations.ts` — optimistic update com senderUserId
-
-Na criação da `tempMessage` (linha ~235), adicionar `senderUserId: user?.id` e `senderName: null`.
-
-### Arquivos alterados
-
-| Arquivo | Mudança |
-|---|---|
-| Migration SQL | `ADD COLUMN sender_user_id`, index |
-| `src/services/api.ts` | Gravar `sender_user_id` no insert |
-| `src/types.ts` | `senderUserId`/`senderName` em UIMessage + transform |
-| `src/components/ChatInterface.tsx` | Exibir nome do agente na bolha |
-| `src/hooks/useConversations.ts` | `senderUserId` na temp message |
-
-### Teste
-
-1. Logar como Agente A → enviar mensagem → nome "Agente A" aparece na bolha
-2. Logar como Agente B → enviar mensagem → nome "Agente B" aparece
-3. Mensagens de Nina continuam com ícone Bot, sem nome de agente
-4. Mensagens do cliente (incoming) não são afetadas
+### Arquivos a modificar
+- `src/index.css` — paleta de cores
+- `src/components/Sidebar.tsx` — logos + cores
+- `src/components/ui/sidebar.tsx` — cores hardcoded
+- `src/pages/Auth.tsx` — logo + cores
+- `src/components/Dashboard.tsx` — cores hardcoded
+- `index.html` — título
+- Assets novos: logos GG baixados do CDN
+- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
 

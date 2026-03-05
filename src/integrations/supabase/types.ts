@@ -509,6 +509,7 @@ export type Database = {
           processed_by_nina: boolean | null
           read_at: string | null
           reply_to_id: string | null
+          sender_user_id: string | null
           sent_at: string
           status: Database["public"]["Enums"]["message_status"]
           type: Database["public"]["Enums"]["message_type"]
@@ -528,6 +529,7 @@ export type Database = {
           processed_by_nina?: boolean | null
           read_at?: string | null
           reply_to_id?: string | null
+          sender_user_id?: string | null
           sent_at?: string
           status?: Database["public"]["Enums"]["message_status"]
           type?: Database["public"]["Enums"]["message_type"]
@@ -547,6 +549,7 @@ export type Database = {
           processed_by_nina?: boolean | null
           read_at?: string | null
           reply_to_id?: string | null
+          sender_user_id?: string | null
           sent_at?: string
           status?: Database["public"]["Enums"]["message_status"]
           type?: Database["public"]["Enums"]["message_type"]
