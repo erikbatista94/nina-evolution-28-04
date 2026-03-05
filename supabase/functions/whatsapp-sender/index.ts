@@ -208,6 +208,25 @@ serve(async (req) => {
   }
 });
 
+async function resolveAgentName(supabase: any, senderUserId: string): Promise<string | null> {
+  const { data: member } = await supabase
+    .from('team_members')
+    .select('name')
+    .eq('user_id', senderUserId)
+    .eq('status', 'active')
+    .maybeSingle();
+
+  if (member?.name) return member.name;
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('full_name')
+    .eq('user_id', senderUserId)
+    .maybeSingle();
+
+  return profile?.full_name || null;
+}
+
 async function sendMessage(supabase: any, settings: any, queueItem: any) {
   console.log(`[Sender] Sending message: ${queueItem.id}`);
 
@@ -224,6 +243,27 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
 
   const recipient = contact.whatsapp_id || contact.phone_number;
 
+  // Resolve agent name prefix for human messages
+  let finalContent = queueItem.content;
+  let agentName: string | null = null;
+
+  if (queueItem.from_type === 'human' && queueItem.message_id) {
+    const { data: msgRecord } = await supabase
+      .from('messages')
+      .select('sender_user_id')
+      .eq('id', queueItem.message_id)
+      .maybeSingle();
+
+    if (msgRecord?.sender_user_id) {
+      agentName = await resolveAgentName(supabase, msgRecord.sender_user_id);
+
+      if (agentName && finalContent && !finalContent.startsWith(`${agentName}:`)) {
+        finalContent = `${agentName}: ${finalContent}`;
+        console.log(`[Sender] Prefixed agent name: "${agentName}"`);
+      }
+    }
+  }
+
   // Build WhatsApp API payload
   let payload: any = {
     messaging_product: 'whatsapp',
@@ -234,14 +274,14 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
   switch (queueItem.message_type) {
     case 'text':
       payload.type = 'text';
-      payload.text = { body: queueItem.content };
+      payload.text = { body: finalContent };
       break;
     
     case 'image':
       payload.type = 'image';
       payload.image = { 
         link: queueItem.media_url,
-        caption: queueItem.content || undefined
+        caption: finalContent || undefined
       };
       break;
     
@@ -260,7 +300,7 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
     
     default:
       payload.type = 'text';
-      payload.text = { body: queueItem.content };
+      payload.text = { body: finalContent };
   }
 
   console.log('[Sender] WhatsApp API payload:', JSON.stringify(payload, null, 2));
@@ -292,13 +332,20 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
   if (queueItem.message_id) {
     // UPDATE existing message (for human messages)
     console.log('[Sender] Updating existing message:', queueItem.message_id);
+    const updateData: any = {
+      whatsapp_message_id: whatsappMessageId,
+      status: 'sent',
+      sent_at: new Date().toISOString()
+    };
+
+    // Save outgoing_text in metadata for audit if content was prefixed
+    if (finalContent !== queueItem.content) {
+      updateData.metadata = { ...(queueItem.metadata || {}), outgoing_text: finalContent };
+    }
+
     const { error: msgError } = await supabase
       .from('messages')
-      .update({
-        whatsapp_message_id: whatsappMessageId,
-        status: 'sent',
-        sent_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', queueItem.message_id);
 
     if (msgError) {
