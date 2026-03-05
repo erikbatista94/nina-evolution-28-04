@@ -257,9 +257,9 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
     if (msgRecord?.sender_user_id) {
       agentName = await resolveAgentName(supabase, msgRecord.sender_user_id);
 
-      if (agentName && finalContent && !finalContent.startsWith(`${agentName}:`)) {
-        finalContent = `${agentName}: ${finalContent}`;
-        console.log(`[Sender] Prefixed agent name: "${agentName}"`);
+      if (agentName && finalContent && !finalContent.startsWith(`${agentName}:`) && !finalContent.startsWith(`*${agentName}:*`)) {
+        finalContent = `*${agentName}:* ${finalContent}`;
+        console.log(`[Sender] Prefixed agent name (bold): "${agentName}"`);
       }
     }
   }
