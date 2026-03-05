@@ -1,46 +1,55 @@
 
 
-## Plano: Rebranding completo para GG (Gesso Gilmar)
+## Plano: Reduzir latência do WhatsApp
 
-Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
+Mudanças mínimas em 3 arquivos + 1 update no banco.
 
-### 1. Substituir logos e ícones
-- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
-- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
-- **Favicon**: Atualizar para o selo GG
-- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
+### 1. GROUPING_DELAY_MS: 10000 → 3500
 
-### 2. Paleta de cores (index.css)
-Atualizar as CSS variables para refletir o vermelho da GG:
-- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
-- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
-- `--ring`: acompanhar o primary
-- Atualizar sidebar variables correspondentes
+**Arquivo:** `supabase/functions/whatsapp-webhook/index.ts`, linha 13
 
-### 3. Referências hardcoded de cores
-Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
-- **Dashboard.tsx**: gradientes, tooltips, glows
-- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
-- **Auth.tsx**: gradient do logo container
-- **index.css**: scrollbar colors
+```
+// DE:
+const GROUPING_DELAY_MS = 10000; // 10 seconds
+// PARA:
+const GROUPING_DELAY_MS = 3500; // 3.5 seconds
+```
 
-Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
+Isso reduz o tempo que o webhook espera antes de agrupar mensagens consecutivas. Com 3.5s, o cliente ainda pode enviar 2-3 mensagens seguidas e elas serão agrupadas numa só resposta.
 
-### 4. Textos e título
-- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
-- **Sidebar**: Default company name de "Minha Empresa" para "GG"
-- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
+### 2. response_delay: ajustar para ~1s
 
-### 5. Corrigir erros de build existentes
-Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
+Dois locais com valores default que servem de fallback:
 
-### Arquivos a modificar
-- `src/index.css` — paleta de cores
-- `src/components/Sidebar.tsx` — logos + cores
-- `src/components/ui/sidebar.tsx` — cores hardcoded
-- `src/pages/Auth.tsx` — logo + cores
-- `src/components/Dashboard.tsx` — cores hardcoded
-- `index.html` — título
-- Assets novos: logos GG baixados do CDN
-- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
+- **`supabase/functions/nina-orchestrator/index.ts`**, linhas 203-204: `response_delay_min: 1000`, `response_delay_max: 3000` → alterar para `500` e `1500`
+- **`supabase/functions/initialize-system/index.ts`**, linhas 187-188: mesmos valores → alterar para `500` e `1500`
+
+Esses são fallbacks. O valor real vem da tabela `nina_settings`. Será necessário um **migration SQL** para atualizar os registros existentes:
+
+```sql
+UPDATE nina_settings SET response_delay_min = 500, response_delay_max = 1500;
+```
+
+### 3. Como testar
+
+1. **Mensagem única**: enviar 1 mensagem → resposta deve chegar em ~4-5s (3.5s grouping + ~1s delay)
+2. **3 mensagens seguidas** (dentro de 3.5s): enviar 3 mensagens rápidas → deve gerar apenas 1 resposta agrupada
+3. **Confirmar 1 resposta**: verificar na tabela `messages` que só há 1 registro `from_type = 'nina'` para o grupo
+
+### 4. Rollback
+
+Reverter os 3 valores:
+- `GROUPING_DELAY_MS = 10000` no webhook
+- `response_delay_min = 1000`, `response_delay_max = 3000` no orchestrator e initialize-system
+- `UPDATE nina_settings SET response_delay_min = 1000, response_delay_max = 3000;`
+
+Ou usar o botão de revert no histórico do chat.
+
+### Resumo de arquivos
+| Arquivo | Mudança |
+|---|---|
+| `supabase/functions/whatsapp-webhook/index.ts` | GROUPING_DELAY_MS: 10000 → 3500 |
+| `supabase/functions/nina-orchestrator/index.ts` | fallback delay: 1000/3000 → 500/1500 |
+| `supabase/functions/initialize-system/index.ts` | default delay: 1000/3000 → 500/1500 |
+| Migration SQL | UPDATE nina_settings existentes |
 
