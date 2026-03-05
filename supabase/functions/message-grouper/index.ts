@@ -79,11 +79,28 @@ serve(async (req) => {
         const phoneNumberId = messages[0].phone_number_id;
 
         // Get owner settings for this phone_number_id
-        const { data: ownerSettings } = await supabase
+        let { data: ownerSettings } = await supabase
           .from('nina_settings')
           .select('user_id, whatsapp_access_token')
           .eq('whatsapp_phone_number_id', phoneNumberId)
           .maybeSingle();
+
+        // Fallback: buscar qualquer settings com token (single-tenant)
+        if (!ownerSettings?.whatsapp_access_token) {
+          console.log(`[MessageGrouper] No settings found for phone_number_id ${phoneNumberId}, trying fallback`);
+          const { data: fallbackSettings } = await supabase
+            .from('nina_settings')
+            .select('user_id, whatsapp_access_token')
+            .not('whatsapp_access_token', 'is', null)
+            .limit(1)
+            .maybeSingle();
+          if (fallbackSettings) {
+            ownerSettings = fallbackSettings;
+            console.log('[MessageGrouper] Using fallback settings');
+          } else {
+            console.warn('[MessageGrouper] No settings with whatsapp_access_token found');
+          }
+        }
 
         // Get all message_ids from the queue entries
         const messageIds = messages.map(m => m.message_id).filter(Boolean);
@@ -420,46 +437,6 @@ async function downloadWhatsAppMedia(settings: any, mediaId: string): Promise<{ 
   }
 }
 
-  try {
-    const mediaInfoResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${mediaId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${settings.whatsapp_access_token}`
-        }
-      }
-    );
-
-    if (!mediaInfoResponse.ok) {
-      console.error('[MessageGrouper] Failed to get media info:', await mediaInfoResponse.text());
-      return null;
-    }
-
-    const mediaInfo = await mediaInfoResponse.json();
-    const mediaUrl = mediaInfo.url;
-
-    if (!mediaUrl) {
-      console.error('[MessageGrouper] No media URL in response');
-      return null;
-    }
-
-    const mediaResponse = await fetch(mediaUrl, {
-      headers: {
-        'Authorization': `Bearer ${settings.whatsapp_access_token}`
-      }
-    });
-
-    if (!mediaResponse.ok) {
-      console.error('[MessageGrouper] Failed to download media:', await mediaResponse.text());
-      return null;
-    }
-
-    return await mediaResponse.arrayBuffer();
-  } catch (error) {
-    console.error('[MessageGrouper] Error downloading media:', error);
-    return null;
-  }
-}
 
 // Transcribe audio using Lovable AI Gateway (Whisper)
 async function transcribeAudio(audioBuffer: ArrayBuffer, lovableApiKey: string): Promise<string | null> {
