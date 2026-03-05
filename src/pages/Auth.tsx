@@ -5,26 +5,22 @@ import { Button } from '@/components/Button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, Lock, User, ArrowRight, Loader2 } from 'lucide-react';
+import { Mail, Lock, ArrowRight, Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import logoGG from '@/assets/logo-gg.png';
 
-// Validation schemas
 const emailSchema = z.string().email('Email inválido');
 const passwordSchema = z.string().min(6, 'Senha deve ter pelo menos 6 caracteres');
-const nameSchema = z.string().min(2, 'Nome deve ter pelo menos 2 caracteres');
 
 const Auth: React.FC = () => {
-  const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [fullName, setFullName] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{ email?: string; password?: string; fullName?: string }>({});
+  const [errors, setErrors] = useState<{ email?: string; password?: string }>({});
   
-  const { signIn, signUp, user, loading } = useAuth();
+  const { signIn, user, loading } = useAuth();
   const navigate = useNavigate();
 
-  // Redirect if already logged in
   useEffect(() => {
     if (!loading && user) {
       navigate('/dashboard', { replace: true });
@@ -32,7 +28,7 @@ const Auth: React.FC = () => {
   }, [user, loading, navigate]);
 
   const validateForm = (): boolean => {
-    const newErrors: { email?: string; password?: string; fullName?: string } = {};
+    const newErrors: { email?: string; password?: string } = {};
     
     const emailResult = emailSchema.safeParse(email);
     if (!emailResult.success) {
@@ -42,13 +38,6 @@ const Auth: React.FC = () => {
     const passwordResult = passwordSchema.safeParse(password);
     if (!passwordResult.success) {
       newErrors.password = passwordResult.error.errors[0].message;
-    }
-    
-    if (!isLogin) {
-      const nameResult = nameSchema.safeParse(fullName);
-      if (!nameResult.success) {
-        newErrors.fullName = nameResult.error.errors[0].message;
-      }
     }
     
     setErrors(newErrors);
@@ -63,33 +52,19 @@ const Auth: React.FC = () => {
     setIsSubmitting(true);
     
     try {
-      if (isLogin) {
-        const { error } = await signIn(email, password);
-        if (error) {
-          if (error.message.includes('Invalid login credentials')) {
-            toast.error('Email ou senha incorretos');
-          } else if (error.message.includes('Email not confirmed')) {
-            toast.error('Por favor, confirme seu email antes de fazer login');
-          } else {
-            toast.error(error.message);
-          }
-          return;
+      const { error } = await signIn(email, password);
+      if (error) {
+        if (error.message.includes('Invalid login credentials')) {
+          toast.error('Email ou senha incorretos');
+        } else if (error.message.includes('Email not confirmed')) {
+          toast.error('Por favor, confirme seu email antes de fazer login');
+        } else {
+          toast.error(error.message);
         }
-        toast.success('Login realizado com sucesso!');
-        navigate('/dashboard', { replace: true });
-      } else {
-        const { error } = await signUp(email, password, fullName);
-        if (error) {
-          if (error.message.includes('User already registered')) {
-            toast.error('Este email já está cadastrado. Tente fazer login.');
-          } else {
-            toast.error(error.message);
-          }
-          return;
-        }
-        toast.success('Conta criada com sucesso! Você já pode usar a plataforma.');
-        navigate('/dashboard', { replace: true });
+        return;
       }
+      toast.success('Login realizado com sucesso!');
+      navigate('/dashboard', { replace: true });
     } finally {
       setIsSubmitting(false);
     }
@@ -105,16 +80,14 @@ const Auth: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background Effects */}
       <div className="fixed top-0 left-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[128px] pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0" />
       <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[128px] pointer-events-none translate-x-1/2 translate-y-1/2 z-0" />
       
       <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-accent mb-4">
             <img 
-              src="/src/assets/logo-gg.png" 
+              src={logoGG} 
               alt="GG Logo" 
               className="w-10 h-10 object-contain"
               onError={(e) => {
@@ -122,40 +95,12 @@ const Auth: React.FC = () => {
               }}
             />
           </div>
-          <h1 className="text-2xl font-bold text-foreground">
-            {isLogin ? 'Bem-vindo de volta' : 'Crie sua conta'}
-          </h1>
-          <p className="text-muted-foreground mt-2">
-            {isLogin 
-              ? 'Entre para acessar sua plataforma'
-              : 'Configure sua assistente de vendas em minutos'
-            }
-          </p>
+          <h1 className="text-2xl font-bold text-foreground">Bem-vindo de volta</h1>
+          <p className="text-muted-foreground mt-2">Entre para acessar sua plataforma</p>
         </div>
 
-        {/* Form Card */}
         <div className="bg-card border border-border rounded-2xl p-8 shadow-xl">
           <form onSubmit={handleSubmit} className="space-y-5">
-            {!isLogin && (
-              <div className="space-y-2">
-                <Label htmlFor="fullName" className="text-foreground">Nome completo</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="fullName"
-                    type="text"
-                    placeholder="Seu nome"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    className="pl-10"
-                  />
-                </div>
-                {errors.fullName && (
-                  <p className="text-sm text-destructive">{errors.fullName}</p>
-                )}
-              </div>
-            )}
-            
             <div className="space-y-2">
               <Label htmlFor="email" className="text-foreground">Email</Label>
               <div className="relative">
@@ -204,30 +149,13 @@ const Auth: React.FC = () => {
               ) : (
                 <ArrowRight className="h-4 w-4 mr-2" />
               )}
-              {isLogin ? 'Entrar' : 'Criar conta'}
+              Entrar
             </Button>
           </form>
-
-          <div className="mt-6 pt-6 border-t border-border text-center">
-            <p className="text-muted-foreground text-sm">
-              {isLogin ? 'Não tem uma conta?' : 'Já tem uma conta?'}
-              <button
-                type="button"
-                onClick={() => {
-                  setIsLogin(!isLogin);
-                  setErrors({});
-                }}
-                className="ml-1 text-primary hover:text-primary/80 font-medium transition-colors"
-              >
-                {isLogin ? 'Criar conta' : 'Fazer login'}
-              </button>
-            </p>
-          </div>
         </div>
 
-        {/* Footer */}
         <p className="text-center text-muted-foreground text-xs mt-6">
-          Ao continuar, você concorda com nossos Termos de Uso e Política de Privacidade.
+          Acesso controlado pelo administrador. Contate seu admin para obter credenciais.
         </p>
       </div>
     </div>
