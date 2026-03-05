@@ -947,6 +947,7 @@ export type Database = {
           last_active: string | null
           name: string
           role: Database["public"]["Enums"]["member_role"]
+          rr_counter: number
           status: Database["public"]["Enums"]["member_status"]
           team_id: string | null
           updated_at: string
@@ -962,6 +963,7 @@ export type Database = {
           last_active?: string | null
           name: string
           role?: Database["public"]["Enums"]["member_role"]
+          rr_counter?: number
           status?: Database["public"]["Enums"]["member_status"]
           team_id?: string | null
           updated_at?: string
@@ -977,6 +979,7 @@ export type Database = {
           last_active?: string | null
           name?: string
           role?: Database["public"]["Enums"]["member_role"]
+          rr_counter?: number
           status?: Database["public"]["Enums"]["member_status"]
           team_id?: string | null
           updated_at?: string
