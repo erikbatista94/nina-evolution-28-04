@@ -79,11 +79,28 @@ serve(async (req) => {
         const phoneNumberId = messages[0].phone_number_id;
 
         // Get owner settings for this phone_number_id
-        const { data: ownerSettings } = await supabase
+        let { data: ownerSettings } = await supabase
           .from('nina_settings')
           .select('user_id, whatsapp_access_token')
           .eq('whatsapp_phone_number_id', phoneNumberId)
           .maybeSingle();
+
+        // Fallback: buscar qualquer settings com token (single-tenant)
+        if (!ownerSettings?.whatsapp_access_token) {
+          console.log(`[MessageGrouper] No settings found for phone_number_id ${phoneNumberId}, trying fallback`);
+          const { data: fallbackSettings } = await supabase
+            .from('nina_settings')
+            .select('user_id, whatsapp_access_token')
+            .not('whatsapp_access_token', 'is', null)
+            .limit(1)
+            .maybeSingle();
+          if (fallbackSettings) {
+            ownerSettings = fallbackSettings;
+            console.log('[MessageGrouper] Using fallback settings');
+          } else {
+            console.warn('[MessageGrouper] No settings with whatsapp_access_token found');
+          }
+        }
 
         // Get all message_ids from the queue entries
         const messageIds = messages.map(m => m.message_id).filter(Boolean);
