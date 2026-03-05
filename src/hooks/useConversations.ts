@@ -363,6 +363,9 @@ export function useConversations() {
   const sendMessage = useCallback(async (conversationId: string, content: string) => {
     if (!content.trim()) return;
 
+    // Get current user for sender tracking
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
     // Optimistic update with temporary ID
     const tempId = `temp-${Date.now()}`;
     const tempMessage: UIMessage = {
@@ -375,7 +378,7 @@ export function useConversations() {
       fromType: 'human',
       mediaUrl: null,
       whatsappMessageId: null,
-      senderUserId: user?.id || null,
+      senderUserId: currentUser?.id || null,
       senderName: null
     };
 
