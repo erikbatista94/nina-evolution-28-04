@@ -1,46 +1,88 @@
 
 
-## Plano: Rebranding completo para GG (Gesso Gilmar)
+## Plano: Prefixar nome do atendente nas mensagens humanas enviadas ao WhatsApp
 
-Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
+### Situação atual
 
-### 1. Substituir logos e ícones
-- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
-- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
-- **Favicon**: Atualizar para o selo GG
-- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
+- `api.sendMessage` já grava `sender_user_id: currentUser?.id` no insert de `messages` e enfileira na `send_queue` com `from_type: 'human'`
+- `whatsapp-sender` usa `queueItem.content` diretamente como body do texto enviado ao Graph API
+- O sender não consulta `messages` nem `team_members` — envia o conteúdo cru da fila
 
-### 2. Paleta de cores (index.css)
-Atualizar as CSS variables para refletir o vermelho da GG:
-- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
-- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
-- `--ring`: acompanhar o primary
-- Atualizar sidebar variables correspondentes
+### Mudança: apenas `supabase/functions/whatsapp-sender/index.ts`
 
-### 3. Referências hardcoded de cores
-Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
-- **Dashboard.tsx**: gradientes, tooltips, glows
-- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
-- **Auth.tsx**: gradient do logo container
-- **index.css**: scrollbar colors
+Na função `sendMessage()`, antes de montar o payload, adicionar lógica de prefixo:
 
-Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
+1. **Se `queueItem.from_type === 'human'` e `queueItem.message_id` existe:**
+   - Buscar `sender_user_id` da tabela `messages` pelo `message_id`
+   - Se `sender_user_id` não for null, resolver nome:
+     - Primeiro: `team_members.name WHERE user_id = sender_user_id`
+     - Fallback: `profiles.full_name WHERE user_id = sender_user_id`
+   - Se encontrou nome e o conteúdo ainda não começa com `"NomeAgente:"`, prefixar: `"${agentName}: ${content}"`
 
-### 4. Textos e título
-- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
-- **Sidebar**: Default company name de "Minha Empresa" para "GG"
-- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
+2. **Persistência para auditoria:**
+   - Ao fazer update da mensagem (linha 295-302), adicionar `metadata: { outgoing_text: textoComPrefixo }` para registro do que foi enviado ao WhatsApp
 
-### 5. Corrigir erros de build existentes
-Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
+3. **Proteção contra duplicação:**
+   - Checar `content.startsWith(agentName + ':')` antes de prefixar
 
-### Arquivos a modificar
-- `src/index.css` — paleta de cores
-- `src/components/Sidebar.tsx` — logos + cores
-- `src/components/ui/sidebar.tsx` — cores hardcoded
-- `src/pages/Auth.tsx` — logo + cores
-- `src/components/Dashboard.tsx` — cores hardcoded
-- `index.html` — título
-- Assets novos: logos GG baixados do CDN
-- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
+### Código (trecho central)
+
+```typescript
+// Inside sendMessage(), before building payload:
+let finalContent = queueItem.content;
+
+if (queueItem.from_type === 'human' && queueItem.message_id) {
+  // Fetch sender_user_id from the message record
+  const { data: msgRecord } = await supabase
+    .from('messages')
+    .select('sender_user_id')
+    .eq('id', queueItem.message_id)
+    .maybeSingle();
+
+  if (msgRecord?.sender_user_id) {
+    // Resolve agent name
+    let agentName: string | null = null;
+    
+    const { data: member } = await supabase
+      .from('team_members')
+      .select('name')
+      .eq('user_id', msgRecord.sender_user_id)
+      .eq('status', 'active')
+      .maybeSingle();
+    
+    agentName = member?.name || null;
+
+    if (!agentName) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('user_id', msgRecord.sender_user_id)
+        .maybeSingle();
+      agentName = profile?.full_name || null;
+    }
+
+    if (agentName && !finalContent.startsWith(`${agentName}:`)) {
+      finalContent = `${agentName}: ${finalContent}`;
+    }
+  }
+}
+```
+
+Depois, usar `finalContent` em vez de `queueItem.content` no payload e salvar `outgoing_text` no metadata.
+
+### Arquivos alterados
+
+| Arquivo | Mudança |
+|---|---|
+| `supabase/functions/whatsapp-sender/index.ts` | Prefixar nome do agente + salvar outgoing_text no metadata |
+
+Nenhuma migration. `messages.content` permanece texto puro. O texto enviado ao WhatsApp (com prefixo) fica em `messages.metadata.outgoing_text`.
+
+### Teste
+
+1. Gabriel envia "Oi" → WhatsApp recebe "Gabriel Souza: Oi"
+2. Erik envia "Tudo bem?" → WhatsApp recebe "Erik Batista: Tudo bem?"
+3. Nina envia mensagem → sem prefixo
+4. `sender_user_id` null → sem prefixo
+5. Agente digita "Gabriel Souza: teste" → não duplica
 
