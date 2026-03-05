@@ -371,11 +371,54 @@ function getMimeType(mediaType: string): string {
 }
 
 // Download media from WhatsApp API
-async function downloadWhatsAppMedia(settings: any, mediaId: string): Promise<ArrayBuffer | null> {
+async function downloadWhatsAppMedia(settings: any, mediaId: string): Promise<{ buffer: ArrayBuffer; mimeType: string | null } | null> {
   if (!settings?.whatsapp_access_token) {
     console.error('[MessageGrouper] No WhatsApp access token configured');
     return null;
   }
+
+  try {
+    const mediaInfoResponse = await fetch(
+      `https://graph.facebook.com/v18.0/${mediaId}`,
+      {
+        headers: {
+          'Authorization': `Bearer ${settings.whatsapp_access_token}`
+        }
+      }
+    );
+
+    if (!mediaInfoResponse.ok) {
+      console.error('[MessageGrouper] Failed to get media info:', await mediaInfoResponse.text());
+      return null;
+    }
+
+    const mediaInfo = await mediaInfoResponse.json();
+    const mediaUrl = mediaInfo.url;
+    const mimeType = mediaInfo.mime_type || null;
+
+    if (!mediaUrl) {
+      console.error('[MessageGrouper] No media URL in response');
+      return null;
+    }
+
+    const mediaResponse = await fetch(mediaUrl, {
+      headers: {
+        'Authorization': `Bearer ${settings.whatsapp_access_token}`
+      }
+    });
+
+    if (!mediaResponse.ok) {
+      console.error('[MessageGrouper] Failed to download media:', await mediaResponse.text());
+      return null;
+    }
+
+    const buffer = await mediaResponse.arrayBuffer();
+    return { buffer, mimeType };
+  } catch (error) {
+    console.error('[MessageGrouper] Error downloading media:', error);
+    return null;
+  }
+}
 
   try {
     const mediaInfoResponse = await fetch(
