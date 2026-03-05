@@ -664,6 +664,13 @@ const ChatInterface: React.FC = () => {
                             {isOutgoing && msg.fromType === 'human' && (
                               <User className="w-3 h-3 text-cyan-400" />
                             )}
+                            {isOutgoing && msg.fromType === 'human' && (
+                              <span className="text-[10px] text-cyan-400 font-medium">
+                                {msg.senderUserId 
+                                  ? (teamMembers.find(m => m.id === msg.senderUserId || (m as any).user_id === msg.senderUserId)?.name || 'Agente')
+                                  : 'Agente'}
+                              </span>
+                            )}
                             <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
                             {isOutgoing && (
                               msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> : 

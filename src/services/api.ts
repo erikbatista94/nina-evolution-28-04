@@ -1304,6 +1304,9 @@ export const api = {
       throw new Error('Conversation not found');
     }
 
+    // Get current user for sender tracking
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
     // First create the message record with status 'processing'
     const { data: msgData, error: msgError } = await supabase
       .from('messages')
@@ -1313,8 +1316,9 @@ export const api = {
         type: 'text',
         from_type: 'human',
         status: 'processing',
-        sent_at: new Date().toISOString()
-      })
+        sent_at: new Date().toISOString(),
+        sender_user_id: currentUser?.id || null
+      } as any)
       .select('id')
       .single();
 

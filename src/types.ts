@@ -354,7 +354,9 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     status: mapDBMessageStatus(msg.status),
     fromType: msg.from_type,
     mediaUrl: msg.media_url,
-    whatsappMessageId: msg.whatsapp_message_id
+    whatsappMessageId: msg.whatsapp_message_id,
+    senderUserId: (msg as any).sender_user_id || null,
+    senderName: null
   };
 }
 
