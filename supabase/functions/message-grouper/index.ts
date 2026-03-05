@@ -242,6 +242,7 @@ async function combineAndTranscribeMessages(
   lovableApiKey: string
 ): Promise<string> {
   const contentParts: string[] = [];
+  const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 
   for (let i = 0; i < queueMessages.length; i++) {
     const queueMsg = queueMessages[i];
@@ -252,17 +253,50 @@ async function combineAndTranscribeMessages(
 
     let content = dbMsg.content || '';
 
+    // Get media ID for any media type
+    const mediaId = messageData.audio?.id || messageData.image?.id || messageData.video?.id || messageData.document?.id;
+    const mediaType = messageData.type; // 'audio', 'image', 'video', 'document'
+
+    // Handle media download + upload to Storage (for all media types)
+    if (mediaId && settings?.whatsapp_access_token && ['image', 'video', 'document'].includes(mediaType)) {
+      console.log(`[MessageGrouper] Downloading ${mediaType} media:`, mediaId);
+      const mediaResult = await downloadWhatsAppMedia(settings, mediaId);
+      if (mediaResult) {
+        const ext = getFileExtension(mediaType, messageData[mediaType]?.mime_type, messageData[mediaType]?.filename);
+        const storagePath = `${dbMsg.conversation_id}/${dbMsg.id}.${ext}`;
+        const mimeType = mediaResult.mimeType || messageData[mediaType]?.mime_type || getMimeType(mediaType);
+        
+        const publicUrl = await uploadMediaToStorage(supabase, supabaseUrl, mediaResult.buffer, storagePath, mimeType);
+        if (publicUrl) {
+          await supabase
+            .from('messages')
+            .update({ media_url: publicUrl })
+            .eq('id', dbMsg.id);
+          console.log(`[MessageGrouper] Uploaded ${mediaType} to Storage:`, publicUrl);
+        }
+      }
+    }
+
     // Handle audio transcription
-    if (messageData.type === 'audio') {
+    if (mediaType === 'audio') {
       const audioMediaId = messageData.audio?.id;
       if (audioMediaId && settings?.whatsapp_access_token && lovableApiKey) {
         console.log('[MessageGrouper] Transcribing audio:', audioMediaId);
-        const audioBuffer = await downloadWhatsAppMedia(settings, audioMediaId);
-        if (audioBuffer) {
-          const transcription = await transcribeAudio(audioBuffer, lovableApiKey);
+        const mediaResult = await downloadWhatsAppMedia(settings, audioMediaId);
+        if (mediaResult) {
+          // Upload audio to storage too
+          const storagePath = `${dbMsg.conversation_id}/${dbMsg.id}.ogg`;
+          const publicUrl = await uploadMediaToStorage(supabase, supabaseUrl, mediaResult.buffer, storagePath, 'audio/ogg');
+          if (publicUrl) {
+            await supabase
+              .from('messages')
+              .update({ media_url: publicUrl })
+              .eq('id', dbMsg.id);
+          }
+
+          const transcription = await transcribeAudio(mediaResult.buffer, lovableApiKey);
           if (transcription) {
             content = transcription;
-            // Update the message in database with transcription
             await supabase
               .from('messages')
               .update({ content: transcription })
@@ -278,6 +312,62 @@ async function combineAndTranscribeMessages(
   }
 
   return contentParts.join('\n');
+}
+
+// Upload media to Supabase Storage
+async function uploadMediaToStorage(
+  supabase: any,
+  supabaseUrl: string,
+  buffer: ArrayBuffer,
+  path: string,
+  mimeType: string
+): Promise<string | null> {
+  try {
+    const blob = new Blob([buffer], { type: mimeType });
+    const { error } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(path, blob, { contentType: mimeType, upsert: true });
+
+    if (error) {
+      console.error('[MessageGrouper] Storage upload error:', error);
+      return null;
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('whatsapp-media')
+      .getPublicUrl(path);
+
+    return urlData?.publicUrl || null;
+  } catch (error) {
+    console.error('[MessageGrouper] Error uploading to storage:', error);
+    return null;
+  }
+}
+
+function getFileExtension(mediaType: string, mimeType?: string, filename?: string): string {
+  if (filename) {
+    const ext = filename.split('.').pop();
+    if (ext) return ext;
+  }
+  if (mimeType) {
+    const map: Record<string, string> = {
+      'image/jpeg': 'jpg', 'image/png': 'png', 'image/webp': 'webp',
+      'video/mp4': 'mp4', 'video/3gpp': '3gp',
+      'application/pdf': 'pdf',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+      'application/msword': 'doc',
+    };
+    if (map[mimeType]) return map[mimeType];
+  }
+  const defaults: Record<string, string> = { image: 'jpg', video: 'mp4', document: 'pdf', audio: 'ogg' };
+  return defaults[mediaType] || 'bin';
+}
+
+function getMimeType(mediaType: string): string {
+  const defaults: Record<string, string> = {
+    image: 'image/jpeg', video: 'video/mp4', document: 'application/pdf', audio: 'audio/ogg'
+  };
+  return defaults[mediaType] || 'application/octet-stream';
 }
 
 // Download media from WhatsApp API
