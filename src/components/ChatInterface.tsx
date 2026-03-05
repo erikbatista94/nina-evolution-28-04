@@ -421,13 +421,63 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
 
+        {/* View Filter Tabs */}
+        <div className="px-4 py-2 border-b border-slate-800/50 flex flex-col gap-2">
+          <div className="flex gap-1 bg-slate-950/50 rounded-lg p-0.5">
+            <button
+              onClick={() => handleViewFilterChange('all')}
+              className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
+                viewFilter === 'all'
+                  ? 'bg-slate-700 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              Geral
+            </button>
+            <button
+              onClick={() => handleViewFilterChange('mine')}
+              className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
+                viewFilter === 'mine'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              Minhas ({myConversationsCount})
+            </button>
+          </div>
+
+          {/* Manager: filter by team member */}
+          {isAdmin && viewFilter === 'all' && (
+            <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+              <SelectTrigger className="h-8 text-xs bg-slate-950/50 border-slate-800">
+                <Users className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="unassigned">Não atribuídas</SelectItem>
+                {teamMembers
+                  .filter(m => m.status === 'active' && m.user_id)
+                  .map(m => (
+                    <SelectItem key={m.user_id} value={m.user_id}>
+                      {m.name}
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {filteredConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-500 p-8 text-center">
               <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-sm">Nenhuma conversa encontrada</p>
-              <p className="text-xs mt-1 opacity-70">As conversas aparecerão aqui quando receberem mensagens</p>
+              <p className="text-xs mt-1 opacity-70">
+                {viewFilter === 'mine' ? 'Nenhuma conversa atribuída a você' : 'As conversas aparecerão aqui quando receberem mensagens'}
+              </p>
             </div>
           ) : (
             filteredConversations.map((chat) => (
