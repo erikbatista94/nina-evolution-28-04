@@ -935,6 +935,74 @@ const ChatInterface: React.FC = () => {
                     onBlur={handleNotesBlur}
                   />
                 </div>
+
+                <div className="h-px bg-slate-800/50 w-full"></div>
+
+                {/* Send Lead to WhatsApp */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <ExternalLink className="w-4 h-4" />
+                    Enviar Lead via WhatsApp
+                  </h4>
+                  
+                  {(() => {
+                    const myMember = teamMembers.find((m: any) => m.user_id === user?.id);
+                    const myWhatsApp = myMember?.whatsapp_number;
+                    const assignedMember = teamMembers.find((m: any) => m.user_id === activeChat.assignedUserId);
+                    const assignedWhatsApp = assignedMember?.whatsapp_number;
+
+                    const buildLeadMessage = () => {
+                      const interests = activeChat.clientMemory?.lead_profile?.interests || [];
+                      const nextAction = activeChat.clientMemory?.sales_intelligence?.next_best_action || 'qualify';
+                      const lastUserMsg = [...activeChat.messages].reverse().find(m => m.fromType === 'user');
+                      
+                      const lines = [
+                        '*Lead GG*',
+                        `Nome: ${activeChat.contactName}`,
+                        `Telefone: ${activeChat.contactPhone}`,
+                      ];
+                      if (interests.length > 0) lines.push(`Interesses: ${interests.join(', ')}`);
+                      if (lastUserMsg) lines.push(`Última msg: ${lastUserMsg.content?.substring(0, 100)}`);
+                      lines.push(`Próxima ação: ${nextAction === 'qualify' ? 'Qualificar lead' : nextAction === 'demo' ? 'Agendar demonstração' : nextAction}`);
+                      lines.push(`Link: ${window.location.origin}/chat?conversation=${activeChat.id}`);
+                      
+                      return lines.join('\n');
+                    };
+
+                    const handleSendToWhatsApp = (whatsappNumber: string) => {
+                      const msg = buildLeadMessage();
+                      const url = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(msg)}`;
+                      window.open(url, '_blank');
+                    };
+
+                    return (
+                      <div className="space-y-2">
+                        <button
+                          onClick={() => myWhatsApp && handleSendToWhatsApp(myWhatsApp)}
+                          disabled={!myWhatsApp}
+                          className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-emerald-600/20 border border-emerald-600/30 text-emerald-400 text-sm font-medium hover:bg-emerald-600/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={!myWhatsApp ? 'Configure seu WhatsApp no perfil da equipe' : undefined}
+                        >
+                          <Phone className="w-4 h-4" />
+                          Enviar para meu WhatsApp
+                        </button>
+                        
+                        {activeChat.assignedUserId && activeChat.assignedUserId !== user?.id && (
+                          <button
+                            onClick={() => assignedWhatsApp && handleSendToWhatsApp(assignedWhatsApp)}
+                            disabled={!assignedWhatsApp}
+                            className="w-full flex items-center gap-2 px-3 py-2.5 rounded-lg bg-cyan-600/20 border border-cyan-600/30 text-cyan-400 text-sm font-medium hover:bg-cyan-600/30 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={!assignedWhatsApp ? 'O responsável não tem WhatsApp configurado' : undefined}
+                          >
+                            <Users className="w-4 h-4" />
+                            Enviar para WhatsApp do responsável
+                            {assignedMember && <span className="text-xs opacity-70">({assignedMember.name})</span>}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
           </div>
