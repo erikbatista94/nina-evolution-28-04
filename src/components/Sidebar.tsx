@@ -10,14 +10,14 @@ import { toast } from 'sonner';
 import logoGG from '@/assets/logo-gg.png';
 import logoGGWhite from '@/assets/logo-gg-white.svg';
 
-const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { id: 'pipeline', label: 'Pipeline', icon: Kanban },
-  { id: 'chat', label: 'Chat Ao Vivo', icon: MessageSquare },
-  { id: 'contacts', label: 'Contatos', icon: Users },
-  { id: 'scheduling', label: 'Agendamentos', icon: Calendar },
-  { id: 'team', label: 'Equipe', icon: ShieldCheck },
-  { id: 'settings', label: 'Configurações', icon: SettingsIcon },
+const allMenuItems = [
+  { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
+  { id: 'pipeline', label: 'Pipeline', icon: Kanban, adminOnly: false },
+  { id: 'chat', label: 'Chat Ao Vivo', icon: MessageSquare, adminOnly: false },
+  { id: 'contacts', label: 'Contatos', icon: Users, adminOnly: false },
+  { id: 'scheduling', label: 'Agendamentos', icon: Calendar, adminOnly: false },
+  { id: 'team', label: 'Equipe', icon: ShieldCheck, adminOnly: false },
+  { id: 'settings', label: 'Configurações', icon: SettingsIcon, adminOnly: true },
 ];
 
 const Logo = ({ companyName }: { companyName: string }) => {
@@ -56,12 +56,14 @@ const LogoIcon = () => {
 };
 
 const SidebarContent = () => {
-  const { companyName } = useCompanySettings();
+  const { companyName, isAdmin } = useCompanySettings();
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname.substring(1) || 'dashboard';
   const { open, setOpen } = useSidebar();
+
+  const menuItems = allMenuItems.filter(item => !item.adminOnly || isAdmin);
 
   const links = menuItems.map(item => ({
     label: item.label,

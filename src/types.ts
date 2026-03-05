@@ -32,6 +32,8 @@ export interface TeamMember {
   weight?: number;
   team?: Team;
   function?: TeamFunction;
+  whatsapp_number?: string | null;
+  user_id?: string | null;
 }
 
 export interface Team {

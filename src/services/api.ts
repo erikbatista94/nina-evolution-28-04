@@ -384,7 +384,9 @@ export const api = {
       function_id: m.function_id,
       weight: m.weight ?? undefined,
       team: m.team as any,
-      function: m.function as any
+      function: m.function as any,
+      whatsapp_number: (m as any).whatsapp_number || null,
+      user_id: m.user_id || null
     }));
   },
 
@@ -445,6 +447,7 @@ export const api = {
     team_id: string | null;
     function_id: string | null;
     weight: number;
+    whatsapp_number: string | null;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')
