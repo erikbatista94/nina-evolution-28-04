@@ -14,7 +14,7 @@ import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation } = useConversations();
+  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
   const { sdrName, companyName } = useCompanySettings();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
@@ -363,7 +363,23 @@ const ChatInterface: React.FC = () => {
       <div className="w-80 lg:w-96 border-r border-slate-800 flex flex-col bg-slate-900/50 backdrop-blur-md z-20 flex-shrink-0">
         {/* Search Header */}
         <div className="p-4 border-b border-slate-800/50">
-          <h2 className="text-lg font-bold text-white mb-4 px-1">Chats Ativos</h2>
+          <div className="flex items-center justify-between mb-4 px-1">
+            <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+            <button
+              onClick={!realtimeConnected ? refetch : undefined}
+              className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
+                realtimeConnected
+                  ? 'text-emerald-400 cursor-default'
+                  : 'text-red-400 animate-pulse cursor-pointer hover:bg-red-500/10'
+              }`}
+              title={realtimeConnected ? 'Realtime conectado' : 'Conexão perdida — clique para reconectar'}
+            >
+              <span className={`inline-block w-2 h-2 rounded-full ${
+                realtimeConnected ? 'bg-emerald-400' : 'bg-red-400'
+              }`} />
+              {!realtimeConnected && 'Reconectando...'}
+            </button>
+          </div>
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500 group-focus-within:text-cyan-400 transition-colors" />
             <input 
