@@ -28,6 +28,10 @@ const ChatInterface: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [notesValue, setNotesValue] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [viewFilter, setViewFilter] = useState<'all' | 'mine'>(() => {
+    return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
+  });
+  const [assignedFilter, setAssignedFilter] = useState<string>('all');
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
