@@ -332,13 +332,20 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
   if (queueItem.message_id) {
     // UPDATE existing message (for human messages)
     console.log('[Sender] Updating existing message:', queueItem.message_id);
+    const updateData: any = {
+      whatsapp_message_id: whatsappMessageId,
+      status: 'sent',
+      sent_at: new Date().toISOString()
+    };
+
+    // Save outgoing_text in metadata for audit if content was prefixed
+    if (finalContent !== queueItem.content) {
+      updateData.metadata = { ...(queueItem.metadata || {}), outgoing_text: finalContent };
+    }
+
     const { error: msgError } = await supabase
       .from('messages')
-      .update({
-        whatsapp_message_id: whatsappMessageId,
-        status: 'sent',
-        sent_at: new Date().toISOString()
-      })
+      .update(updateData)
       .eq('id', queueItem.message_id);
 
     if (msgError) {
