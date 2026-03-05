@@ -17,7 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 
 const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
-  const { sdrName, companyName } = useCompanySettings();
+  const { sdrName, companyName, isAdmin } = useCompanySettings();
+  const { user } = useAuth();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(true);
