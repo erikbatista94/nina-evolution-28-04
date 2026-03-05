@@ -783,6 +783,7 @@ export type Database = {
         Row: {
           avatar_url: string | null
           created_at: string
+          force_password_change: boolean
           full_name: string | null
           id: string
           updated_at: string
@@ -791,6 +792,7 @@ export type Database = {
         Insert: {
           avatar_url?: string | null
           created_at?: string
+          force_password_change?: boolean
           full_name?: string | null
           id?: string
           updated_at?: string
@@ -799,6 +801,7 @@ export type Database = {
         Update: {
           avatar_url?: string | null
           created_at?: string
+          force_password_change?: boolean
           full_name?: string | null
           id?: string
           updated_at?: string
@@ -956,6 +959,7 @@ export type Database = {
           updated_at: string
           user_id: string | null
           weight: number | null
+          whatsapp_number: string | null
         }
         Insert: {
           avatar?: string | null
@@ -972,6 +976,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           weight?: number | null
+          whatsapp_number?: string | null
         }
         Update: {
           avatar?: string | null
@@ -988,6 +993,7 @@ export type Database = {
           updated_at?: string
           user_id?: string | null
           weight?: number | null
+          whatsapp_number?: string | null
         }
         Relationships: [
           {
