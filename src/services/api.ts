@@ -447,6 +447,7 @@ export const api = {
     team_id: string | null;
     function_id: string | null;
     weight: number;
+    whatsapp_number: string | null;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')

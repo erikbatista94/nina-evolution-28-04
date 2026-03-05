@@ -77,7 +77,7 @@ const App: React.FC = () => {
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/scheduling" element={<Scheduling />} />
               <Route path="/team" element={<Team />} />
-              <Route path="/settings" element={<Settings />} />
+              <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
             </Route>
             
             {/* Catch all - redirect to dashboard */}
