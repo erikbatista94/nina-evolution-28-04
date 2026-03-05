@@ -2,20 +2,23 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus
+  Tag, Bot, User, Pause, Brain, Plus, Users
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useAuth } from '@/hooks/useAuth';
 import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
-  const { sdrName, companyName } = useCompanySettings();
+  const { sdrName, companyName, isAdmin } = useCompanySettings();
+  const { user } = useAuth();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(true);
@@ -25,6 +28,10 @@ const ChatInterface: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
   const [notesValue, setNotesValue] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
+  const [viewFilter, setViewFilter] = useState<'all' | 'mine'>(() => {
+    return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
+  });
+  const [assignedFilter, setAssignedFilter] = useState<string>('all');
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -160,15 +167,37 @@ const ChatInterface: React.FC = () => {
     await updateStatus(activeChat.id, status);
   };
 
+  const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
+
+  const handleViewFilterChange = (filter: 'all' | 'mine') => {
+    setViewFilter(filter);
+    localStorage.setItem('chat-view-filter', filter);
+  };
+
   const filteredConversations = conversations.filter(chat => {
-    if (!searchQuery) return true;
-    const query = searchQuery.toLowerCase();
-    return (
-      chat.contactName.toLowerCase().includes(query) ||
-      chat.contactPhone.includes(query) ||
-      chat.lastMessage.toLowerCase().includes(query)
-    );
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      if (!(chat.contactName.toLowerCase().includes(query) ||
+            chat.contactPhone.includes(query) ||
+            chat.lastMessage.toLowerCase().includes(query))) {
+        return false;
+      }
+    }
+    if (viewFilter === 'mine') {
+      return chat.assignedUserId === user?.id;
+    }
+    if (assignedFilter !== 'all') {
+      if (assignedFilter === 'unassigned') return !chat.assignedUserId;
+      return chat.assignedUserId === assignedFilter;
+    }
+    return true;
   });
+
+  const getAssignedMemberName = (userId: string | null) => {
+    if (!userId) return null;
+    const member = teamMembers.find(m => m.user_id === userId);
+    return member?.name || null;
+  };
 
   const renderStatusBadge = (status: ConversationStatus) => {
     const config = {
@@ -392,13 +421,63 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
 
+        {/* View Filter Tabs */}
+        <div className="px-4 py-2 border-b border-slate-800/50 flex flex-col gap-2">
+          <div className="flex gap-1 bg-slate-950/50 rounded-lg p-0.5">
+            <button
+              onClick={() => handleViewFilterChange('all')}
+              className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
+                viewFilter === 'all'
+                  ? 'bg-slate-700 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              Geral
+            </button>
+            <button
+              onClick={() => handleViewFilterChange('mine')}
+              className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
+                viewFilter === 'mine'
+                  ? 'bg-cyan-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-300'
+              }`}
+            >
+              Minhas ({myConversationsCount})
+            </button>
+          </div>
+
+          {/* Manager: filter by team member */}
+          {isAdmin && viewFilter === 'all' && (
+            <Select value={assignedFilter} onValueChange={setAssignedFilter}>
+              <SelectTrigger className="h-8 text-xs bg-slate-950/50 border-slate-800">
+                <Users className="w-3.5 h-3.5 mr-1.5 text-slate-400" />
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="unassigned">Não atribuídas</SelectItem>
+                {teamMembers
+                  .filter(m => m.status === 'active' && m.user_id)
+                  .map(m => (
+                    <SelectItem key={m.user_id} value={m.user_id}>
+                      {m.name}
+                    </SelectItem>
+                  ))
+                }
+              </SelectContent>
+            </Select>
+          )}
+        </div>
+
         {/* Conversation List */}
         <div className="flex-1 overflow-y-auto custom-scrollbar">
           {filteredConversations.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-slate-500 p-8 text-center">
               <MessageSquare className="w-12 h-12 mb-4 opacity-50" />
               <p className="text-sm">Nenhuma conversa encontrada</p>
-              <p className="text-xs mt-1 opacity-70">As conversas aparecerão aqui quando receberem mensagens</p>
+              <p className="text-xs mt-1 opacity-70">
+                {viewFilter === 'mine' ? 'Nenhuma conversa atribuída a você' : 'As conversas aparecerão aqui quando receberem mensagens'}
+              </p>
             </div>
           ) : (
             filteredConversations.map((chat) => (
@@ -441,8 +520,18 @@ const ChatInterface: React.FC = () => {
                      chat.lastMessage || 'Sem mensagens'}
                   </p>
                   
-                  <div className="flex items-center mt-2 gap-1.5">
+                  <div className="flex items-center mt-2 gap-1.5 flex-wrap">
                     {renderStatusBadge(chat.status)}
+                    {isAdmin && !chat.assignedUserId && (
+                      <span className="px-2 py-0.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] rounded-md font-medium">
+                        Não atribuída
+                      </span>
+                    )}
+                    {isAdmin && chat.assignedUserId && (
+                      <span className="px-2 py-0.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-[10px] rounded-md font-medium truncate max-w-[80px]" title={getAssignedMemberName(chat.assignedUserId) || ''}>
+                        {getAssignedMemberName(chat.assignedUserId) || 'Atribuída'}
+                      </span>
+                    )}
                     {chat.tags.slice(0, 1).map(tag => (
                       <span key={tag} className="px-2 py-0.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-[10px] rounded-md font-medium">
                         {tag}
