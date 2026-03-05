@@ -1,13 +1,15 @@
 import React, { useEffect, useState } from 'react';
-import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2 } from 'lucide-react';
+import { UserPlus, Search, Loader2, X, Check, Edit2, Users, Settings, Trash2, Copy, Phone } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
 import { TeamMember, type Team as TeamType, type TeamFunction } from '../types';
 import { supabase } from '@/integrations/supabase/client';
 import TeamConfigModal from './TeamConfigModal';
 import { toast } from 'sonner';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 const Team: React.FC = () => {
+  const { isAdmin } = useCompanySettings();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teams, setTeams] = useState<TeamType[]>([]);
   const [functions, setFunctions] = useState<TeamFunction[]>([]);
@@ -20,7 +22,9 @@ const Team: React.FC = () => {
     role: 'agent',
     team_id: '',
     function_id: '',
-    weight: 1
+    weight: 1,
+    whatsapp_number: '',
+    status: 'active'
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -29,11 +33,15 @@ const Team: React.FC = () => {
     name: '',
     email: '',
     role: 'agent',
-    status: 'invited' as 'active' | 'invited' | 'disabled',
+    status: 'active' as 'active' | 'invited' | 'disabled',
     team_id: '',
     function_id: '',
-    weight: 1
+    weight: 1,
+    whatsapp_number: ''
   });
+  const [isCreatingUser, setIsCreatingUser] = useState(false);
+  const [showCredentialsModal, setShowCredentialsModal] = useState(false);
+  const [credentials, setCredentials] = useState<{ email: string; password: string } | null>(null);
 
   useEffect(() => {
     loadAllData();
@@ -72,27 +80,53 @@ const Team: React.FC = () => {
     };
   };
 
-  const handleInvite = async (e: React.FormEvent) => {
+  const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!isAdmin) {
+      toast.error('Apenas administradores podem criar usuários');
+      return;
+    }
     
+    setIsCreatingUser(true);
     try {
-      await api.createTeamMember({
-        name: formData.name,
-        email: formData.email,
-        role: formData.role as 'agent' | 'admin' | 'manager',
-        team_id: formData.team_id || undefined,
-        function_id: formData.function_id || undefined,
-        weight: formData.weight
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const { data, error } = await supabase.functions.invoke('admin-create-user', {
+        body: {
+          name: formData.name,
+          email: formData.email,
+          role: formData.role,
+          team_id: formData.team_id || undefined,
+          function_id: formData.function_id || undefined,
+          weight: formData.weight,
+          whatsapp_number: formData.whatsapp_number || undefined,
+          status: formData.status
+        }
       });
 
-      toast.success('Membro convidado com sucesso!');
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+
+      setCredentials({ email: formData.email, password: data.temporary_password });
       setShowModal(false);
-      setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1 });
+      setShowCredentialsModal(true);
+      setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1, whatsapp_number: '', status: 'active' });
+      toast.success('Usuário criado com sucesso!');
       await loadAllData();
-    } catch (error) {
-      console.error('Erro ao convidar membro:', error);
-      toast.error('Erro ao convidar membro. Verifique se o email já não está cadastrado.');
+    } catch (error: any) {
+      console.error('Erro ao criar usuário:', error);
+      toast.error(error.message || 'Erro ao criar usuário');
+    } finally {
+      setIsCreatingUser(false);
     }
+  };
+
+  const handleCopyCredentials = () => {
+    if (!credentials) return;
+    const text = `Email: ${credentials.email}\nSenha temporária: ${credentials.password}`;
+    navigator.clipboard.writeText(text);
+    toast.success('Credenciais copiadas!');
   };
 
   const handleUpdateMember = async (id: string, field: string, value: any) => {
@@ -126,7 +160,8 @@ const Team: React.FC = () => {
       status: member.status,
       team_id: member.team_id || '',
       function_id: member.function_id || '',
-      weight: member.weight || 1
+      weight: member.weight || 1,
+      whatsapp_number: member.whatsapp_number || ''
     });
     setShowEditModal(true);
   };
@@ -143,8 +178,9 @@ const Team: React.FC = () => {
         status: editFormData.status,
         team_id: editFormData.team_id || null,
         function_id: editFormData.function_id || null,
-        weight: editFormData.weight
-      });
+        weight: editFormData.weight,
+        whatsapp_number: editFormData.whatsapp_number || null
+      } as any);
       toast.success('Membro atualizado com sucesso!');
       setShowEditModal(false);
       setEditingMember(null);
@@ -166,7 +202,6 @@ const Team: React.FC = () => {
     }
   };
 
-  // Filtered members based on search
   const filteredMembers = members.filter(m => {
     if (!searchTerm.trim()) return true;
     const term = searchTerm.toLowerCase();
@@ -180,7 +215,6 @@ const Team: React.FC = () => {
     );
   });
 
-  // Dynamic stats
   const stats = {
     total: members.length,
     admins: members.filter(m => m.role === 'admin').length,
@@ -197,14 +231,18 @@ const Team: React.FC = () => {
           <p className="text-sm text-slate-400 mt-1">Gerencie usuários e times da organização</p>
         </div>
         <div className="flex gap-3">
-          <Button onClick={() => setShowConfigModal(true)} variant="outline" className="border-slate-700">
-            <Settings className="w-4 h-4 mr-2" />
-            Configurar
-          </Button>
-          <Button onClick={() => setShowModal(true)} className="shadow-lg shadow-cyan-500/20 bg-slate-100 text-slate-900 hover:bg-white hover:text-black">
-            <UserPlus className="w-4 h-4 mr-2" />
-            Convidar Usuário
-          </Button>
+          {isAdmin && (
+            <>
+              <Button onClick={() => setShowConfigModal(true)} variant="outline" className="border-slate-700">
+                <Settings className="w-4 h-4 mr-2" />
+                Configurar
+              </Button>
+              <Button onClick={() => setShowModal(true)} className="shadow-lg shadow-cyan-500/20 bg-slate-100 text-slate-900 hover:bg-white hover:text-black">
+                <UserPlus className="w-4 h-4 mr-2" />
+                Criar Usuário
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
@@ -256,10 +294,12 @@ const Team: React.FC = () => {
             <div className="flex flex-col items-center justify-center p-12">
                 <Users className="w-12 h-12 text-slate-600 mb-4" />
                 <p className="text-slate-400 mb-4">Nenhum membro cadastrado ainda.</p>
-                <Button onClick={() => setShowModal(true)} className="bg-slate-100 text-slate-900 hover:bg-white">
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Convidar Primeiro Membro
-                </Button>
+                {isAdmin && (
+                  <Button onClick={() => setShowModal(true)} className="bg-slate-100 text-slate-900 hover:bg-white">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Criar Primeiro Usuário
+                  </Button>
+                )}
             </div>
         ) : (
             <div className="overflow-x-auto">
@@ -268,18 +308,18 @@ const Team: React.FC = () => {
                         <tr className="border-b border-slate-800/50">
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Usuário</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Email</th>
+                            <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">WhatsApp</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Role</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Time</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Função</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider">Peso</th>
                             <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center">Status</th>
-                            <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center">Ações</th>
+                            {isAdmin && <th className="px-6 py-4 text-xs font-medium text-slate-500 uppercase tracking-wider text-center">Ações</th>}
                         </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-800/30">
                         {filteredMembers.map((member) => (
                             <tr key={member.id} className="hover:bg-slate-800/20 transition-colors group">
-                                {/* User Info */}
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <div className="flex items-center gap-3">
                                         <div className="flex-shrink-0 w-9 h-9 rounded-full bg-slate-800 flex items-center justify-center text-xs font-bold text-slate-300 border border-slate-700 uppercase">
@@ -288,89 +328,102 @@ const Team: React.FC = () => {
                                         <span className="text-sm font-medium text-slate-200">{member.name}</span>
                                     </div>
                                 </td>
-                                
-                                {/* Email */}
                                 <td className="px-6 py-4 whitespace-nowrap">
                                     <span className="text-sm text-slate-400">{member.email}</span>
                                 </td>
-
-                                {/* Role Selector */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <select
-                                        value={member.role}
-                                        onChange={(e) => handleUpdateMember(member.id, 'role', e.target.value)}
-                                        className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
-                                    >
-                                        <option value="agent">Atendente</option>
-                                        <option value="manager">Gerente</option>
-                                        <option value="admin">Admin</option>
-                                    </select>
+                                    <span className="text-sm text-slate-400">{member.whatsapp_number || '-'}</span>
                                 </td>
-
-                                {/* Time Selector */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <select
-                                        value={member.team_id || ''}
-                                        onChange={(e) => handleUpdateMember(member.id, 'team_id', e.target.value || null)}
-                                        className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
-                                    >
-                                        <option value="">Sem time</option>
-                                        {teams.map(team => (
-                                            <option key={team.id} value={team.id}>{team.name}</option>
-                                        ))}
-                                    </select>
+                                    {isAdmin ? (
+                                      <select
+                                          value={member.role}
+                                          onChange={(e) => handleUpdateMember(member.id, 'role', e.target.value)}
+                                          className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
+                                      >
+                                          <option value="agent">Atendente</option>
+                                          <option value="manager">Gerente</option>
+                                          <option value="admin">Admin</option>
+                                      </select>
+                                    ) : (
+                                      <span className="text-sm text-slate-300">
+                                        {member.role === 'agent' ? 'Atendente' : member.role === 'manager' ? 'Gerente' : 'Admin'}
+                                      </span>
+                                    )}
                                 </td>
-
-                                {/* Function Selector */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <select
-                                        value={member.function_id || ''}
-                                        onChange={(e) => handleUpdateMember(member.id, 'function_id', e.target.value || null)}
-                                        className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
-                                    >
-                                        <option value="">Sem função</option>
-                                        {functions.map(func => (
-                                            <option key={func.id} value={func.id}>{func.name}</option>
-                                        ))}
-                                    </select>
+                                    {isAdmin ? (
+                                      <select
+                                          value={member.team_id || ''}
+                                          onChange={(e) => handleUpdateMember(member.id, 'team_id', e.target.value || null)}
+                                          className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
+                                      >
+                                          <option value="">Sem time</option>
+                                          {teams.map(team => (
+                                              <option key={team.id} value={team.id}>{team.name}</option>
+                                          ))}
+                                      </select>
+                                    ) : (
+                                      <span className="text-sm text-slate-300">
+                                        {teams.find(t => t.id === member.team_id)?.name || 'Sem time'}
+                                      </span>
+                                    )}
                                 </td>
-
-                                {/* Weight */}
                                 <td className="px-6 py-4 whitespace-nowrap">
-                                    <input
-                                        type="number"
-                                        min="1"
-                                        max="10"
-                                        value={member.weight || 1}
-                                        onChange={(e) => handleUpdateMember(member.id, 'weight', parseInt(e.target.value))}
-                                        className="w-16 px-2 py-1 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 text-center"
-                                    />
+                                    {isAdmin ? (
+                                      <select
+                                          value={member.function_id || ''}
+                                          onChange={(e) => handleUpdateMember(member.id, 'function_id', e.target.value || null)}
+                                          className="w-32 px-3 py-1.5 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 cursor-pointer hover:border-slate-600 transition-colors"
+                                      >
+                                          <option value="">Sem função</option>
+                                          {functions.map(func => (
+                                              <option key={func.id} value={func.id}>{func.name}</option>
+                                          ))}
+                                      </select>
+                                    ) : (
+                                      <span className="text-sm text-slate-300">
+                                        {functions.find(f => f.id === member.function_id)?.name || 'Sem função'}
+                                      </span>
+                                    )}
                                 </td>
-
-                                {/* Status */}
+                                <td className="px-6 py-4 whitespace-nowrap">
+                                    {isAdmin ? (
+                                      <input
+                                          type="number"
+                                          min="1"
+                                          max="10"
+                                          value={member.weight || 1}
+                                          onChange={(e) => handleUpdateMember(member.id, 'weight', parseInt(e.target.value))}
+                                          className="w-16 px-2 py-1 bg-slate-950 border border-slate-800 rounded-md text-sm text-slate-300 text-center"
+                                      />
+                                    ) : (
+                                      <span className="text-sm text-slate-300">{member.weight || 1}</span>
+                                    )}
+                                </td>
                                 <td className="px-6 py-4 whitespace-nowrap text-center">
                                     {getStatusBadge(member.status)}
                                 </td>
-
-                                {/* Actions */}
-                                <td className="px-6 py-4 whitespace-nowrap text-center">
-                                    <div className="flex items-center justify-center gap-1">
-                                        <button 
-                                            onClick={() => handleEditClick(member)}
-                                            className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
-                                            title="Editar membro"
-                                        >
-                                            <Edit2 className="w-4 h-4" />
-                                        </button>
-                                        <button 
-                                            onClick={() => handleDeleteMember(member.id, member.name)}
-                                            className="p-2 rounded-lg text-slate-500 hover:bg-red-900/50 hover:text-red-400 transition-colors"
-                                            title="Excluir membro"
-                                        >
-                                            <Trash2 className="w-4 h-4" />
-                                        </button>
-                                    </div>
-                                </td>
+                                {isAdmin && (
+                                  <td className="px-6 py-4 whitespace-nowrap text-center">
+                                      <div className="flex items-center justify-center gap-1">
+                                          <button 
+                                              onClick={() => handleEditClick(member)}
+                                              className="p-2 rounded-lg text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                                              title="Editar membro"
+                                          >
+                                              <Edit2 className="w-4 h-4" />
+                                          </button>
+                                          <button 
+                                              onClick={() => handleDeleteMember(member.id, member.name)}
+                                              className="p-2 rounded-lg text-slate-500 hover:bg-red-900/50 hover:text-red-400 transition-colors"
+                                              title="Excluir membro"
+                                          >
+                                              <Trash2 className="w-4 h-4" />
+                                          </button>
+                                      </div>
+                                  </td>
+                                )}
                             </tr>
                         ))}
                     </tbody>
@@ -379,18 +432,18 @@ const Team: React.FC = () => {
         )}
       </div>
 
-      {/* Invite Modal */}
+      {/* Create User Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center">
-                    <h3 className="text-lg font-bold text-white">Convidar para a Equipe</h3>
+                    <h3 className="text-lg font-bold text-white">Criar Novo Usuário</h3>
                     <button onClick={() => setShowModal(false)} className="text-slate-400 hover:text-white transition-colors">
                         <X className="w-5 h-5" />
                     </button>
                 </div>
                 
-                <form onSubmit={handleInvite} className="p-6 space-y-4">
+                <form onSubmit={handleCreateUser} className="p-6 space-y-4">
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-300">Nome Completo</label>
                         <input 
@@ -403,7 +456,7 @@ const Team: React.FC = () => {
                         />
                     </div>
                     <div className="space-y-2">
-                        <label className="text-sm font-medium text-slate-300">Email Corporativo</label>
+                        <label className="text-sm font-medium text-slate-300">Email</label>
                         <input 
                             required
                             type="email" 
@@ -412,6 +465,20 @@ const Team: React.FC = () => {
                             value={formData.email}
                             onChange={(e) => setFormData({...formData, email: e.target.value})}
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">WhatsApp do Atendente</label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                          <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
+                              placeholder="5511999999999"
+                              value={formData.whatsapp_number}
+                              onChange={(e) => setFormData({...formData, whatsapp_number: e.target.value.replace(/\D/g, '')})}
+                          />
+                        </div>
+                        <p className="text-xs text-slate-500">Formato: DDI + DDD + número (ex: 5511999999999)</p>
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-300">Nível de Acesso</label>
@@ -475,9 +542,51 @@ const Team: React.FC = () => {
 
                     <div className="pt-4 flex gap-3">
                         <Button type="button" variant="ghost" onClick={() => setShowModal(false)} className="flex-1 border border-slate-700 hover:bg-slate-800">Cancelar</Button>
-                        <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200">Enviar Convite</Button>
+                        <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200" disabled={isCreatingUser}>
+                          {isCreatingUser ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                          Criar Usuário
+                        </Button>
                     </div>
                 </form>
+            </div>
+        </div>
+      )}
+
+      {/* Credentials Modal */}
+      {showCredentialsModal && credentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+                <div className="p-6 border-b border-slate-800">
+                    <h3 className="text-lg font-bold text-white">Credenciais do Novo Usuário</h3>
+                    <p className="text-sm text-amber-400 mt-2">⚠️ Copie as credenciais agora. A senha não será exibida novamente.</p>
+                </div>
+                
+                <div className="p-6 space-y-4">
+                    <div className="bg-slate-950 border border-slate-800 rounded-lg p-4 space-y-3">
+                        <div>
+                            <span className="text-xs text-slate-500">Email</span>
+                            <p className="text-sm text-white font-mono">{credentials.email}</p>
+                        </div>
+                        <div>
+                            <span className="text-xs text-slate-500">Senha Temporária</span>
+                            <p className="text-sm text-white font-mono">{credentials.password}</p>
+                        </div>
+                    </div>
+
+                    <p className="text-xs text-slate-400">
+                      O usuário deverá trocar a senha no primeiro login.
+                    </p>
+
+                    <div className="flex gap-3">
+                        <Button onClick={handleCopyCredentials} className="flex-1 bg-white text-black hover:bg-slate-200">
+                            <Copy className="w-4 h-4 mr-2" />
+                            Copiar Credenciais
+                        </Button>
+                        <Button variant="ghost" onClick={() => { setShowCredentialsModal(false); setCredentials(null); }} className="border border-slate-700 hover:bg-slate-800">
+                            Fechar
+                        </Button>
+                    </div>
+                </div>
             </div>
         </div>
       )}
@@ -492,7 +601,7 @@ const Team: React.FC = () => {
       {/* Edit Member Modal */}
       {showEditModal && editingMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto">
                 <div className="p-6 border-b border-slate-800 flex justify-between items-center">
                     <h3 className="text-lg font-bold text-white">Editar Membro</h3>
                     <button onClick={() => { setShowEditModal(false); setEditingMember(null); }} className="text-slate-400 hover:text-white transition-colors">
@@ -520,6 +629,19 @@ const Team: React.FC = () => {
                             value={editFormData.email}
                             onChange={(e) => setEditFormData({...editFormData, email: e.target.value})}
                         />
+                    </div>
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">WhatsApp</label>
+                        <div className="relative">
+                          <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+                          <input 
+                              type="text" 
+                              className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 pl-10 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all"
+                              placeholder="5511999999999"
+                              value={editFormData.whatsapp_number}
+                              onChange={(e) => setEditFormData({...editFormData, whatsapp_number: e.target.value.replace(/\D/g, '')})}
+                          />
+                        </div>
                     </div>
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-300">Nível de Acesso</label>

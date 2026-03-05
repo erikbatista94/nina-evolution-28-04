@@ -384,7 +384,9 @@ export const api = {
       function_id: m.function_id,
       weight: m.weight ?? undefined,
       team: m.team as any,
-      function: m.function as any
+      function: m.function as any,
+      whatsapp_number: (m as any).whatsapp_number || null,
+      user_id: m.user_id || null
     }));
   },
 

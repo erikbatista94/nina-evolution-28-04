@@ -56,12 +56,14 @@ const LogoIcon = () => {
 };
 
 const SidebarContent = () => {
-  const { companyName } = useCompanySettings();
+  const { companyName, isAdmin } = useCompanySettings();
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
   const currentPath = location.pathname.substring(1) || 'dashboard';
   const { open, setOpen } = useSidebar();
+
+  const menuItems = allMenuItems.filter(item => !item.adminOnly || isAdmin);
 
   const links = menuItems.map(item => ({
     label: item.label,
