@@ -37,7 +37,8 @@ const Team: React.FC = () => {
     team_id: '',
     function_id: '',
     weight: 1,
-    whatsapp_number: ''
+    whatsapp_number: '',
+    google_calendar_email: ''
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
