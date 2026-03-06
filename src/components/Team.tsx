@@ -37,7 +37,8 @@ const Team: React.FC = () => {
     team_id: '',
     function_id: '',
     weight: 1,
-    whatsapp_number: ''
+    whatsapp_number: '',
+    google_calendar_email: ''
   });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [showCredentialsModal, setShowCredentialsModal] = useState(false);
@@ -161,7 +162,8 @@ const Team: React.FC = () => {
       team_id: member.team_id || '',
       function_id: member.function_id || '',
       weight: member.weight || 1,
-      whatsapp_number: member.whatsapp_number || ''
+      whatsapp_number: member.whatsapp_number || '',
+      google_calendar_email: (member as any).google_calendar_email || ''
     });
     setShowEditModal(true);
   };
@@ -179,7 +181,8 @@ const Team: React.FC = () => {
         team_id: editFormData.team_id || null,
         function_id: editFormData.function_id || null,
         weight: editFormData.weight,
-        whatsapp_number: editFormData.whatsapp_number || null
+        whatsapp_number: editFormData.whatsapp_number || null,
+        google_calendar_email: editFormData.google_calendar_email || null
       } as any);
       toast.success('Membro atualizado com sucesso!');
       setShowEditModal(false);
@@ -714,6 +717,18 @@ const Team: React.FC = () => {
                             onChange={(e) => setEditFormData({...editFormData, weight: parseInt(e.target.value)})}
                             className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
                         />
+                    </div>
+
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Email Google Calendar</label>
+                        <input
+                            type="email"
+                            placeholder="vendedor@empresa.com"
+                            value={editFormData.google_calendar_email}
+                            onChange={(e) => setEditFormData({...editFormData, google_calendar_email: e.target.value})}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all placeholder:text-slate-600"
+                        />
+                        <p className="text-xs text-slate-500">Email usado no Google Calendar para associar eventos</p>
                     </div>
 
                     <div className="pt-4 flex gap-3">

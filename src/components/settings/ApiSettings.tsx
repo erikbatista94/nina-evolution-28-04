@@ -21,6 +21,13 @@ interface NinaSettings {
   elevenlabs_speed: number | null;
   elevenlabs_speaker_boost: boolean;
   audio_response_enabled: boolean;
+  // Google Calendar
+  google_client_id: string | null;
+  google_client_secret: string | null;
+  google_refresh_token: string | null;
+  google_calendar_id: string | null;
+  default_visit_duration: number;
+  available_time_slots: string[];
 }
 
 const VOICE_OPTIONS = [
@@ -66,6 +73,9 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const [saving, setSaving] = useState(false);
   const [showWhatsAppToken, setShowWhatsAppToken] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [showGoogleSecret, setShowGoogleSecret] = useState(false);
+  const [showGoogleRefresh, setShowGoogleRefresh] = useState(false);
+  const [testingGcal, setTestingGcal] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [webhookOpen, setWebhookOpen] = useState(false);
   const [advancedVoiceOpen, setAdvancedVoiceOpen] = useState(false);
@@ -113,6 +123,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
     elevenlabs_speed: 1.0,
     elevenlabs_speaker_boost: true,
     audio_response_enabled: false,
+    google_client_id: null,
+    google_client_secret: null,
+    google_refresh_token: null,
+    google_calendar_id: null,
+    default_visit_duration: 90,
+    available_time_slots: ['08:00', '09:30', '11:00', '13:00', '14:30', '16:00'],
   });
 
   // Auto-save ElevenLabs API key when field loses focus
@@ -191,6 +207,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
         elevenlabs_speed: data.elevenlabs_speed,
         elevenlabs_speaker_boost: data.elevenlabs_speaker_boost,
         audio_response_enabled: data.audio_response_enabled || false,
+        google_client_id: (data as any).google_client_id || null,
+        google_client_secret: (data as any).google_client_secret || null,
+        google_refresh_token: (data as any).google_refresh_token || null,
+        google_calendar_id: (data as any).google_calendar_id || null,
+        default_visit_duration: (data as any).default_visit_duration || 90,
+        available_time_slots: (data as any).available_time_slots || ['08:00', '09:30', '11:00', '13:00', '14:30', '16:00'],
       });
     } catch (error) {
       console.error('[ApiSettings] Error loading settings:', error);
@@ -224,6 +246,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           elevenlabs_speed: settings.elevenlabs_speed,
           elevenlabs_speaker_boost: settings.elevenlabs_speaker_boost,
           audio_response_enabled: settings.audio_response_enabled,
+          google_client_id: settings.google_client_id,
+          google_client_secret: settings.google_client_secret,
+          google_refresh_token: settings.google_refresh_token,
+          google_calendar_id: settings.google_calendar_id,
+          default_visit_duration: settings.default_visit_duration,
+          available_time_slots: settings.available_time_slots,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id!);
@@ -449,6 +477,23 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
 
   const whatsappConfigured = settings.whatsapp_access_token && settings.whatsapp_phone_number_id;
   const elevenlabsConfigured = settings.elevenlabs_api_key;
+  const gcalConfigured = settings.google_client_id && settings.google_client_secret && settings.google_refresh_token && settings.google_calendar_id;
+
+  const handleTestGoogleCalendar = async () => {
+    setTestingGcal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'test-connection' }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Conectado! Agenda: ${data.calendarName}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao testar conexão');
+    } finally {
+      setTestingGcal(false);
+    }
+  };
 
   if (loading) {
     return (
