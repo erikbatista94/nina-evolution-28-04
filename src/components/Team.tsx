@@ -181,7 +181,8 @@ const Team: React.FC = () => {
         team_id: editFormData.team_id || null,
         function_id: editFormData.function_id || null,
         weight: editFormData.weight,
-        whatsapp_number: editFormData.whatsapp_number || null
+        whatsapp_number: editFormData.whatsapp_number || null,
+        google_calendar_email: editFormData.google_calendar_email || null
       } as any);
       toast.success('Membro atualizado com sucesso!');
       setShowEditModal(false);
