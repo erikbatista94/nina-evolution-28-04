@@ -162,7 +162,8 @@ const Team: React.FC = () => {
       team_id: member.team_id || '',
       function_id: member.function_id || '',
       weight: member.weight || 1,
-      whatsapp_number: member.whatsapp_number || ''
+      whatsapp_number: member.whatsapp_number || '',
+      google_calendar_email: (member as any).google_calendar_email || ''
     });
     setShowEditModal(true);
   };
