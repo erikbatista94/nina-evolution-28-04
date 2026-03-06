@@ -22,6 +22,8 @@ export type Database = {
           date: string
           description: string | null
           duration: number
+          google_event_id: string | null
+          google_sync_status: string | null
           id: string
           meeting_url: string | null
           metadata: Json | null
@@ -39,6 +41,8 @@ export type Database = {
           date: string
           description?: string | null
           duration?: number
+          google_event_id?: string | null
+          google_sync_status?: string | null
           id?: string
           meeting_url?: string | null
           metadata?: Json | null
@@ -56,6 +60,8 @@ export type Database = {
           date?: string
           description?: string | null
           duration?: number
+          google_event_id?: string | null
+          google_sync_status?: string | null
           id?: string
           meeting_url?: string | null
           metadata?: Json | null
@@ -85,6 +91,7 @@ export type Database = {
       }
       contacts: {
         Row: {
+          address_full: string | null
           blocked_at: string | null
           blocked_reason: string | null
           call_name: string | null
@@ -106,6 +113,7 @@ export type Database = {
           whatsapp_id: string | null
         }
         Insert: {
+          address_full?: string | null
           blocked_at?: string | null
           blocked_reason?: string | null
           call_name?: string | null
@@ -127,6 +135,7 @@ export type Database = {
           whatsapp_id?: string | null
         }
         Update: {
+          address_full?: string | null
           blocked_at?: string | null
           blocked_reason?: string | null
           call_name?: string | null
@@ -628,11 +637,13 @@ export type Database = {
           async_booking_enabled: boolean | null
           audio_response_enabled: boolean | null
           auto_response_enabled: boolean
+          available_time_slots: Json
           business_days: number[]
           business_hours_end: string
           business_hours_start: string
           company_name: string | null
           created_at: string
+          default_visit_duration: number
           elevenlabs_api_key: string | null
           elevenlabs_model: string | null
           elevenlabs_similarity_boost: number
@@ -641,6 +652,10 @@ export type Database = {
           elevenlabs_stability: number
           elevenlabs_style: number
           elevenlabs_voice_id: string
+          google_calendar_id: string | null
+          google_client_id: string | null
+          google_client_secret: string | null
+          google_refresh_token: string | null
           id: string
           is_active: boolean
           message_breaking_enabled: boolean
@@ -666,11 +681,13 @@ export type Database = {
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
           auto_response_enabled?: boolean
+          available_time_slots?: Json
           business_days?: number[]
           business_hours_end?: string
           business_hours_start?: string
           company_name?: string | null
           created_at?: string
+          default_visit_duration?: number
           elevenlabs_api_key?: string | null
           elevenlabs_model?: string | null
           elevenlabs_similarity_boost?: number
@@ -679,6 +696,10 @@ export type Database = {
           elevenlabs_stability?: number
           elevenlabs_style?: number
           elevenlabs_voice_id?: string
+          google_calendar_id?: string | null
+          google_client_id?: string | null
+          google_client_secret?: string | null
+          google_refresh_token?: string | null
           id?: string
           is_active?: boolean
           message_breaking_enabled?: boolean
@@ -704,11 +725,13 @@ export type Database = {
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
           auto_response_enabled?: boolean
+          available_time_slots?: Json
           business_days?: number[]
           business_hours_end?: string
           business_hours_start?: string
           company_name?: string | null
           created_at?: string
+          default_visit_duration?: number
           elevenlabs_api_key?: string | null
           elevenlabs_model?: string | null
           elevenlabs_similarity_boost?: number
@@ -717,6 +740,10 @@ export type Database = {
           elevenlabs_stability?: number
           elevenlabs_style?: number
           elevenlabs_voice_id?: string
+          google_calendar_id?: string | null
+          google_client_id?: string | null
+          google_client_secret?: string | null
+          google_refresh_token?: string | null
           id?: string
           is_active?: boolean
           message_breaking_enabled?: boolean
@@ -949,6 +976,7 @@ export type Database = {
           created_at: string
           email: string
           function_id: string | null
+          google_calendar_email: string | null
           id: string
           last_active: string | null
           name: string
@@ -966,6 +994,7 @@ export type Database = {
           created_at?: string
           email: string
           function_id?: string | null
+          google_calendar_email?: string | null
           id?: string
           last_active?: string | null
           name: string
@@ -983,6 +1012,7 @@ export type Database = {
           created_at?: string
           email?: string
           function_id?: string | null
+          google_calendar_email?: string | null
           id?: string
           last_active?: string | null
           name?: string
