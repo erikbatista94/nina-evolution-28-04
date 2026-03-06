@@ -207,6 +207,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
         elevenlabs_speed: data.elevenlabs_speed,
         elevenlabs_speaker_boost: data.elevenlabs_speaker_boost,
         audio_response_enabled: data.audio_response_enabled || false,
+        google_client_id: (data as any).google_client_id || null,
+        google_client_secret: (data as any).google_client_secret || null,
+        google_refresh_token: (data as any).google_refresh_token || null,
+        google_calendar_id: (data as any).google_calendar_id || null,
+        default_visit_duration: (data as any).default_visit_duration || 90,
+        available_time_slots: (data as any).available_time_slots || ['08:00', '09:30', '11:00', '13:00', '14:30', '16:00'],
       });
     } catch (error) {
       console.error('[ApiSettings] Error loading settings:', error);
