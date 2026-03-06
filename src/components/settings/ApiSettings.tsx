@@ -73,6 +73,9 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const [saving, setSaving] = useState(false);
   const [showWhatsAppToken, setShowWhatsAppToken] = useState(false);
   const [showElevenLabsKey, setShowElevenLabsKey] = useState(false);
+  const [showGoogleSecret, setShowGoogleSecret] = useState(false);
+  const [showGoogleRefresh, setShowGoogleRefresh] = useState(false);
+  const [testingGcal, setTestingGcal] = useState(false);
   const [copiedWebhook, setCopiedWebhook] = useState(false);
   const [webhookOpen, setWebhookOpen] = useState(false);
   const [advancedVoiceOpen, setAdvancedVoiceOpen] = useState(false);
