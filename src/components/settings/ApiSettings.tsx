@@ -477,6 +477,23 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
 
   const whatsappConfigured = settings.whatsapp_access_token && settings.whatsapp_phone_number_id;
   const elevenlabsConfigured = settings.elevenlabs_api_key;
+  const gcalConfigured = settings.google_client_id && settings.google_client_secret && settings.google_refresh_token && settings.google_calendar_id;
+
+  const handleTestGoogleCalendar = async () => {
+    setTestingGcal(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'test-connection' }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      toast.success(`Conectado! Agenda: ${data.calendarName}`);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao testar conexão');
+    } finally {
+      setTestingGcal(false);
+    }
+  };
 
   if (loading) {
     return (
