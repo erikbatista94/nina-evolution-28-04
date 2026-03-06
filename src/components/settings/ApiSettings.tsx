@@ -246,6 +246,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           elevenlabs_speed: settings.elevenlabs_speed,
           elevenlabs_speaker_boost: settings.elevenlabs_speaker_boost,
           audio_response_enabled: settings.audio_response_enabled,
+          google_client_id: settings.google_client_id,
+          google_client_secret: settings.google_client_secret,
+          google_refresh_token: settings.google_refresh_token,
+          google_calendar_id: settings.google_calendar_id,
+          default_visit_duration: settings.default_visit_duration,
+          available_time_slots: settings.available_time_slots,
           updated_at: new Date().toISOString(),
         })
         .eq('id', settings.id!);
