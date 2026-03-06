@@ -123,6 +123,12 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
     elevenlabs_speed: 1.0,
     elevenlabs_speaker_boost: true,
     audio_response_enabled: false,
+    google_client_id: null,
+    google_client_secret: null,
+    google_refresh_token: null,
+    google_calendar_id: null,
+    default_visit_duration: 90,
+    available_time_slots: ['08:00', '09:30', '11:00', '13:00', '14:30', '16:00'],
   });
 
   // Auto-save ElevenLabs API key when field loses focus
