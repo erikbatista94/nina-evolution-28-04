@@ -1,31 +1,17 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, RotateCcw, BookOpen, Lock } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
 import SystemRoadmap from './SystemRoadmap';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
-import { useOnboardingStatus } from '@/hooks/useOnboardingStatus';
-import { useOutletContext } from 'react-router-dom';
-
-interface OutletContext {
-  showOnboarding: boolean;
-  setShowOnboarding: (show: boolean) => void;
-}
 
 const Settings: React.FC = () => {
   const { companyName, isAdmin } = useCompanySettings();
   const agentRef = useRef<AgentSettingsRef>(null);
   const apiRef = useRef<ApiSettingsRef>(null);
   const [activeTab, setActiveTab] = useState('agent');
-  const { resetWizard } = useOnboardingStatus();
-  const { setShowOnboarding } = useOutletContext<OutletContext>();
-
-  const handleReopenOnboarding = () => {
-    resetWizard();
-    setShowOnboarding(true);
-  };
 
   const handleSave = async () => {
     if (activeTab === 'agent') {
@@ -60,17 +46,6 @@ const Settings: React.FC = () => {
           </p>
         </div>
         <div className="flex gap-2 items-center">
-          {isAdmin && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={handleReopenOnboarding}
-              className="text-slate-400 hover:text-white gap-2"
-            >
-              <RotateCcw className="w-4 h-4" />
-              Refazer Onboarding
-            </Button>
-          )}
           <span className="px-3 py-1 bg-cyan-500/10 border border-cyan-500/20 text-cyan-400 text-xs rounded-full font-mono flex items-center">
             {isAdmin ? (
               <>

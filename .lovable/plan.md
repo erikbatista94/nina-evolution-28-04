@@ -1,48 +1,46 @@
 
 
-## Plano: Remover Onboarding Wizard Completamente
+## Plano: Rebranding completo para GG (Gesso Gilmar)
 
-### Mudanças
+Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
 
-#### 1. `src/App.tsx` — Remover OnboardingWizard e estado relacionado
+### 1. Substituir logos e ícones
+- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
+- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
+- **Favicon**: Atualizar para o selo GG
+- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
 
-- Remover import de `OnboardingWizard` e `useOnboardingStatus`
-- Remover `useState(showOnboarding)` e `useEffect` que abre o wizard
-- Remover `<OnboardingWizard>` do render
-- Remover `showOnboarding`/`setShowOnboarding` do Outlet context (simplificar ou remover)
+### 2. Paleta de cores (index.css)
+Atualizar as CSS variables para refletir o vermelho da GG:
+- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
+- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
+- `--ring`: acompanhar o primary
+- Atualizar sidebar variables correspondentes
 
-#### 2. `src/components/Dashboard.tsx` — Remover OnboardingBanner
+### 3. Referências hardcoded de cores
+Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
+- **Dashboard.tsx**: gradientes, tooltips, glows
+- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
+- **Auth.tsx**: gradient do logo container
+- **index.css**: scrollbar colors
 
-- Remover import de `OnboardingBanner`
-- Remover `useOutletContext` (não precisa mais de `setShowOnboarding`)
-- Remover `<OnboardingBanner>` do render
+Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
 
-#### 3. `src/components/Settings.tsx` — Remover botão "Refazer Onboarding"
+### 4. Textos e título
+- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
+- **Sidebar**: Default company name de "Minha Empresa" para "GG"
+- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
 
-- Remover import de `useOnboardingStatus`
-- Remover `useOutletContext`, `resetWizard`, `handleReopenOnboarding`
-- Remover botão "Refazer Onboarding" da UI
+### 5. Corrigir erros de build existentes
+Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
 
-#### 4. Arquivos que podem ser deletados (ou mantidos inativos)
-
-Não precisa deletar, mas ficam sem uso:
-- `src/components/OnboardingWizard.tsx`
-- `src/components/OnboardingBanner.tsx`
-- `src/hooks/useOnboardingStatus.ts`
-- `src/components/onboarding/Step*.tsx` (7 arquivos)
-
-#### 5. Sidebar + AdminRoute (já implementados)
-
-Verificar que já estão funcionando:
-- Sidebar já filtra "Configurações" por `isAdmin`
-- `AdminRoute` já protege `/settings`
-- Nenhuma mudança adicional necessária
-
-### Arquivos alterados
-
-| Arquivo | Mudança |
-|---|---|
-| `src/App.tsx` | Remover wizard, estado, e outlet context de onboarding |
-| `src/components/Dashboard.tsx` | Remover banner e outlet context |
-| `src/components/Settings.tsx` | Remover botão "Refazer Onboarding" e hooks relacionados |
+### Arquivos a modificar
+- `src/index.css` — paleta de cores
+- `src/components/Sidebar.tsx` — logos + cores
+- `src/components/ui/sidebar.tsx` — cores hardcoded
+- `src/pages/Auth.tsx` — logo + cores
+- `src/components/Dashboard.tsx` — cores hardcoded
+- `index.html` — título
+- Assets novos: logos GG baixados do CDN
+- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
 
