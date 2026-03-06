@@ -21,6 +21,13 @@ interface NinaSettings {
   elevenlabs_speed: number | null;
   elevenlabs_speaker_boost: boolean;
   audio_response_enabled: boolean;
+  // Google Calendar
+  google_client_id: string | null;
+  google_client_secret: string | null;
+  google_refresh_token: string | null;
+  google_calendar_id: string | null;
+  default_visit_duration: number;
+  available_time_slots: string[];
 }
 
 const VOICE_OPTIONS = [
