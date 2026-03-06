@@ -719,6 +719,18 @@ const Team: React.FC = () => {
                         />
                     </div>
 
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Email Google Calendar</label>
+                        <input
+                            type="email"
+                            placeholder="vendedor@empresa.com"
+                            value={editFormData.google_calendar_email}
+                            onChange={(e) => setEditFormData({...editFormData, google_calendar_email: e.target.value})}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white focus:ring-1 focus:ring-slate-600 outline-none transition-all placeholder:text-slate-600"
+                        />
+                        <p className="text-xs text-slate-500">Email usado no Google Calendar para associar eventos</p>
+                    </div>
+
                     <div className="pt-4 flex gap-3">
                         <Button type="button" variant="ghost" onClick={() => { setShowEditModal(false); setEditingMember(null); }} className="flex-1 border border-slate-700 hover:bg-slate-800">Cancelar</Button>
                         <Button type="submit" className="flex-1 bg-white text-black hover:bg-slate-200">Salvar Alterações</Button>
