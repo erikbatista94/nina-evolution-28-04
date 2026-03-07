@@ -114,8 +114,12 @@ export interface Appointment {
     id: string;
     name: string | null;
     phone_number: string;
+    address_full?: string | null;
   };
   metadata?: AppointmentMetadata;
+  google_event_id?: string | null;
+  google_sync_status?: string | null;
+  status?: string;
 }
 
 export interface Deal {
