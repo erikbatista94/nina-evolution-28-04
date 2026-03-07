@@ -386,7 +386,8 @@ export const api = {
       team: m.team as any,
       function: m.function as any,
       whatsapp_number: (m as any).whatsapp_number || null,
-      user_id: m.user_id || null
+      user_id: m.user_id || null,
+      google_calendar_email: (m as any).google_calendar_email || null,
     }));
   },
 
