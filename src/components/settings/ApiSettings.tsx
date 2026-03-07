@@ -894,6 +894,134 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
         </div>
       </div>
 
+      {/* Google Calendar */}
+      <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <svg className="w-5 h-5 text-blue-400" viewBox="0 0 24 24" fill="currentColor"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2z"/></svg>
+            <h3 className="font-semibold text-white">Google Calendar</h3>
+          </div>
+          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
+            gcalConfigured 
+              ? 'bg-emerald-500/10 text-emerald-400' 
+              : 'bg-amber-500/10 text-amber-400'
+          }`}>
+            <span className={`h-2 w-2 rounded-full ${gcalConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            {gcalConfigured ? 'Configurado' : 'Aguardando'}
+          </div>
+        </div>
+
+        <details className="mb-4">
+          <summary className="text-xs text-blue-400 cursor-pointer hover:text-blue-300 flex items-center gap-2 py-2">
+            <HelpCircle className="w-4 h-4" />
+            Como obter as credenciais do Google Calendar?
+          </summary>
+          <div className="mt-2 p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs space-y-3">
+            <ol className="list-decimal list-inside space-y-1.5 text-slate-400">
+              <li>Acesse o <a href="https://console.cloud.google.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">Google Cloud Console</a></li>
+              <li>Crie um projeto e ative a <strong className="text-white">Google Calendar API</strong></li>
+              <li>Configure uma tela de consentimento OAuth</li>
+              <li>Crie credenciais OAuth 2.0 (Client ID e Client Secret)</li>
+              <li>Use o <a href="https://developers.google.com/oauthplayground" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">OAuth Playground</a> para gerar o Refresh Token</li>
+              <li>Copie o Calendar ID da agenda compartilhada (Configurações da agenda → Integrar agenda)</li>
+            </ol>
+          </div>
+        </details>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Client ID</label>
+            <input
+              type="text"
+              value={settings.google_client_id || ''}
+              onChange={(e) => setSettings({ ...settings, google_client_id: e.target.value })}
+              placeholder="xxxxx.apps.googleusercontent.com"
+              className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Client Secret</label>
+            <div className="relative">
+              <input
+                type={showGoogleSecret ? "text" : "password"}
+                value={settings.google_client_secret || ''}
+                onChange={(e) => setSettings({ ...settings, google_client_secret: e.target.value })}
+                placeholder="GOCSPX-..."
+                className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+              <button type="button" onClick={() => setShowGoogleSecret(!showGoogleSecret)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                {showGoogleSecret ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Refresh Token</label>
+            <div className="relative">
+              <input
+                type={showGoogleRefresh ? "text" : "password"}
+                value={settings.google_refresh_token || ''}
+                onChange={(e) => setSettings({ ...settings, google_refresh_token: e.target.value })}
+                placeholder="1//0xxxxxxx..."
+                className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+              />
+              <button type="button" onClick={() => setShowGoogleRefresh(!showGoogleRefresh)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                {showGoogleRefresh ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Calendar ID</label>
+            <input
+              type="text"
+              value={settings.google_calendar_id || ''}
+              onChange={(e) => setSettings({ ...settings, google_calendar_id: e.target.value })}
+              placeholder="empresa@group.calendar.google.com"
+              className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Duração Padrão da Visita</label>
+            <select
+              value={settings.default_visit_duration}
+              onChange={(e) => setSettings({ ...settings, default_visit_duration: parseInt(e.target.value) })}
+              className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+            >
+              <option value={60}>60 minutos</option>
+              <option value={90}>90 minutos (Padrão)</option>
+              <option value={120}>120 minutos</option>
+            </select>
+          </div>
+          <div>
+            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Horários Disponíveis</label>
+            <div className="flex flex-wrap gap-1.5">
+              {settings.available_time_slots.map((slot, i) => (
+                <span key={i} className="px-2 py-1 bg-blue-500/10 text-blue-300 text-xs rounded-md border border-blue-500/20">
+                  {slot}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {gcalConfigured && (
+          <Button
+            onClick={handleTestGoogleCalendar}
+            disabled={testingGcal}
+            variant="ghost"
+            className="text-blue-400 hover:text-blue-300 border border-blue-500/30"
+          >
+            {testingGcal ? (
+              <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando...</>
+            ) : (
+              <><Check className="w-4 h-4 mr-2" />Testar Conexão</>
+            )}
+          </Button>
+        )}
+      </div>
+
       {/* Test Message Collapsible */}
       <Collapsible.Root open={testSectionOpen} onOpenChange={setTestSectionOpen}>
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">

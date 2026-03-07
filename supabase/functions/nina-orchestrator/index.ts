@@ -95,6 +95,30 @@ const cancelAppointmentTool = {
   }
 };
 
+// Tool definition for checking Google Calendar availability
+const checkGCalAvailabilityTool = {
+  type: "function",
+  function: {
+    name: "check_google_calendar_availability",
+    description: "Consultar horários disponíveis no Google Calendar para agendamento de visita técnica. Use quando o cliente quiser agendar uma visita ou perguntar sobre disponibilidade de horários.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "Data para consultar no formato YYYY-MM-DD"
+        },
+        dates: {
+          type: "array",
+          items: { type: "string" },
+          description: "Lista de datas para consultar no formato YYYY-MM-DD"
+        }
+      },
+      required: []
+    }
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -722,7 +746,8 @@ async function processQueueItem(
     tools.push(createAppointmentTool);
     tools.push(rescheduleAppointmentTool);
     tools.push(cancelAppointmentTool);
-    console.log('[Nina] AI scheduling enabled, adding appointment tools (create, reschedule, cancel)');
+    tools.push(checkGCalAvailabilityTool);
+    console.log('[Nina] AI scheduling enabled, adding appointment + GCal tools');
   }
 
   // Build request body
@@ -859,6 +884,55 @@ async function processQueueItem(
         }
       } catch (parseError) {
         console.error('[Nina] Error parsing cancel_appointment arguments:', parseError);
+      }
+    }
+    
+    if (toolCall.function?.name === 'check_google_calendar_availability') {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        console.log('[Nina] Processing check_google_calendar_availability tool call:', args);
+        
+        const gcalUrl = `${supabaseUrl}/functions/v1/google-calendar`;
+        const gcalResp = await fetch(gcalUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({
+            action: 'check-availability',
+            date: args.date,
+            dates: args.dates
+          })
+        });
+        
+        const gcalData = await gcalResp.json();
+        
+        if (gcalData.error) {
+          aiContent = (aiContent || '') + `\n\n⚠️ Não foi possível consultar a agenda: ${gcalData.error}`;
+        } else if (gcalData.availability) {
+          // Multiple dates
+          const slotsInfo = gcalData.availability.map((a: any) => {
+            const dateFormatted = a.date.split('-').reverse().join('/');
+            return a.freeSlots.length > 0
+              ? `📅 ${dateFormatted}: ${a.freeSlots.join(', ')}`
+              : `📅 ${dateFormatted}: Sem horários disponíveis`;
+          }).join('\n');
+          aiContent = (aiContent || '') + `\n\nHorários disponíveis:\n${slotsInfo}`;
+        } else if (gcalData.freeSlots) {
+          // Single date
+          const dateFormatted = gcalData.date.split('-').reverse().join('/');
+          if (gcalData.freeSlots.length > 0) {
+            aiContent = (aiContent || '') + `\n\n📅 Horários disponíveis em ${dateFormatted}: ${gcalData.freeSlots.join(', ')}`;
+          } else {
+            aiContent = (aiContent || '') + `\n\n📅 ${dateFormatted}: Sem horários disponíveis. Posso verificar outro dia?`;
+          }
+        }
+        
+        console.log('[Nina] GCal availability check completed');
+      } catch (parseError) {
+        console.error('[Nina] Error checking GCal availability:', parseError);
+        aiContent = (aiContent || '') + '\n\n⚠️ Não foi possível consultar a agenda no momento.';
       }
     }
   }

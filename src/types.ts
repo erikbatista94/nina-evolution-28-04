@@ -34,6 +34,7 @@ export interface TeamMember {
   function?: TeamFunction;
   whatsapp_number?: string | null;
   user_id?: string | null;
+  google_calendar_email?: string | null;
 }
 
 export interface Team {
@@ -113,8 +114,12 @@ export interface Appointment {
     id: string;
     name: string | null;
     phone_number: string;
+    address_full?: string | null;
   };
   metadata?: AppointmentMetadata;
+  google_event_id?: string | null;
+  google_sync_status?: string | null;
+  status?: string;
 }
 
 export interface Deal {

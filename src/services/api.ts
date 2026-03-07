@@ -386,7 +386,8 @@ export const api = {
       team: m.team as any,
       function: m.function as any,
       whatsapp_number: (m as any).whatsapp_number || null,
-      user_id: m.user_id || null
+      user_id: m.user_id || null,
+      google_calendar_email: (m as any).google_calendar_email || null,
     }));
   },
 
@@ -448,6 +449,7 @@ export const api = {
     function_id: string | null;
     weight: number;
     whatsapp_number: string | null;
+    google_calendar_email: string | null;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')
@@ -628,14 +630,14 @@ export const api = {
       .from('appointments')
       .select(`
         *,
-        contact:contacts(id, name, phone_number)
+        contact:contacts(id, name, phone_number, address_full)
       `)
       .order('date', { ascending: true })
       .order('time', { ascending: true });
 
     if (error) {
       console.error('[API] Error fetching appointments:', error);
-      return []; // Return empty array on error
+      return [];
     }
 
     if (!data || data.length === 0) {
@@ -653,11 +655,15 @@ export const api = {
       attendees: a.attendees || [],
       contact_id: a.contact_id ?? undefined,
       contact: a.contact ? {
-        id: a.contact.id,
-        name: a.contact.name,
-        phone_number: a.contact.phone_number
+        id: (a.contact as any).id,
+        name: (a.contact as any).name,
+        phone_number: (a.contact as any).phone_number,
+        address_full: (a.contact as any).address_full,
       } : undefined,
-      metadata: a.metadata as Appointment['metadata']
+      metadata: a.metadata as Appointment['metadata'],
+      google_event_id: (a as any).google_event_id || null,
+      google_sync_status: (a as any).google_sync_status || null,
+      status: (a as any).status || 'scheduled',
     }));
   },
 

@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -32,6 +33,8 @@ const ChatInterface: React.FC = () => {
     return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
   });
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -165,6 +168,34 @@ const ChatInterface: React.FC = () => {
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
     await updateStatus(activeChat.id, status);
+  };
+
+  const handleCheckAvailability = async () => {
+    setCheckingAvailability(true);
+    setAvailableSlots(null);
+    try {
+      // Get next 3 business days
+      const dates: string[] = [];
+      const now = new Date();
+      let d = new Date(now);
+      while (dates.length < 3) {
+        d.setDate(d.getDate() + 1);
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) {
+          dates.push(d.toISOString().split('T')[0]);
+        }
+      }
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'check-availability', dates }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAvailableSlots(data?.availability || []);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao consultar disponibilidade');
+    } finally {
+      setCheckingAvailability(false);
+    }
   };
 
   const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
@@ -871,6 +902,57 @@ const ChatInterface: React.FC = () => {
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
 
+                {/* Quick Actions - Ver horários */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Agendamento
+                  </h4>
+                  <button
+                    onClick={handleCheckAvailability}
+                    disabled={checkingAvailability}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-sm text-blue-400 transition-all disabled:opacity-50"
+                  >
+                    {checkingAvailability ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" />Consultando...</>
+                    ) : (
+                      <><Calendar className="w-4 h-4" />Ver horários disponíveis</>
+                    )}
+                  </button>
+                  
+                  {availableSlots && availableSlots.length > 0 && (
+                    <div className="space-y-2">
+                      {availableSlots.map((day, i) => (
+                        <div key={i} className="p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-xs text-slate-400 font-medium">
+                            {day.date.split('-').reverse().join('/')}
+                          </span>
+                          {day.freeSlots.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {day.freeSlots.map((slot: string) => (
+                                <button
+                                  key={slot}
+                                  onClick={() => {
+                                    const msg = `Podemos agendar a visita para ${day.date.split('-').reverse().join('/')} às ${slot}?`;
+                                    setInputText(msg);
+                                    setAvailableSlots(null);
+                                  }}
+                                  className="px-2 py-1 bg-emerald-500/10 text-emerald-300 text-xs rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                                >
+                                  {slot}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500 mt-1">Sem horários</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-slate-800/50 w-full"></div>
                 {/* Tags */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
