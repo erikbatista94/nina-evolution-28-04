@@ -34,6 +34,7 @@ export interface TeamMember {
   function?: TeamFunction;
   whatsapp_number?: string | null;
   user_id?: string | null;
+  google_calendar_email?: string | null;
 }
 
 export interface Team {
