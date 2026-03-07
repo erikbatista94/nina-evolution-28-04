@@ -1020,6 +1020,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             )}
           </Button>
         )}
+      </div>
+
       {/* Test Message Collapsible */}
       <Collapsible.Root open={testSectionOpen} onOpenChange={setTestSectionOpen}>
         <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">

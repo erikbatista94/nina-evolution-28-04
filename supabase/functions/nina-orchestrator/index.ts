@@ -95,6 +95,30 @@ const cancelAppointmentTool = {
   }
 };
 
+// Tool definition for checking Google Calendar availability
+const checkGCalAvailabilityTool = {
+  type: "function",
+  function: {
+    name: "check_google_calendar_availability",
+    description: "Consultar horários disponíveis no Google Calendar para agendamento de visita técnica. Use quando o cliente quiser agendar uma visita ou perguntar sobre disponibilidade de horários.",
+    parameters: {
+      type: "object",
+      properties: {
+        date: {
+          type: "string",
+          description: "Data para consultar no formato YYYY-MM-DD"
+        },
+        dates: {
+          type: "array",
+          items: { type: "string" },
+          description: "Lista de datas para consultar no formato YYYY-MM-DD"
+        }
+      },
+      required: []
+    }
+  }
+};
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
