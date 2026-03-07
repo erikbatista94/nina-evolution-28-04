@@ -449,6 +449,7 @@ export const api = {
     function_id: string | null;
     weight: number;
     whatsapp_number: string | null;
+    google_calendar_email: string | null;
   }>): Promise<void> => {
     const { error } = await supabase
       .from('team_members')
