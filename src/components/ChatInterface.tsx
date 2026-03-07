@@ -33,6 +33,8 @@ const ChatInterface: React.FC = () => {
     return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
   });
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
+  const [checkingAvailability, setCheckingAvailability] = useState(false);
+  const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
