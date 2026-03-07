@@ -886,6 +886,55 @@ async function processQueueItem(
         console.error('[Nina] Error parsing cancel_appointment arguments:', parseError);
       }
     }
+    
+    if (toolCall.function?.name === 'check_google_calendar_availability') {
+      try {
+        const args = JSON.parse(toolCall.function.arguments);
+        console.log('[Nina] Processing check_google_calendar_availability tool call:', args);
+        
+        const gcalUrl = `${supabaseUrl}/functions/v1/google-calendar`;
+        const gcalResp = await fetch(gcalUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${supabaseServiceKey}`
+          },
+          body: JSON.stringify({
+            action: 'check-availability',
+            date: args.date,
+            dates: args.dates
+          })
+        });
+        
+        const gcalData = await gcalResp.json();
+        
+        if (gcalData.error) {
+          aiContent = (aiContent || '') + `\n\n⚠️ Não foi possível consultar a agenda: ${gcalData.error}`;
+        } else if (gcalData.availability) {
+          // Multiple dates
+          const slotsInfo = gcalData.availability.map((a: any) => {
+            const dateFormatted = a.date.split('-').reverse().join('/');
+            return a.freeSlots.length > 0
+              ? `📅 ${dateFormatted}: ${a.freeSlots.join(', ')}`
+              : `📅 ${dateFormatted}: Sem horários disponíveis`;
+          }).join('\n');
+          aiContent = (aiContent || '') + `\n\nHorários disponíveis:\n${slotsInfo}`;
+        } else if (gcalData.freeSlots) {
+          // Single date
+          const dateFormatted = gcalData.date.split('-').reverse().join('/');
+          if (gcalData.freeSlots.length > 0) {
+            aiContent = (aiContent || '') + `\n\n📅 Horários disponíveis em ${dateFormatted}: ${gcalData.freeSlots.join(', ')}`;
+          } else {
+            aiContent = (aiContent || '') + `\n\n📅 ${dateFormatted}: Sem horários disponíveis. Posso verificar outro dia?`;
+          }
+        }
+        
+        console.log('[Nina] GCal availability check completed');
+      } catch (parseError) {
+        console.error('[Nina] Error checking GCal availability:', parseError);
+        aiContent = (aiContent || '') + '\n\n⚠️ Não foi possível consultar a agenda no momento.';
+      }
+    }
   }
 
   // If no content and we only got tool calls, generate a default response
