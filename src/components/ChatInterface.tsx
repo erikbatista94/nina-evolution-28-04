@@ -902,6 +902,57 @@ const ChatInterface: React.FC = () => {
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
 
+                {/* Quick Actions - Ver horários */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                    <Calendar className="w-4 h-4" />
+                    Agendamento
+                  </h4>
+                  <button
+                    onClick={handleCheckAvailability}
+                    disabled={checkingAvailability}
+                    className="w-full flex items-center justify-center gap-2 px-3 py-2.5 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/30 rounded-lg text-sm text-blue-400 transition-all disabled:opacity-50"
+                  >
+                    {checkingAvailability ? (
+                      <><Loader2 className="w-4 h-4 animate-spin" />Consultando...</>
+                    ) : (
+                      <><Calendar className="w-4 h-4" />Ver horários disponíveis</>
+                    )}
+                  </button>
+                  
+                  {availableSlots && availableSlots.length > 0 && (
+                    <div className="space-y-2">
+                      {availableSlots.map((day, i) => (
+                        <div key={i} className="p-2.5 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-xs text-slate-400 font-medium">
+                            {day.date.split('-').reverse().join('/')}
+                          </span>
+                          {day.freeSlots.length > 0 ? (
+                            <div className="flex flex-wrap gap-1.5 mt-1.5">
+                              {day.freeSlots.map((slot: string) => (
+                                <button
+                                  key={slot}
+                                  onClick={() => {
+                                    const msg = `Podemos agendar a visita para ${day.date.split('-').reverse().join('/')} às ${slot}?`;
+                                    setInputText(msg);
+                                    setAvailableSlots(null);
+                                  }}
+                                  className="px-2 py-1 bg-emerald-500/10 text-emerald-300 text-xs rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
+                                >
+                                  {slot}
+                                </button>
+                              ))}
+                            </div>
+                          ) : (
+                            <p className="text-xs text-slate-500 mt-1">Sem horários</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="h-px bg-slate-800/50 w-full"></div>
                 {/* Tags */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
