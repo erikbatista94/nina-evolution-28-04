@@ -170,6 +170,34 @@ const ChatInterface: React.FC = () => {
     await updateStatus(activeChat.id, status);
   };
 
+  const handleCheckAvailability = async () => {
+    setCheckingAvailability(true);
+    setAvailableSlots(null);
+    try {
+      // Get next 3 business days
+      const dates: string[] = [];
+      const now = new Date();
+      let d = new Date(now);
+      while (dates.length < 3) {
+        d.setDate(d.getDate() + 1);
+        const day = d.getDay();
+        if (day !== 0 && day !== 6) {
+          dates.push(d.toISOString().split('T')[0]);
+        }
+      }
+      const { data, error } = await supabase.functions.invoke('google-calendar', {
+        body: { action: 'check-availability', dates }
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      setAvailableSlots(data?.availability || []);
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao consultar disponibilidade');
+    } finally {
+      setCheckingAvailability(false);
+    }
+  };
+
   const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
 
   const handleViewFilterChange = (filter: 'all' | 'mine') => {
