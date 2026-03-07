@@ -746,7 +746,8 @@ async function processQueueItem(
     tools.push(createAppointmentTool);
     tools.push(rescheduleAppointmentTool);
     tools.push(cancelAppointmentTool);
-    console.log('[Nina] AI scheduling enabled, adding appointment tools (create, reschedule, cancel)');
+    tools.push(checkGCalAvailabilityTool);
+    console.log('[Nina] AI scheduling enabled, adding appointment + GCal tools');
   }
 
   // Build request body
