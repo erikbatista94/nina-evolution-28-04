@@ -35,10 +35,24 @@ async function getSettings(supabase: any) {
     .limit(1)
     .maybeSingle();
 
-  if (error) throw new Error('Erro ao carregar configurações');
-  if (!data?.google_client_id || !data?.google_client_secret || !data?.google_refresh_token || !data?.google_calendar_id) {
-    throw new Error('Google Calendar não configurado. Configure em Configurações → APIs.');
+  if (error) {
+    console.error('[GCal] Settings query error:', error);
+    throw new Error(`Erro ao carregar configurações: ${error.message}`);
   }
+  if (!data) {
+    throw new Error('Nenhuma configuração encontrada na tabela nina_settings.');
+  }
+
+  const missing: string[] = [];
+  if (!data.google_client_id) missing.push('Client ID');
+  if (!data.google_client_secret) missing.push('Client Secret');
+  if (!data.google_refresh_token) missing.push('Refresh Token');
+  if (!data.google_calendar_id) missing.push('Calendar ID');
+
+  if (missing.length > 0) {
+    throw new Error(`Google Calendar: campos não configurados: ${missing.join(', ')}. Salve as credenciais em Configurações → APIs.`);
+  }
+
   return data;
 }
 

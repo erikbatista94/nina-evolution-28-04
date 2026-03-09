@@ -480,14 +480,34 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const gcalConfigured = settings.google_client_id && settings.google_client_secret && settings.google_refresh_token && settings.google_calendar_id;
 
   const handleTestGoogleCalendar = async () => {
+    if (!settings.google_client_id || !settings.google_client_secret || !settings.google_refresh_token || !settings.google_calendar_id) {
+      toast.error('Preencha todos os campos do Google Calendar antes de testar.');
+      return;
+    }
     setTestingGcal(true);
     try {
+      // Save credentials first so the edge function can read them
+      const { error: saveError } = await supabase
+        .from('nina_settings')
+        .update({
+          google_client_id: settings.google_client_id,
+          google_client_secret: settings.google_client_secret,
+          google_refresh_token: settings.google_refresh_token,
+          google_calendar_id: settings.google_calendar_id,
+          default_visit_duration: settings.default_visit_duration,
+          available_time_slots: settings.available_time_slots,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', settings.id!);
+
+      if (saveError) throw new Error('Erro ao salvar credenciais antes do teste.');
+
       const { data, error } = await supabase.functions.invoke('google-calendar', {
         body: { action: 'test-connection' }
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      toast.success(`Conectado! Agenda: ${data.calendarName}`);
+      toast.success(`Conectado! Agenda: ${data.calendarName} (${data.timeZone})`);
     } catch (err: any) {
       toast.error(err.message || 'Erro ao testar conexão');
     } finally {
