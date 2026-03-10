@@ -2584,6 +2584,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.trigger-whatsapp-sender]
+verify_jwt = false
+
+[functions.google-calendar]
+verify_jwt = false
+
+[functions.admin-create-user]
 verify_jwt = false`}</pre>
               </div>
               
@@ -2716,6 +2722,10 @@ verify_jwt = false`}</pre>
               <div className="flex items-center gap-2 text-sm text-slate-300">
                 <div className="w-5 h-5 rounded border border-slate-600 flex items-center justify-center text-xs">☐</div>
                 <span>(Opcional) ElevenLabs API Key configurada</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-slate-300">
+                <div className="w-5 h-5 rounded border border-slate-600 flex items-center justify-center text-xs">☐</div>
+                <span>(Opcional) Google Calendar credenciais configuradas</span>
               </div>
             </div>
           </div>
