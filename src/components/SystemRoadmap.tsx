@@ -2584,6 +2584,12 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.trigger-whatsapp-sender]
+verify_jwt = false
+
+[functions.google-calendar]
+verify_jwt = false
+
+[functions.admin-create-user]
 verify_jwt = false`}</pre>
               </div>
               
