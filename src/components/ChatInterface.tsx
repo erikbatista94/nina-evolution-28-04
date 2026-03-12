@@ -937,11 +937,13 @@ const ChatInterface: React.FC = () => {
                     className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none transition-all"
                   >
                     <option value="">Não atribuído</option>
-                    {teamMembers.map(member => (
-                      <option key={member.id} value={member.id}>
-                        {member.name} ({member.role})
-                      </option>
-                    ))}
+                    {teamMembers
+                      .filter(member => member.user_id)
+                      .map(member => (
+                        <option key={member.user_id} value={member.user_id}>
+                          {member.name} ({member.role})
+                        </option>
+                      ))}
                   </select>
                 </div>
 
