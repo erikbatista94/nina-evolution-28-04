@@ -1378,6 +1378,78 @@ export const api = {
   },
 
   /**
+   * Send a file message (upload to storage, create message + queue)
+   */
+  sendFileMessage: async (
+    conversationId: string,
+    file: File,
+    messageType: 'image' | 'document'
+  ): Promise<string> => {
+    console.log(`[API] Sending file message to conversation ${conversationId}`, file.name, messageType);
+
+    // Get conversation to find contact_id
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('contact_id')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      console.error('[API] Error getting conversation:', convError);
+      throw new Error('Conversation not found');
+    }
+
+    // Upload file to Supabase Storage
+    const fileExt = file.name.split('.').pop() || 'bin';
+    const filePath = `chat-uploads/${conversationId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+
+    console.log('[API] Uploading file to storage:', filePath);
+    const { error: uploadError } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(filePath, file, { contentType: file.type, upsert: false });
+
+    if (uploadError) {
+      console.error('[API] Error uploading file:', uploadError);
+      throw new Error('Failed to upload file');
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('whatsapp-media')
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+    console.log('[API] File uploaded, public URL:', publicUrl);
+
+    // Get current user for sender tracking
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    // Create message record
+    const { data: msgData, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        content: file.name,
+        type: messageType,
+        from_type: 'human',
+        status: 'sent',
+        media_url: publicUrl,
+        media_type: file.type,
+        sent_at: new Date().toISOString(),
+        sender_user_id: currentUser?.id || null
+      } as any)
+      .select('id')
+      .single();
+
+    if (msgError || !msgData) {
+      console.error('[API] Error creating file message record:', msgError);
+      throw new Error('Failed to create message record');
+    }
+
+    console.log('[API] File message created with ID:', msgData.id);
+    return msgData.id;
+  },
+
+  /**
    * Update conversation status (nina/human/paused)
    */
   updateConversationStatus: async (

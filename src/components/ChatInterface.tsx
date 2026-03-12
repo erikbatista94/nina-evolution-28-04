@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendFileMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -35,6 +35,8 @@ const ChatInterface: React.FC = () => {
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -163,6 +165,38 @@ const ChatInterface: React.FC = () => {
     setInputText('');
     
     await sendMessage(activeChat.id, content);
+  };
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeChat) return;
+
+    console.log('[Chat] File selected:', file.name, file.type, file.size);
+
+    // Validate size (10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('Arquivo muito grande. Máximo: 10MB');
+      return;
+    }
+
+    // Determine message type
+    const imageTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp'];
+    const messageType: 'image' | 'document' = imageTypes.includes(file.type) ? 'image' : 'document';
+
+    console.log('[Chat] Uploading file as:', messageType);
+    setUploadingFile(true);
+
+    try {
+      await sendFileMessage(activeChat.id, file, messageType);
+      console.log('[Chat] File message sent successfully');
+      toast.success('Arquivo enviado');
+    } catch (err) {
+      console.error('[Chat] Error sending file:', err);
+    } finally {
+      setUploadingFile(false);
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
   };
 
   const handleStatusChange = async (status: ConversationStatus) => {
@@ -736,12 +770,23 @@ const ChatInterface: React.FC = () => {
                     type="button" 
                     variant="ghost" 
                     size="icon"
-                    disabled
-                    title="Em breve: Enviar anexos"
-                    className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
+                    disabled={uploadingFile}
+                    title="Enviar anexo"
+                    className="text-slate-400 rounded-full hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                    onClick={() => {
+                      console.log('[Chat] Attach button clicked');
+                      fileInputRef.current?.click();
+                    }}
                   >
-                    <Paperclip className="w-5 h-5" />
+                    {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                   </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,.pdf,.doc,.docx"
+                    onChange={handleFileSelect}
+                  />
                 </div>
                 
                 <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
