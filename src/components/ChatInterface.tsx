@@ -605,12 +605,17 @@ const ChatInterface: React.FC = () => {
                   
                   <div className="flex items-center mt-2 gap-1.5 flex-wrap">
                     {renderStatusBadge(chat.status)}
-                    {isAdmin && !chat.assignedUserId && (
+                    {!chat.assignedUserId && (
                       <span className="px-2 py-0.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] rounded-md font-medium">
                         Não atribuída
                       </span>
                     )}
-                    {isAdmin && chat.assignedUserId && (
+                    {chat.assignedUserId === user?.id && (
+                      <span className="px-2 py-0.5 bg-cyan-500/15 border border-cyan-500/30 text-cyan-400 text-[10px] rounded-md font-medium">
+                        Minha
+                      </span>
+                    )}
+                    {chat.assignedUserId && chat.assignedUserId !== user?.id && (
                       <span className="px-2 py-0.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-[10px] rounded-md font-medium truncate max-w-[80px]" title={getAssignedMemberName(chat.assignedUserId) || ''}>
                         {getAssignedMemberName(chat.assignedUserId) || 'Atribuída'}
                       </span>
