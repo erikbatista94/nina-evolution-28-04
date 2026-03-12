@@ -1,47 +1,46 @@
 
 
-## Plano: Corrigir e Padronizar Sistema de Atribuição de Conversas
+## Plano: Rebranding completo para GG (Gesso Gilmar)
 
-### Problema raiz identificado
+Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
 
-O dropdown "Responsável" (linha 941 do ChatInterface.tsx) usa `member.id` (ID da tabela `team_members`) como valor das options, mas o campo `assigned_user_id` na tabela `conversations` armazena o UUID de `auth.users` (`member.user_id`). Isso causa:
+### 1. Substituir logos e ícones
+- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
+- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
+- **Favicon**: Atualizar para o selo GG
+- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
 
-1. Ao atribuir, grava o ID errado no banco
-2. O filtro "Minhas" compara `assignedUserId` com `user?.id` (auth UUID) -- nunca bate
-3. Badges de atribuição falham silenciosamente
+### 2. Paleta de cores (index.css)
+Atualizar as CSS variables para refletir o vermelho da GG:
+- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
+- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
+- `--ring`: acompanhar o primary
+- Atualizar sidebar variables correspondentes
 
-### Mudanças necessárias
+### 3. Referências hardcoded de cores
+Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
+- **Dashboard.tsx**: gradientes, tooltips, glows
+- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
+- **Auth.tsx**: gradient do logo container
+- **index.css**: scrollbar colors
 
-#### 1. Corrigir dropdown "Responsável" (`ChatInterface.tsx`)
+Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
 
-Trocar `member.id` por `member.user_id` no `<option value>` e no `<select value>`. Filtrar membros sem `user_id` (contas ainda não vinculadas).
+### 4. Textos e título
+- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
+- **Sidebar**: Default company name de "Minha Empresa" para "GG"
+- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
 
-#### 2. Lógica de "Atendimento Humano" com auto-atribuição (`ChatInterface.tsx`)
+### 5. Corrigir erros de build existentes
+Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
 
-Substituir `handleStatusChange('human')` por lógica contextual:
-- Se `!assignedUserId` → atribuir ao user logado + mudar status
-- Se `assignedUserId === user.id` → apenas mudar status
-- Se `assignedUserId !== user.id` e `!isAdmin` → bloquear com toast de erro
-- Se `isAdmin` → permitir sempre
-
-#### 3. Badges de atribuição na lista de conversas (`ChatInterface.tsx`)
-
-Mostrar badges para todos os usuários (não só admin):
-- "Não atribuída" (amarelo) 
-- "Minha" (cyan) quando `assignedUserId === user.id`
-- Nome do responsável quando atribuída a outro
-
-#### 4. Nenhuma mudança no backend
-
-O `api.assignConversation` já faz corretamente: atualiza `assigned_user_id` na conversa e `owner_id` no deal. O realtime subscription de `conversations` já propaga UPDATE events. O hook `useConversations.assignConversation` já faz optimistic update do `assignedUserId`.
-
-### Arquivos alterados
-
-| Arquivo | Mudança |
-|---|---|
-| `src/components/ChatInterface.tsx` | Corrigir value do dropdown, auto-atribuição no "Humano", badges para todos |
-
-### Sem migration necessária
-
-O campo `assigned_user_id` e a sincronização com deals já existem e funcionam corretamente. O problema é exclusivamente no frontend.
+### Arquivos a modificar
+- `src/index.css` — paleta de cores
+- `src/components/Sidebar.tsx` — logos + cores
+- `src/components/ui/sidebar.tsx` — cores hardcoded
+- `src/pages/Auth.tsx` — logo + cores
+- `src/components/Dashboard.tsx` — cores hardcoded
+- `index.html` — título
+- Assets novos: logos GG baixados do CDN
+- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
 
