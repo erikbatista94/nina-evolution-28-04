@@ -35,6 +35,8 @@ const ChatInterface: React.FC = () => {
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
+  const [uploadingFile, setUploadingFile] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
