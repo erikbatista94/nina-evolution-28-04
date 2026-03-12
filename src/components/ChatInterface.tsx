@@ -201,6 +201,24 @@ const ChatInterface: React.FC = () => {
 
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
+
+    // Auto-assignment logic for human mode
+    if (status === 'human') {
+      const assignedId = activeChat.assignedUserId;
+      
+      if (assignedId && assignedId !== user?.id && !isAdmin) {
+        const ownerName = getAssignedMemberName(assignedId) || 'outro responsável';
+        toast.error(`Esta conversa já está atribuída a ${ownerName}.`);
+        return;
+      }
+
+      // Auto-assign if unassigned
+      if (!assignedId && user?.id) {
+        await assignConversation(activeChat.id, user.id);
+        toast.success('Conversa atribuída automaticamente a você.');
+      }
+    }
+
     await updateStatus(activeChat.id, status);
   };
 
