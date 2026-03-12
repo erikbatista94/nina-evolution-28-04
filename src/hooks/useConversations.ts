@@ -558,6 +558,7 @@ export function useConversations() {
     error,
     realtimeConnected,
     sendMessage,
+    sendFileMessage,
     updateStatus,
     markAsRead,
     assignConversation,

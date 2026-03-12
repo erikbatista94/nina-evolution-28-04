@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendFileMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
