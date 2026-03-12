@@ -770,12 +770,23 @@ const ChatInterface: React.FC = () => {
                     type="button" 
                     variant="ghost" 
                     size="icon"
-                    disabled
-                    title="Em breve: Enviar anexos"
-                    className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
+                    disabled={uploadingFile}
+                    title="Enviar anexo"
+                    className="text-slate-400 rounded-full hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                    onClick={() => {
+                      console.log('[Chat] Attach button clicked');
+                      fileInputRef.current?.click();
+                    }}
                   >
-                    <Paperclip className="w-5 h-5" />
+                    {uploadingFile ? <Loader2 className="w-5 h-5 animate-spin" /> : <Paperclip className="w-5 h-5" />}
                   </Button>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/jpeg,image/jpg,image/png,image/webp,.pdf,.doc,.docx"
+                    onChange={handleFileSelect}
+                  />
                 </div>
                 
                 <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
