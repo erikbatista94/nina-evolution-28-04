@@ -418,6 +418,56 @@ export function useConversations() {
     }
   }, []);
 
+  // Send file message
+  const sendFileMessage = useCallback(async (
+    conversationId: string,
+    file: File,
+    messageType: 'image' | 'document'
+  ) => {
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    const tempId = `temp-file-${Date.now()}`;
+    const tempMessage: UIMessage = {
+      id: tempId,
+      content: file.name,
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      direction: MessageDirection.OUTGOING,
+      type: messageType === 'image' ? MessageType.IMAGE : MessageType.DOCUMENT,
+      status: 'sent',
+      fromType: 'human',
+      mediaUrl: URL.createObjectURL(file),
+      whatsappMessageId: null,
+      senderUserId: currentUser?.id || null,
+      senderName: null
+    };
+
+    setConversations(prev => prev.map(conv => {
+      if (conv.id === conversationId) {
+        return {
+          ...conv,
+          messages: [...conv.messages, tempMessage],
+          lastMessage: `📎 ${file.name}`,
+          lastMessageTime: 'Agora'
+        };
+      }
+      return conv;
+    }));
+
+    try {
+      await api.sendFileMessage(conversationId, file, messageType);
+      console.log('[useConversations] File message sent successfully');
+    } catch (err) {
+      console.error('[useConversations] Error sending file:', err);
+      toast.error('Erro ao enviar arquivo');
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          return { ...conv, messages: conv.messages.filter(m => m.id !== tempId) };
+        }
+        return conv;
+      }));
+    }
+  }, []);
+
   // Update conversation status
   const updateStatus = useCallback(async (
     conversationId: string, 
