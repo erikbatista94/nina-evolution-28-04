@@ -14,9 +14,11 @@ import { PipelineSettingsModal } from './PipelineSettingsModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useAuth } from '@/hooks/useAuth';
 
 const Kanban: React.FC = () => {
-  const { sdrName } = useCompanySettings();
+  const { sdrName, isAdmin } = useCompanySettings();
+  const { user } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [stages, setStages] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
