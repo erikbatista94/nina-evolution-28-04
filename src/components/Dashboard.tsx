@@ -140,6 +140,7 @@ const Dashboard: React.FC = () => {
               {periodLabels[p]}
             </button>
           ))}
+          </div>
         </div>
       </div>
 
