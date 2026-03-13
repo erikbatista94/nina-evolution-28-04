@@ -113,6 +113,23 @@ export const api = {
 
     try {
       // Fetch all metrics in parallel
+      // Build queries with optional userId filter
+      let convPeriodQ = supabase.from('conversations').select('id', { count: 'exact', head: true }).gte('last_message_at', periodStartStr);
+      let convPrevQ = supabase.from('conversations').select('id', { count: 'exact', head: true }).gte('last_message_at', prevPeriodStartStr).lt('last_message_at', periodStartStr);
+      let wonPeriodQ = supabase.from('deals').select('id', { count: 'exact', head: true }).not('won_at', 'is', null).gte('won_at', periodStartStr);
+      let wonPrevQ = supabase.from('deals').select('id', { count: 'exact', head: true }).not('won_at', 'is', null).gte('won_at', prevPeriodStartStr).lt('won_at', periodStartStr);
+      let apptPeriodQ = supabase.from('appointments').select('id', { count: 'exact', head: true }).gte('created_at', periodStartStr);
+      let apptPrevQ = supabase.from('appointments').select('id', { count: 'exact', head: true }).gte('created_at', prevPeriodStartStr).lt('created_at', periodStartStr);
+
+      if (userId) {
+        convPeriodQ = convPeriodQ.eq('assigned_user_id', userId);
+        convPrevQ = convPrevQ.eq('assigned_user_id', userId);
+        wonPeriodQ = wonPeriodQ.eq('owner_id', userId);
+        wonPrevQ = wonPrevQ.eq('owner_id', userId);
+        apptPeriodQ = apptPeriodQ.eq('user_id', userId);
+        apptPrevQ = apptPrevQ.eq('user_id', userId);
+      }
+
       const [
         messagesPeriodResult,
         messagesPrevResult,
@@ -124,17 +141,8 @@ export const api = {
         appointmentsPrevResult,
         avgResponseResult
       ] = await Promise.all([
-        // Atendimentos = conversas únicas com atividade no período
-        supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_message_at', periodStartStr),
-        // Atendimentos no período anterior
-        supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_message_at', prevPeriodStartStr)
-          .lt('last_message_at', periodStartStr),
+        convPeriodQ,
+        convPrevQ,
         // New contacts in period
         supabase
           .from('contacts')
@@ -146,30 +154,10 @@ export const api = {
           .select('id', { count: 'exact', head: true })
           .gte('created_at', prevPeriodStartStr)
           .lt('created_at', periodStartStr),
-        // Won deals in period
-        supabase
-          .from('deals')
-          .select('id', { count: 'exact', head: true })
-          .not('won_at', 'is', null)
-          .gte('won_at', periodStartStr),
-        // Won deals in previous period
-        supabase
-          .from('deals')
-          .select('id', { count: 'exact', head: true })
-          .not('won_at', 'is', null)
-          .gte('won_at', prevPeriodStartStr)
-          .lt('won_at', periodStartStr),
-        // Appointments in period
-        supabase
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', periodStartStr),
-        // Appointments in previous period
-        supabase
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', prevPeriodStartStr)
-          .lt('created_at', periodStartStr),
+        wonPeriodQ,
+        wonPrevQ,
+        apptPeriodQ,
+        apptPrevQ,
         // Average response time (for the period)
         supabase
           .from('messages')
