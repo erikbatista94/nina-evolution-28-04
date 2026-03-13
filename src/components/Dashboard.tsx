@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { StatMetric } from '../types';
+import { StatMetric, TeamMember } from '../types';
 import { api } from '../services/api';
 import { SystemHealthCard } from './SystemHealthCard';
+import { useAuth } from '@/hooks/useAuth';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 type PeriodFilter = 'today' | '7days' | '30days';
 
