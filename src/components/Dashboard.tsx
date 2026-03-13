@@ -22,19 +22,34 @@ const periodDays: Record<PeriodFilter, number> = {
 };
 
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const { isAdmin } = useCompanySettings();
   const [metrics, setMetrics] = useState<StatMetric[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodFilter>('today');
+  const [selectedSeller, setSelectedSeller] = useState<string>('all');
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      api.fetchTeam().then(setTeamMembers).catch(console.error);
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
         const days = periodDays[period];
+        // Determine userId filter
+        const filterUserId = isAdmin
+          ? (selectedSeller !== 'all' ? selectedSeller : undefined)
+          : user?.id;
+        
         const [metricsData, chartDataResponse] = await Promise.all([
-          api.fetchDashboardMetrics(days),
-          api.fetchChartData(days)
+          api.fetchDashboardMetrics(days, filterUserId),
+          api.fetchChartData(days, filterUserId)
         ]);
         setMetrics(metricsData);
         setChartData(chartDataResponse);
@@ -46,7 +61,7 @@ const Dashboard: React.FC = () => {
     };
 
     loadData();
-  }, [period]);
+  }, [period, selectedSeller, isAdmin, user?.id]);
 
   const getIcon = (label: string) => {
     if (label.includes('Conversões')) return <DollarSign className="h-5 w-5 text-emerald-400" />;
