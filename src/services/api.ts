@@ -259,7 +259,7 @@ export const api = {
 
       // Group messages by day
       const messagesMap = new Map<string, number>();
-      (messagesResult.data || []).forEach(m => {
+      filteredMessages.forEach(m => {
         const dateStr = getDateString(new Date(m.sent_at));
         messagesMap.set(dateStr, (messagesMap.get(dateStr) || 0) + 1);
       });
