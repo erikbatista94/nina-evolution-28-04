@@ -229,21 +229,33 @@ export const api = {
     periodStart.setHours(0, 0, 0, 0);
 
     try {
+      let messagesQ = supabase.from('messages').select('sent_at, conversation_id').gte('sent_at', periodStart.toISOString());
+      let dealsQ = supabase.from('deals').select('won_at').not('won_at', 'is', null).gte('won_at', periodStart.toISOString());
+      let appointmentsQ = supabase.from('appointments').select('created_at').gte('created_at', periodStart.toISOString());
+
+      if (userId) {
+        dealsQ = dealsQ.eq('owner_id', userId);
+        appointmentsQ = appointmentsQ.eq('user_id', userId);
+        // For messages, we need to filter by conversations assigned to the user
+        // We'll filter after fetching by joining with conversations
+      }
+
       const [messagesResult, dealsResult, appointmentsResult] = await Promise.all([
-        supabase
-          .from('messages')
-          .select('sent_at')
-          .gte('sent_at', periodStart.toISOString()),
-        supabase
-          .from('deals')
-          .select('won_at')
-          .not('won_at', 'is', null)
-          .gte('won_at', periodStart.toISOString()),
-        supabase
-          .from('appointments')
-          .select('created_at')
-          .gte('created_at', periodStart.toISOString())
+        messagesQ,
+        dealsQ,
+        appointmentsQ
       ]);
+
+      // If userId filter, get conversation IDs assigned to this user and filter messages
+      let filteredMessages = messagesResult.data || [];
+      if (userId && filteredMessages.length > 0) {
+        const { data: userConvs } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('assigned_user_id', userId);
+        const userConvIds = new Set(userConvs?.map(c => c.id) || []);
+        filteredMessages = filteredMessages.filter(m => userConvIds.has((m as any).conversation_id));
+      }
 
       // Group messages by day
       const messagesMap = new Map<string, number>();
