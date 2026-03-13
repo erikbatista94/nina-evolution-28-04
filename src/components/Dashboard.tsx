@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { StatMetric } from '../types';
+import { StatMetric, TeamMember } from '../types';
 import { api } from '../services/api';
 import { SystemHealthCard } from './SystemHealthCard';
+import { useAuth } from '@/hooks/useAuth';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
 
 type PeriodFilter = 'today' | '7days' | '30days';
 
@@ -20,19 +22,34 @@ const periodDays: Record<PeriodFilter, number> = {
 };
 
 const Dashboard: React.FC = () => {
+  const { user } = useAuth();
+  const { isAdmin } = useCompanySettings();
   const [metrics, setMetrics] = useState<StatMetric[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodFilter>('today');
+  const [selectedSeller, setSelectedSeller] = useState<string>('all');
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+
+  useEffect(() => {
+    if (isAdmin) {
+      api.fetchTeam().then(setTeamMembers).catch(console.error);
+    }
+  }, [isAdmin]);
 
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
         const days = periodDays[period];
+        // Determine userId filter
+        const filterUserId = isAdmin
+          ? (selectedSeller !== 'all' ? selectedSeller : undefined)
+          : user?.id;
+        
         const [metricsData, chartDataResponse] = await Promise.all([
-          api.fetchDashboardMetrics(days),
-          api.fetchChartData(days)
+          api.fetchDashboardMetrics(days, filterUserId),
+          api.fetchChartData(days, filterUserId)
         ]);
         setMetrics(metricsData);
         setChartData(chartDataResponse);
@@ -44,7 +61,7 @@ const Dashboard: React.FC = () => {
     };
 
     loadData();
-  }, [period]);
+  }, [period, selectedSeller, isAdmin, user?.id]);
 
   const getIcon = (label: string) => {
     if (label.includes('Conversões')) return <DollarSign className="h-5 w-5 text-emerald-400" />;
@@ -96,7 +113,20 @@ const Dashboard: React.FC = () => {
             Visão geral da performance da sua IA {period === 'today' ? 'hoje' : `nos últimos ${periodLabels[period].toLowerCase()}`}.
           </p>
         </div>
-        <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <select
+              value={selectedSeller}
+              onChange={(e) => setSelectedSeller(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none"
+            >
+              <option value="all">Todos os vendedores</option>
+              {teamMembers.filter(m => m.user_id).map(m => (
+                <option key={m.user_id} value={m.user_id!}>{m.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
           {(['today', '7days', '30days'] as PeriodFilter[]).map((p) => (
             <button
               key={p}
@@ -110,6 +140,7 @@ const Dashboard: React.FC = () => {
               {periodLabels[p]}
             </button>
           ))}
+          </div>
         </div>
       </div>
 

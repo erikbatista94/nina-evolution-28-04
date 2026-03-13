@@ -1,48 +1,46 @@
 
 
-## Plano: Controle de Visualização por Usuário (Pipeline + Dashboard)
+## Plano: Rebranding completo para GG (Gesso Gilmar)
 
-### Contexto
+Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
 
-O campo `deals.owner_id` já armazena o `auth.user_id` (sincronizado via `assignConversation`). A filtragem será feita no frontend, mantendo o Realtime funcional para todos.
+### 1. Substituir logos e ícones
+- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
+- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
+- **Favicon**: Atualizar para o selo GG
+- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
 
-### Mudanças
+### 2. Paleta de cores (index.css)
+Atualizar as CSS variables para refletir o vermelho da GG:
+- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
+- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
+- `--ring`: acompanhar o primary
+- Atualizar sidebar variables correspondentes
 
-#### 1. `src/components/Kanban.tsx` — Filtro por role + dropdown admin
+### 3. Referências hardcoded de cores
+Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
+- **Dashboard.tsx**: gradientes, tooltips, glows
+- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
+- **Auth.tsx**: gradient do logo container
+- **index.css**: scrollbar colors
 
-- Importar `useAuth` e `useCompanySettings` para obter `user.id` e `isAdmin`
-- Adicionar estado `selectedOwnerFilter` (string | 'all')
-- **Vendedor**: filtrar `deals` onde `deal.ownerId === user.id` (antes de aplicar `searchQuery`)
-- **Admin**: mostrar todos por padrão; adicionar dropdown "Responsável" no header (ao lado do search) com opções: "Todos", lista de `teamMembers` com `user_id`
-- Quando admin selecionar vendedor, filtrar `deals` por `deal.ownerId === selectedUserId`
+Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
 
-#### 2. `src/components/Dashboard.tsx` — Métricas filtradas por usuário
+### 4. Textos e título
+- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
+- **Sidebar**: Default company name de "Minha Empresa" para "GG"
+- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
 
-- Importar `useAuth` e `useCompanySettings`
-- Adicionar estado `selectedSeller` (string | 'all')
-- Modificar chamadas a `api.fetchDashboardMetrics` e `api.fetchChartData` para aceitar parâmetro opcional `userId`
-- **Vendedor**: passar automaticamente `user.id`
-- **Admin**: mostrar dropdown "Vendedor" no header; passar `selectedSeller` quando não for 'all'
+### 5. Corrigir erros de build existentes
+Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
 
-#### 3. `src/services/api.ts` — Adicionar filtro userId às queries
-
-- `fetchDashboardMetrics(days, userId?)`: quando `userId` fornecido, adicionar `.eq('assigned_user_id', userId)` nas queries de conversations, e `.eq('owner_id', userId)` nos deals/appointments
-- `fetchChartData(days, userId?)`: mesma lógica de filtro
-- `fetchPipeline(userId?)`: quando `userId` fornecido, adicionar `.eq('owner_id', userId)` na query de deals
-
-#### 4. `src/types.ts` — Sem mudanças
-
-O tipo `Deal` já tem `ownerId`. Nenhuma alteração de tipo necessária.
-
-### Arquivos alterados
-
-| Arquivo | Mudança |
-|---|---|
-| `src/services/api.ts` | Adicionar parâmetro `userId?` a `fetchDashboardMetrics`, `fetchChartData`, `fetchPipeline` |
-| `src/components/Kanban.tsx` | Filtro por vendedor (auto para vendedor, dropdown para admin) |
-| `src/components/Dashboard.tsx` | Filtro por vendedor (auto para vendedor, dropdown para admin) |
-
-### Sem migration necessária
-
-A filtragem é client-side. O RLS já permite acesso a todos os deals para usuários autenticados (single-tenant). A segregação visual é feita no frontend baseada no `owner_id`.
+### Arquivos a modificar
+- `src/index.css` — paleta de cores
+- `src/components/Sidebar.tsx` — logos + cores
+- `src/components/ui/sidebar.tsx` — cores hardcoded
+- `src/pages/Auth.tsx` — logo + cores
+- `src/components/Dashboard.tsx` — cores hardcoded
+- `index.html` — título
+- Assets novos: logos GG baixados do CDN
+- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
 

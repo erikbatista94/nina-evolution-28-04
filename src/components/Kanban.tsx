@@ -14,13 +14,16 @@ import { PipelineSettingsModal } from './PipelineSettingsModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useAuth } from '@/hooks/useAuth';
 
 const Kanban: React.FC = () => {
-  const { sdrName } = useCompanySettings();
+  const { sdrName, isAdmin } = useCompanySettings();
+  const { user } = useAuth();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [stages, setStages] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('all');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState<'note' | 'activity' | 'email'>('note');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -276,7 +279,19 @@ const Kanban: React.FC = () => {
     }
   };
 
-  const filteredDeals = deals.filter(deal => 
+  // Role-based filtering: sellers see only their deals, admin sees all (or filtered)
+  const ownerFilteredDeals = (() => {
+    if (!isAdmin && user) {
+      // Seller: only their deals
+      return deals.filter(deal => deal.ownerId === user.id);
+    }
+    if (isAdmin && selectedOwnerFilter !== 'all') {
+      return deals.filter(deal => deal.ownerId === selectedOwnerFilter);
+    }
+    return deals;
+  })();
+
+  const filteredDeals = ownerFilteredDeals.filter(deal => 
     deal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
     deal.company.toLowerCase().includes(searchQuery.toLowerCase())
   );
@@ -305,7 +320,19 @@ const Kanban: React.FC = () => {
           <h2 className="text-3xl font-bold tracking-tight text-white">Pipeline de Vendas</h2>
           <p className="text-sm text-slate-400 mt-1">Gerencie oportunidades e acompanhe o fluxo de receita.</p>
         </div>
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="flex gap-3 w-full sm:w-auto items-center">
+          {isAdmin && (
+            <select
+              value={selectedOwnerFilter}
+              onChange={(e) => setSelectedOwnerFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none"
+            >
+              <option value="all">Todos os vendedores</option>
+              {teamMembers.filter(m => m.user_id).map(m => (
+                <option key={m.user_id} value={m.user_id!}>{m.name}</option>
+              ))}
+            </select>
+          )}
           <div className="relative flex-1 sm:w-64">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
              <input 
@@ -313,7 +340,7 @@ const Kanban: React.FC = () => {
                 placeholder="Buscar oportunidade..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-cyan-500 outline-none placeholder:text-slate-600"
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none placeholder:text-slate-600"
              />
           </div>
           <Button 

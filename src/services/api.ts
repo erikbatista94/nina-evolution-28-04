@@ -92,7 +92,7 @@ export const api = {
    * Fetch dashboard metrics with real data from Supabase
    * @param days - Number of days to fetch (1 = today, 7 = last 7 days, 30 = last 30 days)
    */
-  fetchDashboardMetrics: async (days: number = 1): Promise<StatMetric[]> => {
+  fetchDashboardMetrics: async (days: number = 1, userId?: string): Promise<StatMetric[]> => {
     const now = new Date();
     now.setHours(23, 59, 59, 999);
     
@@ -113,6 +113,23 @@ export const api = {
 
     try {
       // Fetch all metrics in parallel
+      // Build queries with optional userId filter
+      let convPeriodQ = supabase.from('conversations').select('id', { count: 'exact', head: true }).gte('last_message_at', periodStartStr);
+      let convPrevQ = supabase.from('conversations').select('id', { count: 'exact', head: true }).gte('last_message_at', prevPeriodStartStr).lt('last_message_at', periodStartStr);
+      let wonPeriodQ = supabase.from('deals').select('id', { count: 'exact', head: true }).not('won_at', 'is', null).gte('won_at', periodStartStr);
+      let wonPrevQ = supabase.from('deals').select('id', { count: 'exact', head: true }).not('won_at', 'is', null).gte('won_at', prevPeriodStartStr).lt('won_at', periodStartStr);
+      let apptPeriodQ = supabase.from('appointments').select('id', { count: 'exact', head: true }).gte('created_at', periodStartStr);
+      let apptPrevQ = supabase.from('appointments').select('id', { count: 'exact', head: true }).gte('created_at', prevPeriodStartStr).lt('created_at', periodStartStr);
+
+      if (userId) {
+        convPeriodQ = convPeriodQ.eq('assigned_user_id', userId);
+        convPrevQ = convPrevQ.eq('assigned_user_id', userId);
+        wonPeriodQ = wonPeriodQ.eq('owner_id', userId);
+        wonPrevQ = wonPrevQ.eq('owner_id', userId);
+        apptPeriodQ = apptPeriodQ.eq('user_id', userId);
+        apptPrevQ = apptPrevQ.eq('user_id', userId);
+      }
+
       const [
         messagesPeriodResult,
         messagesPrevResult,
@@ -124,17 +141,8 @@ export const api = {
         appointmentsPrevResult,
         avgResponseResult
       ] = await Promise.all([
-        // Atendimentos = conversas únicas com atividade no período
-        supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_message_at', periodStartStr),
-        // Atendimentos no período anterior
-        supabase
-          .from('conversations')
-          .select('id', { count: 'exact', head: true })
-          .gte('last_message_at', prevPeriodStartStr)
-          .lt('last_message_at', periodStartStr),
+        convPeriodQ,
+        convPrevQ,
         // New contacts in period
         supabase
           .from('contacts')
@@ -146,30 +154,10 @@ export const api = {
           .select('id', { count: 'exact', head: true })
           .gte('created_at', prevPeriodStartStr)
           .lt('created_at', periodStartStr),
-        // Won deals in period
-        supabase
-          .from('deals')
-          .select('id', { count: 'exact', head: true })
-          .not('won_at', 'is', null)
-          .gte('won_at', periodStartStr),
-        // Won deals in previous period
-        supabase
-          .from('deals')
-          .select('id', { count: 'exact', head: true })
-          .not('won_at', 'is', null)
-          .gte('won_at', prevPeriodStartStr)
-          .lt('won_at', periodStartStr),
-        // Appointments in period
-        supabase
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', periodStartStr),
-        // Appointments in previous period
-        supabase
-          .from('appointments')
-          .select('id', { count: 'exact', head: true })
-          .gte('created_at', prevPeriodStartStr)
-          .lt('created_at', periodStartStr),
+        wonPeriodQ,
+        wonPrevQ,
+        apptPeriodQ,
+        apptPrevQ,
         // Average response time (for the period)
         supabase
           .from('messages')
@@ -235,31 +223,43 @@ export const api = {
    * Fetch chart data for the specified number of days
    * @param days - Number of days to fetch
    */
-  fetchChartData: async (days: number = 7): Promise<any[]> => {
+  fetchChartData: async (days: number = 7, userId?: string): Promise<any[]> => {
     const periodStart = new Date();
     periodStart.setDate(periodStart.getDate() - (days - 1));
     periodStart.setHours(0, 0, 0, 0);
 
     try {
+      let messagesQ = supabase.from('messages').select('sent_at, conversation_id').gte('sent_at', periodStart.toISOString());
+      let dealsQ = supabase.from('deals').select('won_at').not('won_at', 'is', null).gte('won_at', periodStart.toISOString());
+      let appointmentsQ = supabase.from('appointments').select('created_at').gte('created_at', periodStart.toISOString());
+
+      if (userId) {
+        dealsQ = dealsQ.eq('owner_id', userId);
+        appointmentsQ = appointmentsQ.eq('user_id', userId);
+        // For messages, we need to filter by conversations assigned to the user
+        // We'll filter after fetching by joining with conversations
+      }
+
       const [messagesResult, dealsResult, appointmentsResult] = await Promise.all([
-        supabase
-          .from('messages')
-          .select('sent_at')
-          .gte('sent_at', periodStart.toISOString()),
-        supabase
-          .from('deals')
-          .select('won_at')
-          .not('won_at', 'is', null)
-          .gte('won_at', periodStart.toISOString()),
-        supabase
-          .from('appointments')
-          .select('created_at')
-          .gte('created_at', periodStart.toISOString())
+        messagesQ,
+        dealsQ,
+        appointmentsQ
       ]);
+
+      // If userId filter, get conversation IDs assigned to this user and filter messages
+      let filteredMessages = messagesResult.data || [];
+      if (userId && filteredMessages.length > 0) {
+        const { data: userConvs } = await supabase
+          .from('conversations')
+          .select('id')
+          .eq('assigned_user_id', userId);
+        const userConvIds = new Set(userConvs?.map(c => c.id) || []);
+        filteredMessages = filteredMessages.filter(m => userConvIds.has((m as any).conversation_id));
+      }
 
       // Group messages by day
       const messagesMap = new Map<string, number>();
-      (messagesResult.data || []).forEach(m => {
+      filteredMessages.forEach(m => {
         const dateStr = getDateString(new Date(m.sent_at));
         messagesMap.set(dateStr, (messagesMap.get(dateStr) || 0) + 1);
       });
@@ -762,8 +762,8 @@ export const api = {
   /**
    * Fetch pipeline/deals with real data
    */
-  fetchPipeline: async (): Promise<Deal[]> => {
-    const { data, error } = await supabase
+  fetchPipeline: async (userId?: string): Promise<Deal[]> => {
+    let query = supabase
       .from('deals')
       .select(`
         *,
@@ -771,6 +771,12 @@ export const api = {
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('owner_id', userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[API] Error fetching pipeline:', error);
