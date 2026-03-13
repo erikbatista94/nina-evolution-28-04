@@ -762,7 +762,7 @@ export const api = {
   /**
    * Fetch pipeline/deals with real data
    */
-  fetchPipeline: async (): Promise<Deal[]> => {
+  fetchPipeline: async (userId?: string): Promise<Deal[]> => {
     const { data, error } = await supabase
       .from('deals')
       .select(`
