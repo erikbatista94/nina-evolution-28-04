@@ -113,6 +113,19 @@ const Dashboard: React.FC = () => {
             Visão geral da performance da sua IA {period === 'today' ? 'hoje' : `nos últimos ${periodLabels[period].toLowerCase()}`}.
           </p>
         </div>
+        <div className="flex items-center gap-3">
+          {isAdmin && (
+            <select
+              value={selectedSeller}
+              onChange={(e) => setSelectedSeller(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none"
+            >
+              <option value="all">Todos os vendedores</option>
+              {teamMembers.filter(m => m.user_id).map(m => (
+                <option key={m.user_id} value={m.user_id!}>{m.name}</option>
+              ))}
+            </select>
+          )
         <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
           {(['today', '7days', '30days'] as PeriodFilter[]).map((p) => (
             <button
