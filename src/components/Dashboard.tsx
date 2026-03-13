@@ -125,8 +125,8 @@ const Dashboard: React.FC = () => {
                 <option key={m.user_id} value={m.user_id!}>{m.name}</option>
               ))}
             </select>
-          )
-        <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
+          )}
+          <div className="flex items-center gap-2 bg-slate-900 p-1 rounded-lg border border-slate-800">
           {(['today', '7days', '30days'] as PeriodFilter[]).map((p) => (
             <button
               key={p}
