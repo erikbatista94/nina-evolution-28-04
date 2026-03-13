@@ -763,7 +763,7 @@ export const api = {
    * Fetch pipeline/deals with real data
    */
   fetchPipeline: async (userId?: string): Promise<Deal[]> => {
-    const { data, error } = await supabase
+    let query = supabase
       .from('deals')
       .select(`
         *,
@@ -771,6 +771,12 @@ export const api = {
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
+
+    if (userId) {
+      query = query.eq('owner_id', userId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[API] Error fetching pipeline:', error);
