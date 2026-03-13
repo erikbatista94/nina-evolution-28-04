@@ -23,6 +23,7 @@ const Kanban: React.FC = () => {
   const [stages, setStages] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedOwnerFilter, setSelectedOwnerFilter] = useState<string>('all');
   const [selectedDeal, setSelectedDeal] = useState<Deal | null>(null);
   const [activeTab, setActiveTab] = useState<'note' | 'activity' | 'email'>('note');
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
