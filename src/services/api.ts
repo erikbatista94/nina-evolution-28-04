@@ -223,7 +223,7 @@ export const api = {
    * Fetch chart data for the specified number of days
    * @param days - Number of days to fetch
    */
-  fetchChartData: async (days: number = 7): Promise<any[]> => {
+  fetchChartData: async (days: number = 7, userId?: string): Promise<any[]> => {
     const periodStart = new Date();
     periodStart.setDate(periodStart.getDate() - (days - 1));
     periodStart.setHours(0, 0, 0, 0);
