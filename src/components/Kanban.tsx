@@ -320,7 +320,19 @@ const Kanban: React.FC = () => {
           <h2 className="text-3xl font-bold tracking-tight text-white">Pipeline de Vendas</h2>
           <p className="text-sm text-slate-400 mt-1">Gerencie oportunidades e acompanhe o fluxo de receita.</p>
         </div>
-        <div className="flex gap-3 w-full sm:w-auto">
+        <div className="flex gap-3 w-full sm:w-auto items-center">
+          {isAdmin && (
+            <select
+              value={selectedOwnerFilter}
+              onChange={(e) => setSelectedOwnerFilter(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none"
+            >
+              <option value="all">Todos os vendedores</option>
+              {teamMembers.filter(m => m.user_id).map(m => (
+                <option key={m.user_id} value={m.user_id!}>{m.name}</option>
+              ))}
+            </select>
+          )}
           <div className="relative flex-1 sm:w-64">
              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
              <input 
@@ -328,7 +340,7 @@ const Kanban: React.FC = () => {
                 placeholder="Buscar oportunidade..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-cyan-500 outline-none placeholder:text-slate-600"
+                className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none placeholder:text-slate-600"
              />
           </div>
           <Button 
