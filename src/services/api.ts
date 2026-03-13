@@ -92,7 +92,7 @@ export const api = {
    * Fetch dashboard metrics with real data from Supabase
    * @param days - Number of days to fetch (1 = today, 7 = last 7 days, 30 = last 30 days)
    */
-  fetchDashboardMetrics: async (days: number = 1): Promise<StatMetric[]> => {
+  fetchDashboardMetrics: async (days: number = 1, userId?: string): Promise<StatMetric[]> => {
     const now = new Date();
     now.setHours(23, 59, 59, 999);
     
