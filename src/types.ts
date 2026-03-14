@@ -91,6 +91,21 @@ export interface Contact {
   email: string;
   status: 'lead' | 'customer' | 'churned';
   lastContact: string;
+  customerType: string | null;
+  interestServices: string[];
+  city: string | null;
+  neighborhood: string | null;
+  jobSize: string | null;
+  hasProject: boolean | null;
+  startTimeframe: string | null;
+  leadTemperature: string | null;
+  leadStatus: string | null;
+  source: string | null;
+  nextBestAction: string | null;
+  assignedUserId: string | null;
+  lastInteractionAt: string | null;
+  tags: string[];
+  profilePictureUrl: string | null;
 }
 
 export interface StatMetric {

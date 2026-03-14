@@ -55,6 +55,9 @@ serve(async (req) => {
         p_contact_id: contact_id,
         p_new_memory: basicMemory
       });
+
+      // Update last_interaction_at
+      await supabase.from('contacts').update({ last_interaction_at: new Date().toISOString() }).eq('id', contact_id);
       
       console.log('[Analyze] Basic update completed');
       return new Response(JSON.stringify({ updated: true, type: 'basic' }), {
@@ -63,7 +66,6 @@ serve(async (req) => {
     }
 
     // FULL ANALYSIS: Fetch pipeline stages and current deal
-    // Only fetch AI-managed stages with criteria (single-tenant - no user_id filter)
     const { data: stages } = await supabase
       .from('pipeline_stages')
       .select('id, title, ai_trigger_criteria, position')
@@ -88,12 +90,10 @@ serve(async (req) => {
 
     console.log(`[Analyze] Running full AI analysis${hasAiManagedStages ? ' with stage determination' : ' (insights only)'}...`);
 
-    // Prepare stage criteria for AI (only if there are AI-managed stages)
     const stagesCriteria = hasAiManagedStages
       ? stages.map(s => `- ${s.title} (ID: ${s.id}): ${s.ai_trigger_criteria}`).join('\n')
       : '';
 
-    // Prepare conversation snippet for AI analysis
     const conversationSnippet = `
 MENSAGEM DO CLIENTE:
 ${user_message}
@@ -112,7 +112,7 @@ ${stagesCriteria}
 ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
     `.trim();
 
-    // Build tools array - always include memory insights, conditionally include stage determination
+    // Build tools array
     const tools: any[] = [
       {
         type: "function",
@@ -152,6 +152,44 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
                 type: "string",
                 enum: ["unknown", "immediate", "1month", "3months", "6months+"],
                 description: "Timeline de decisão baseado em urgência"
+              },
+              // NEW CRM structured fields
+              customer_type: {
+                type: "string",
+                enum: ["arquiteto", "cliente_final", "engenheiro", "construtora", "empresa", "designer"],
+                description: "Tipo de cliente identificado na conversa. Deixar null se não identificado."
+              },
+              city: {
+                type: "string",
+                description: "Cidade mencionada pelo cliente. Deixar null se não mencionada."
+              },
+              neighborhood: {
+                type: "string",
+                description: "Bairro mencionado pelo cliente. Deixar null se não mencionado."
+              },
+              job_size: {
+                type: "string",
+                enum: ["pequena", "media", "grande"],
+                description: "Tamanho estimado da obra. Deixar null se não identificado."
+              },
+              has_project: {
+                type: "boolean",
+                description: "Se o cliente tem projeto arquitetônico/técnico. Null se não mencionado."
+              },
+              lead_status: {
+                type: "string",
+                enum: ["novo", "qualificando", "qualificado", "agendado", "perdido", "ganho"],
+                description: "Status do lead baseado na conversa"
+              },
+              source: {
+                type: "string",
+                enum: ["indicacao", "google", "instagram", "whatsapp", "outro"],
+                description: "Origem do lead se mencionada. Null se não identificada."
+              },
+              interest_services: {
+                type: "array",
+                items: { type: "string" },
+                description: "Serviços específicos de interesse: drywall, forro, gesso, vinilico, ripado_pvc, molduras, iluminacao, etc."
               }
             },
             required: ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline"],
@@ -161,7 +199,6 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
       }
     ];
 
-    // Only add stage determination tool if there are AI-managed stages
     if (hasAiManagedStages) {
       tools.push({
         type: "function",
@@ -195,12 +232,12 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
     }
 
     const systemPrompt = hasAiManagedStages 
-      ? `Você é um analista de conversas de vendas. Analise a interação e:
-1. Extraia insights estruturados para atualizar a memória do cliente
-2. Determine para qual estágio do pipeline o deal deve ir com base nos critérios fornecidos`
-      : `Você é um analista de conversas de vendas. Analise a interação e extraia insights estruturados para atualizar a memória do cliente.`;
+      ? `Você é um analista de conversas de vendas de uma empresa de gesso, forros e iluminação. Analise a interação e:
+1. Extraia insights estruturados para atualizar a memória do cliente, incluindo tipo de cliente, cidade, bairro, serviços de interesse, tamanho da obra e se tem projeto.
+2. Determine para qual estágio do pipeline o deal deve ir com base nos critérios fornecidos.
+Preencha o máximo de campos possível com base nas informações da conversa. Se um campo não pode ser determinado, omita-o.`
+      : `Você é um analista de conversas de vendas de uma empresa de gesso, forros e iluminação. Analise a interação e extraia insights estruturados para atualizar a memória do cliente, incluindo tipo de cliente, cidade, bairro, serviços de interesse, tamanho da obra e se tem projeto. Preencha o máximo de campos possível com base nas informações da conversa.`;
 
-    // Call AI to extract insights AND determine deal stage (if applicable)
     const analysisResponse = await fetch(LOVABLE_AI_URL, {
       method: 'POST',
       headers: {
@@ -230,7 +267,6 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
       throw new Error('No insights extracted');
     }
 
-    // Extract insights from tool calls
     let insights = null;
     let stageResult = null;
 
@@ -293,6 +329,41 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
         p_contact_id: contact_id,
         p_new_memory: updatedMemory
       });
+
+      // === SYNC STRUCTURED CRM FIELDS TO CONTACTS ===
+      const leadTemp = insights.qualification_score > 70 ? 'quente' : insights.qualification_score > 40 ? 'morno' : 'frio';
+      const startTimeframe = insights.decision_timeline === 'immediate' ? 'imediato' :
+                             insights.decision_timeline === '1month' ? '30d' :
+                             insights.decision_timeline === '3months' ? '60d' :
+                             insights.decision_timeline === '6months+' ? '90d' : null;
+
+      const structuredUpdate: Record<string, any> = {
+        lead_temperature: leadTemp,
+        next_best_action: insights.next_best_action,
+        last_interaction_at: new Date().toISOString(),
+      };
+
+      // Only set fields if the AI extracted them (don't overwrite with null)
+      if (insights.interest_services?.length) structuredUpdate.interest_services = insights.interest_services;
+      if (insights.customer_type) structuredUpdate.customer_type = insights.customer_type;
+      if (insights.city) structuredUpdate.city = insights.city;
+      if (insights.neighborhood) structuredUpdate.neighborhood = insights.neighborhood;
+      if (insights.job_size) structuredUpdate.job_size = insights.job_size;
+      if (insights.has_project !== undefined && insights.has_project !== null) structuredUpdate.has_project = insights.has_project;
+      if (insights.lead_status) structuredUpdate.lead_status = insights.lead_status;
+      if (insights.source) structuredUpdate.source = insights.source;
+      if (startTimeframe) structuredUpdate.start_timeframe = startTimeframe;
+
+      const { error: updateError } = await supabase
+        .from('contacts')
+        .update(structuredUpdate)
+        .eq('id', contact_id);
+
+      if (updateError) {
+        console.error('[Analyze] Error syncing structured fields:', updateError);
+      } else {
+        console.log('[Analyze] ✅ Structured CRM fields synced:', Object.keys(structuredUpdate));
+      }
 
       console.log('[Analyze] Memory updated successfully');
     }

@@ -92,21 +92,34 @@ export type Database = {
       contacts: {
         Row: {
           address_full: string | null
+          assigned_user_id: string | null
           blocked_at: string | null
           blocked_reason: string | null
           call_name: string | null
+          city: string | null
           client_memory: Json | null
           created_at: string
+          customer_type: string | null
           email: string | null
           first_contact_date: string
+          has_project: boolean | null
           id: string
+          interest_services: string[] | null
           is_blocked: boolean | null
           is_business: boolean | null
+          job_size: string | null
           last_activity: string
+          last_interaction_at: string | null
+          lead_status: string | null
+          lead_temperature: string | null
           name: string | null
+          neighborhood: string | null
+          next_best_action: string | null
           notes: string | null
           phone_number: string
           profile_picture_url: string | null
+          source: string | null
+          start_timeframe: string | null
           tags: string[] | null
           updated_at: string
           user_id: string | null
@@ -114,21 +127,34 @@ export type Database = {
         }
         Insert: {
           address_full?: string | null
+          assigned_user_id?: string | null
           blocked_at?: string | null
           blocked_reason?: string | null
           call_name?: string | null
+          city?: string | null
           client_memory?: Json | null
           created_at?: string
+          customer_type?: string | null
           email?: string | null
           first_contact_date?: string
+          has_project?: boolean | null
           id?: string
+          interest_services?: string[] | null
           is_blocked?: boolean | null
           is_business?: boolean | null
+          job_size?: string | null
           last_activity?: string
+          last_interaction_at?: string | null
+          lead_status?: string | null
+          lead_temperature?: string | null
           name?: string | null
+          neighborhood?: string | null
+          next_best_action?: string | null
           notes?: string | null
           phone_number: string
           profile_picture_url?: string | null
+          source?: string | null
+          start_timeframe?: string | null
           tags?: string[] | null
           updated_at?: string
           user_id?: string | null
@@ -136,21 +162,34 @@ export type Database = {
         }
         Update: {
           address_full?: string | null
+          assigned_user_id?: string | null
           blocked_at?: string | null
           blocked_reason?: string | null
           call_name?: string | null
+          city?: string | null
           client_memory?: Json | null
           created_at?: string
+          customer_type?: string | null
           email?: string | null
           first_contact_date?: string
+          has_project?: boolean | null
           id?: string
+          interest_services?: string[] | null
           is_blocked?: boolean | null
           is_business?: boolean | null
+          job_size?: string | null
           last_activity?: string
+          last_interaction_at?: string | null
+          lead_status?: string | null
+          lead_temperature?: string | null
           name?: string | null
+          neighborhood?: string | null
+          next_best_action?: string | null
           notes?: string | null
           phone_number?: string
           profile_picture_url?: string | null
+          source?: string | null
+          start_timeframe?: string | null
           tags?: string[] | null
           updated_at?: string
           user_id?: string | null

@@ -37,12 +37,13 @@ export const MOCK_TEAM: TeamMember[] = [
   },
 ];
 
+const defaultContactFields = { customerType: null, interestServices: [], city: null, neighborhood: null, jobSize: null, hasProject: null, startTimeframe: null, leadTemperature: null, leadStatus: null, source: null, nextBestAction: null, assignedUserId: null, lastInteractionAt: null, tags: [], profilePictureUrl: null };
 export const MOCK_CONTACTS: Contact[] = [
-  { id: '1', name: 'Ana Silva', phone: '+55 11 99999-0001', email: 'ana@email.com', status: 'customer', lastContact: '2023-10-25' },
-  { id: '2', name: 'Carlos Souza', phone: '+55 11 99999-0002', email: 'carlos@tech.com', status: 'lead', lastContact: '2023-10-26' },
-  { id: '3', name: 'Beatriz Costa', phone: '+55 11 99999-0003', email: 'bia@design.com', status: 'churned', lastContact: '2023-09-10' },
-  { id: '4', name: 'João Pereira', phone: '+55 11 99999-0004', email: 'joao@corp.com', status: 'lead', lastContact: '2023-10-27' },
-  { id: '5', name: 'Fernanda Lima', phone: '+55 11 99999-0005', email: 'nanda@email.com', status: 'customer', lastContact: '2023-10-27' },
+  { id: '1', name: 'Ana Silva', phone: '+55 11 99999-0001', email: 'ana@email.com', status: 'customer', lastContact: '2023-10-25', ...defaultContactFields },
+  { id: '2', name: 'Carlos Souza', phone: '+55 11 99999-0002', email: 'carlos@tech.com', status: 'lead', lastContact: '2023-10-26', ...defaultContactFields },
+  { id: '3', name: 'Beatriz Costa', phone: '+55 11 99999-0003', email: 'bia@design.com', status: 'churned', lastContact: '2023-09-10', ...defaultContactFields },
+  { id: '4', name: 'João Pereira', phone: '+55 11 99999-0004', email: 'joao@corp.com', status: 'lead', lastContact: '2023-10-27', ...defaultContactFields },
+  { id: '5', name: 'Fernanda Lima', phone: '+55 11 99999-0005', email: 'nanda@email.com', status: 'customer', lastContact: '2023-10-27', ...defaultContactFields },
 ];
 
 export const MOCK_CONVERSATIONS: Conversation[] = [
