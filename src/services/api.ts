@@ -345,8 +345,23 @@ export const api = {
       name: c.name || c.call_name || c.phone_number,
       phone: c.phone_number,
       email: c.email || '',
-      status: 'lead' as const, // Map from tags or client_memory in future
-      lastContact: new Date(c.last_activity).toLocaleDateString('pt-BR')
+      status: (c as any).lead_status === 'ganho' ? 'customer' as const : (c as any).lead_status === 'perdido' ? 'churned' as const : 'lead' as const,
+      lastContact: new Date(c.last_activity).toLocaleDateString('pt-BR'),
+      customerType: (c as any).customer_type || null,
+      interestServices: (c as any).interest_services || [],
+      city: (c as any).city || null,
+      neighborhood: (c as any).neighborhood || null,
+      jobSize: (c as any).job_size || null,
+      hasProject: (c as any).has_project ?? null,
+      startTimeframe: (c as any).start_timeframe || null,
+      leadTemperature: (c as any).lead_temperature || null,
+      leadStatus: (c as any).lead_status || null,
+      source: (c as any).source || null,
+      nextBestAction: (c as any).next_best_action || null,
+      assignedUserId: (c as any).assigned_user_id || null,
+      lastInteractionAt: (c as any).last_interaction_at || null,
+      tags: c.tags || [],
+      profilePictureUrl: c.profile_picture_url || null,
     }));
   },
 
