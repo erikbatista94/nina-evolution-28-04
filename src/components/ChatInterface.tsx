@@ -38,6 +38,9 @@ const ChatInterface: React.FC = () => {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplyQuery, setQuickReplyQuery] = useState('');
+  const [showQuickRepliesManager, setShowQuickRepliesManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Audio player state
