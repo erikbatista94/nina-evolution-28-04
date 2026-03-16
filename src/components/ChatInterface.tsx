@@ -481,7 +481,16 @@ const ChatInterface: React.FC = () => {
         {/* Search Header */}
         <div className="p-4 border-b border-slate-800/50">
           <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+              <button
+                onClick={() => setShowQuickRepliesManager(true)}
+                title="Mensagens Rápidas"
+                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <Zap className="w-4 h-4" />
+              </button>
+            </div>
             <button
               onClick={!realtimeConnected ? refetch : undefined}
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
