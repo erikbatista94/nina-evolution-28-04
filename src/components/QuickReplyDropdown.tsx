@@ -11,7 +11,7 @@ interface QuickReply {
 }
 
 interface Props {
-  query: string; // the text after "/"
+  query: string;
   onSelect: (content: string) => void;
   onClose: () => void;
   visible: boolean;
@@ -20,14 +20,12 @@ interface Props {
 export const QuickReplyDropdown: React.FC<Props> = ({ query, onSelect, onClose, visible }) => {
   const { user } = useAuth();
   const [replies, setReplies] = useState<QuickReply[]>([]);
-  const [filtered, setFiltered] = useState<QuickReply[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
-  const [loaded, setLoaded] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
 
-  // Load once
+  // Load when becoming visible
   useEffect(() => {
-    if (!user || loaded) return;
+    if (!visible || !user) return;
     supabase
       .from('quick_replies')
       .select('*')
@@ -35,33 +33,49 @@ export const QuickReplyDropdown: React.FC<Props> = ({ query, onSelect, onClose, 
       .order('shortcut')
       .then(({ data }) => {
         setReplies((data || []) as QuickReply[]);
-        setLoaded(true);
       });
-  }, [user, loaded]);
+  }, [visible, user]);
 
-  // Refresh when becoming visible
-  useEffect(() => {
-    if (visible && user) {
-      setLoaded(false);
-    }
-  }, [visible]);
-
-  // Filter
-  useEffect(() => {
+  const filtered = replies.filter(r => {
     const q = query.toLowerCase();
-    const f = replies.filter(r =>
-      r.shortcut.toLowerCase().includes('/' + q) ||
-      r.title.toLowerCase().includes(q)
-    );
-    setFiltered(f);
-    setSelectedIndex(0);
-  }, [query, replies]);
+    return r.shortcut.toLowerCase().includes('/' + q) || r.title.toLowerCase().includes(q);
+  });
 
-  // Keyboard navigation is handled by parent via onKeyDown
-
+  // Reset index when filter changes
   useEffect(() => {
-    // Scroll selected into view
-    const el = listRef.current?.children[selectedIndex] as HTMLElement;
+    setSelectedIndex(0);
+  }, [query]);
+
+  // Handle keyboard events from parent textarea via event delegation
+  useEffect(() => {
+    if (!visible || filtered.length === 0) return;
+
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.min(i + 1, filtered.length - 1));
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        setSelectedIndex(i => Math.max(i - 1, 0));
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        e.stopPropagation();
+        if (filtered[selectedIndex]) {
+          onSelect(filtered[selectedIndex].content);
+        }
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        onClose();
+      }
+    };
+
+    document.addEventListener('keydown', handler, true);
+    return () => document.removeEventListener('keydown', handler, true);
+  }, [visible, filtered, selectedIndex, onSelect, onClose]);
+
+  // Scroll into view
+  useEffect(() => {
+    const el = listRef.current?.children[selectedIndex + 1] as HTMLElement; // +1 for header
     el?.scrollIntoView({ block: 'nearest' });
   }, [selectedIndex]);
 
@@ -70,7 +84,7 @@ export const QuickReplyDropdown: React.FC<Props> = ({ query, onSelect, onClose, 
   return (
     <div
       ref={listRef}
-      className="absolute bottom-full left-0 right-0 mb-1 mx-4 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50"
+      className="absolute bottom-full left-0 right-0 mb-1 bg-slate-900 border border-slate-700 rounded-lg shadow-xl max-h-48 overflow-y-auto z-50"
     >
       <div className="px-3 py-1.5 border-b border-slate-800 flex items-center gap-1.5">
         <Zap className="w-3 h-3 text-amber-400" />
@@ -84,7 +98,7 @@ export const QuickReplyDropdown: React.FC<Props> = ({ query, onSelect, onClose, 
           }`}
           onMouseEnter={() => setSelectedIndex(i)}
           onMouseDown={(e) => {
-            e.preventDefault(); // prevent blur
+            e.preventDefault();
             onSelect(r.content);
           }}
         >
@@ -98,25 +112,3 @@ export const QuickReplyDropdown: React.FC<Props> = ({ query, onSelect, onClose, 
     </div>
   );
 };
-
-// Hook for parent to control keyboard nav
-export function useQuickReplyNav(
-  filteredCount: number,
-  selectedIndex: number,
-  setSelectedIndex: React.Dispatch<React.SetStateAction<number>>
-) {
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'ArrowDown') {
-      e.preventDefault();
-      setSelectedIndex(i => Math.min(i + 1, filteredCount - 1));
-      return true;
-    }
-    if (e.key === 'ArrowUp') {
-      e.preventDefault();
-      setSelectedIndex(i => Math.max(i - 1, 0));
-      return true;
-    }
-    return false;
-  };
-  return handleKeyDown;
-}
