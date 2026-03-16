@@ -1,9 +1,9 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -15,6 +15,8 @@ import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { QuickReplyDropdown } from './QuickReplyDropdown';
+import { QuickRepliesManager } from './QuickRepliesManager';
 
 const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, sendFileMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
@@ -36,6 +38,9 @@ const ChatInterface: React.FC = () => {
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [showQuickReplies, setShowQuickReplies] = useState(false);
+  const [quickReplyQuery, setQuickReplyQuery] = useState('');
+  const [showQuickRepliesManager, setShowQuickRepliesManager] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   // Audio player state
@@ -476,7 +481,16 @@ const ChatInterface: React.FC = () => {
         {/* Search Header */}
         <div className="p-4 border-b border-slate-800/50">
           <div className="flex items-center justify-between mb-4 px-1">
-            <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-lg font-bold text-white">Chats Ativos</h2>
+              <button
+                onClick={() => setShowQuickRepliesManager(true)}
+                title="Mensagens Rápidas"
+                className="p-1.5 text-slate-400 hover:text-amber-400 hover:bg-slate-800 rounded-lg transition-colors"
+              >
+                <Zap className="w-4 h-4" />
+              </button>
+            </div>
             <button
               onClick={!realtimeConnected ? refetch : undefined}
               className={`flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] font-medium transition-all ${
@@ -812,17 +826,50 @@ const ChatInterface: React.FC = () => {
                   />
                 </div>
                 
-                <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                <div className="flex-1 relative bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                  <QuickReplyDropdown
+                    query={quickReplyQuery}
+                    visible={showQuickReplies}
+                    onSelect={(content) => {
+                      setInputText(content);
+                      setShowQuickReplies(false);
+                      setQuickReplyQuery('');
+                    }}
+                    onClose={() => {
+                      setShowQuickReplies(false);
+                      setQuickReplyQuery('');
+                    }}
+                  />
                   <textarea
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInputText(val);
+                      // Detect "/" at start or after whitespace
+                      const slashMatch = val.match(/(?:^|\s)\/(\S*)$/);
+                      if (slashMatch) {
+                        setShowQuickReplies(true);
+                        setQuickReplyQuery(slashMatch[1]);
+                      } else {
+                        setShowQuickReplies(false);
+                        setQuickReplyQuery('');
                       }
                     }}
-                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite sua mensagem...'}
+                    onKeyDown={(e) => {
+                      if (showQuickReplies) {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setShowQuickReplies(false);
+                          return;
+                        }
+                        // Let dropdown handle arrow/enter via onMouseDown
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!showQuickReplies) handleSendMessage();
+                      }
+                    }}
+                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite / para atalhos...'}
                     className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
                     rows={1}
                   />
@@ -1185,6 +1232,8 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
       )}
+
+      <QuickRepliesManager open={showQuickRepliesManager} onClose={() => setShowQuickRepliesManager(false)} />
     </div>
   );
 };
