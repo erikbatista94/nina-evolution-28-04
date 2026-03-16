@@ -817,17 +817,50 @@ const ChatInterface: React.FC = () => {
                   />
                 </div>
                 
-                <div className="flex-1 bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                <div className="flex-1 relative bg-slate-950 rounded-2xl border border-slate-800 focus-within:ring-2 focus-within:ring-cyan-500/30 focus-within:border-cyan-500/50 transition-all shadow-inner">
+                  <QuickReplyDropdown
+                    query={quickReplyQuery}
+                    visible={showQuickReplies}
+                    onSelect={(content) => {
+                      setInputText(content);
+                      setShowQuickReplies(false);
+                      setQuickReplyQuery('');
+                    }}
+                    onClose={() => {
+                      setShowQuickReplies(false);
+                      setQuickReplyQuery('');
+                    }}
+                  />
                   <textarea
                     value={inputText}
-                    onChange={(e) => setInputText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleSendMessage();
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setInputText(val);
+                      // Detect "/" at start or after whitespace
+                      const slashMatch = val.match(/(?:^|\s)\/(\S*)$/);
+                      if (slashMatch) {
+                        setShowQuickReplies(true);
+                        setQuickReplyQuery(slashMatch[1]);
+                      } else {
+                        setShowQuickReplies(false);
+                        setQuickReplyQuery('');
                       }
                     }}
-                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite sua mensagem...'}
+                    onKeyDown={(e) => {
+                      if (showQuickReplies) {
+                        if (e.key === 'Escape') {
+                          e.preventDefault();
+                          setShowQuickReplies(false);
+                          return;
+                        }
+                        // Let dropdown handle arrow/enter via onMouseDown
+                      }
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        if (!showQuickReplies) handleSendMessage();
+                      }
+                    }}
+                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite / para atalhos...'}
                     className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
                     rows={1}
                   />
