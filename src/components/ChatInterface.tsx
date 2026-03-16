@@ -1232,6 +1232,8 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
       )}
+
+      <QuickRepliesManager open={showQuickRepliesManager} onClose={() => setShowQuickRepliesManager(false)} />
     </div>
   );
 };
