@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import PromptGeneratorSheet from './PromptGeneratorSheet';
 import { DEFAULT_NINA_PROMPT } from '@/prompts/default-nina-prompt';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompanySettings } from '@/hooks/useCompanySettings';
+import KnowledgeBase from './KnowledgeBase';
 import {
   Tooltip,
   TooltipContent,
@@ -48,6 +50,7 @@ export interface AgentSettingsRef {
 
 const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
   const { user } = useAuth();
+  const { isAdmin } = useCompanySettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
@@ -508,6 +511,9 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
             </div>
           </div>
         </div>
+
+        {/* Knowledge Base - Admin only */}
+        {isAdmin && <KnowledgeBase />}
 
       </div>
       </TooltipProvider>

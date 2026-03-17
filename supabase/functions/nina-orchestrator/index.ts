@@ -731,7 +731,58 @@ async function processQueueItem(
   );
 
   // Process template variables ({{ data_hora }}, {{ dia_semana }}, etc.)
-  const processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact);
+  let processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact);
+
+  // === KB RAG INJECTION ===
+  try {
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const msgContent = message.content || '';
+    
+    if (msgContent.length >= 3) {
+      console.log('[Nina] Searching knowledge base...');
+      const kbResponse = await fetch(`${supabaseUrl}/functions/v1/knowledge-search`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${serviceKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ query: msgContent, top_k: 5 })
+      });
+
+      if (kbResponse.ok) {
+        const kbData = await kbResponse.json();
+        const results = kbData.results || [];
+        
+        if (results.length > 0) {
+          let kbBlock = '\n\n[BASE DE CONHECIMENTO DA EMPRESA - FONTE PRIORITÁRIA]\n';
+          let totalChars = 0;
+          const MAX_KB_CHARS = 2500;
+
+          for (const r of results) {
+            const entry = `- (${r.title} | ${r.category}) ${r.content}\n`;
+            if (totalChars + entry.length > MAX_KB_CHARS) break;
+            kbBlock += entry;
+            totalChars += entry.length;
+          }
+
+          kbBlock += '\n[REGRAS DA BASE DE CONHECIMENTO]\n';
+          kbBlock += '- Use esses trechos como fonte confiável para responder.\n';
+          kbBlock += '- Se não houver trechos relevantes para a pergunta, NÃO invente informações.\n';
+          kbBlock += '- Se a pergunta não for coberta pela KB, faça pergunta de clarificação ou ofereça encaminhar para um humano.\n';
+          kbBlock += '- NÃO exponha os trechos literalmente ao cliente; use-os para construir uma resposta natural e curta.\n';
+
+          processedPrompt += kbBlock;
+          console.log(`[Nina] KB injected: ${results.length} chunks, ${totalChars} chars`);
+        } else {
+          console.log('[Nina] No KB results found');
+        }
+      }
+    }
+  } catch (kbErr) {
+    console.warn('[Nina] KB search failed (non-blocking):', kbErr);
+  }
+  // === END KB RAG INJECTION ===
 
   console.log('[Nina] Calling Lovable AI...');
 
