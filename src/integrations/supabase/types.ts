@@ -453,6 +453,92 @@ export type Database = {
           },
         ]
       }
+      knowledge_chunks: {
+        Row: {
+          chunk_index: number
+          content: string
+          created_at: string
+          id: string
+          search_vector: unknown
+          source_id: string
+          tenant_id: string | null
+        }
+        Insert: {
+          chunk_index: number
+          content: string
+          created_at?: string
+          id?: string
+          search_vector?: unknown
+          source_id: string
+          tenant_id?: string | null
+        }
+        Update: {
+          chunk_index?: number
+          content?: string
+          created_at?: string
+          id?: string
+          search_vector?: unknown
+          source_id?: string
+          tenant_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "knowledge_chunks_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      knowledge_sources: {
+        Row: {
+          category: string
+          created_at: string
+          created_by: string | null
+          file_path: string | null
+          id: string
+          indexed_at: string | null
+          last_index_error: string | null
+          raw_text: string | null
+          status: string
+          tenant_id: string | null
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          file_path?: string | null
+          id?: string
+          indexed_at?: string | null
+          last_index_error?: string | null
+          raw_text?: string | null
+          status?: string
+          tenant_id?: string | null
+          title: string
+          type?: string
+          updated_at?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          created_by?: string | null
+          file_path?: string | null
+          id?: string
+          indexed_at?: string | null
+          last_index_error?: string | null
+          raw_text?: string | null
+          status?: string
+          tenant_id?: string | null
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       message_grouping_queue: {
         Row: {
           contacts_data: Json | null
@@ -1274,6 +1360,7 @@ export type Database = {
       }
       cleanup_processed_message_queue: { Args: never; Returns: undefined }
       cleanup_processed_queues: { Args: never; Returns: undefined }
+      current_tenant_id: { Args: never; Returns: string }
       get_auth_user_id: { Args: never; Returns: string }
       get_or_create_conversation_state: {
         Args: { p_conversation_id: string }
@@ -1300,6 +1387,17 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      search_knowledge: {
+        Args: { p_query: string; p_tenant_id?: string; p_top_k?: number }
+        Returns: {
+          category: string
+          chunk_index: number
+          content: string
+          rank: number
+          source_id: string
+          title: string
+        }[]
       }
       update_client_memory: {
         Args: { p_contact_id: string; p_new_memory: Json }
