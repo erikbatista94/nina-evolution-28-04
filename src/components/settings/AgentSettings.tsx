@@ -512,6 +512,9 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
           </div>
         </div>
 
+        {/* Knowledge Base - Admin only */}
+        {isAdmin && <KnowledgeBase />}
+
       </div>
       </TooltipProvider>
     </>
