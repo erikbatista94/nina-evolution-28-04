@@ -50,6 +50,7 @@ export interface AgentSettingsRef {
 
 const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
   const { user } = useAuth();
+  const { isAdmin } = useCompanySettings();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [isGeneratorOpen, setIsGeneratorOpen] = useState(false);
