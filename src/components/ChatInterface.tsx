@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -17,6 +17,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { QuickReplyDropdown } from './QuickReplyDropdown';
 import { QuickRepliesManager } from './QuickRepliesManager';
+import AudioRecorder from './AudioRecorder';
+
+const EMOJI_CATEGORIES = [
+  { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
+  { label: '👋 Gestos', emojis: ['👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👋','🤚','✋','🖐️','👊','✊','🤛','🤜','🙏','💪','🫶','❤️‍🔥'] },
+  { label: '❤️ Corações', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','❣️','💕','💞','💓','💗','💖','💝','💘'] },
+  { label: '🎉 Objetos', emojis: ['🎉','🎊','🎈','✨','🔥','💯','⭐','🌟','💡','📌','📎','✅','❌','⚠️','💬','👀','🚀','🏆','🎯','💰','📱','💻','📧','🗓️','⏰','🔔'] },
+];
 
 const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, sendFileMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
