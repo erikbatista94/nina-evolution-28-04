@@ -49,7 +49,10 @@ const ChatInterface: React.FC = () => {
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyQuery, setQuickReplyQuery] = useState('');
   const [showQuickRepliesManager, setShowQuickRepliesManager] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
