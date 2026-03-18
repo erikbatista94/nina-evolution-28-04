@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -17,6 +17,14 @@ import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { QuickReplyDropdown } from './QuickReplyDropdown';
 import { QuickRepliesManager } from './QuickRepliesManager';
+import AudioRecorder from './AudioRecorder';
+
+const EMOJI_CATEGORIES = [
+  { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
+  { label: '👋 Gestos', emojis: ['👍','👎','👌','✌️','🤞','🤟','🤘','🤙','👋','🤚','✋','🖐️','👊','✊','🤛','🤜','🙏','💪','🫶','❤️‍🔥'] },
+  { label: '❤️ Corações', emojis: ['❤️','🧡','💛','💚','💙','💜','🖤','🤍','💔','❣️','💕','💞','💓','💗','💖','💝','💘'] },
+  { label: '🎉 Objetos', emojis: ['🎉','🎊','🎈','✨','🔥','💯','⭐','🌟','💡','📌','📎','✅','❌','⚠️','💬','👀','🚀','🏆','🎯','💰','📱','💻','📧','🗓️','⏰','🔔'] },
+];
 
 const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, sendFileMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
@@ -41,7 +49,10 @@ const ChatInterface: React.FC = () => {
   const [showQuickReplies, setShowQuickReplies] = useState(false);
   const [quickReplyQuery, setQuickReplyQuery] = useState('');
   const [showQuickRepliesManager, setShowQuickRepliesManager] = useState(false);
+  const [isRecording, setIsRecording] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
   
   // Audio player state
   const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
@@ -789,20 +800,65 @@ const ChatInterface: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input Area */}
+             {/* Input Area */}
             <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
+              {isRecording && activeChat ? (
+                <div className="max-w-4xl mx-auto">
+                  <AudioRecorder
+                    conversationId={activeChat.id}
+                    contactPhone={activeChat.contactPhone}
+                    contactName={activeChat.contactName}
+                    onSent={() => { setIsRecording(false); refetch(); }}
+                    onCancel={() => setIsRecording(false)}
+                  />
+                </div>
+              ) : (
               <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto">
                 <div className="flex items-center gap-1">
-                  <Button 
-                    type="button" 
-                    variant="ghost" 
-                    size="icon" 
-                    disabled
-                    title="Em breve: Emoji picker"
-                    className="text-slate-500 rounded-full cursor-not-allowed opacity-50"
-                  >
-                    <Smile className="w-5 h-5" />
-                  </Button>
+                  {/* Emoji Picker */}
+                  <Popover open={emojiPickerOpen} onOpenChange={setEmojiPickerOpen}>
+                    <PopoverTrigger asChild>
+                      <Button 
+                        type="button" 
+                        variant="ghost" 
+                        size="icon" 
+                        title="Emojis"
+                        className="text-slate-400 rounded-full hover:text-cyan-400 hover:bg-slate-800 transition-colors"
+                      >
+                        <Smile className="w-5 h-5" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent 
+                      className="w-80 p-0 bg-slate-900 border-slate-700" 
+                      side="top" 
+                      align="start"
+                      sideOffset={8}
+                    >
+                      <div className="max-h-64 overflow-y-auto p-2">
+                        {EMOJI_CATEGORIES.map((cat) => (
+                          <div key={cat.label} className="mb-2">
+                            <p className="text-xs font-medium text-slate-500 px-1 mb-1">{cat.label}</p>
+                            <div className="grid grid-cols-8 gap-0.5">
+                              {cat.emojis.map((emoji) => (
+                                <button
+                                  key={emoji}
+                                  type="button"
+                                  onClick={() => {
+                                    setInputText(prev => prev + emoji);
+                                    setEmojiPickerOpen(false);
+                                    textareaRef.current?.focus();
+                                  }}
+                                  className="w-8 h-8 flex items-center justify-center rounded hover:bg-slate-800 text-lg transition-colors"
+                                >
+                                  {emoji}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </PopoverContent>
+                  </Popover>
                   <Button 
                     type="button" 
                     variant="ghost" 
@@ -841,11 +897,11 @@ const ChatInterface: React.FC = () => {
                     }}
                   />
                   <textarea
+                    ref={textareaRef}
                     value={inputText}
                     onChange={(e) => {
                       const val = e.target.value;
                       setInputText(val);
-                      // Detect "/" at start or after whitespace
                       const slashMatch = val.match(/(?:^|\s)\/(\S*)$/);
                       if (slashMatch) {
                         setShowQuickReplies(true);
@@ -862,7 +918,6 @@ const ChatInterface: React.FC = () => {
                           setShowQuickReplies(false);
                           return;
                         }
-                        // Let dropdown handle arrow/enter via onMouseDown
                       }
                       if (e.key === 'Enter' && !e.shiftKey) {
                         e.preventDefault();
@@ -875,18 +930,25 @@ const ChatInterface: React.FC = () => {
                   />
                 </div>
 
-                <Button 
-                  type="submit" 
-                  disabled={!inputText.trim()}
-                  className={`rounded-full w-12 h-12 p-0 transition-all ${
-                    inputText.trim() 
-                      ? 'shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95' 
-                      : 'opacity-50 cursor-not-allowed'
-                  }`}
-                >
-                  <Send className="w-5 h-5 ml-0.5" />
-                </Button>
+                {inputText.trim() ? (
+                  <Button 
+                    type="submit" 
+                    className="rounded-full w-12 h-12 p-0 transition-all shadow-lg shadow-cyan-500/20 hover:scale-105 active:scale-95"
+                  >
+                    <Send className="w-5 h-5 ml-0.5" />
+                  </Button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setIsRecording(true)}
+                    className="w-12 h-12 flex items-center justify-center rounded-full bg-emerald-600 hover:bg-emerald-500 text-white transition-all shadow-lg shadow-emerald-500/20 hover:scale-105 active:scale-95"
+                    title="Gravar áudio"
+                  >
+                    <Mic className="w-5 h-5" />
+                  </button>
+                )}
               </form>
+              )}
             </div>
           </div>
 
