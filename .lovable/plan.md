@@ -1,46 +1,97 @@
 
 
-## Plano: Rebranding completo para GG (Gesso Gilmar)
+## Plano: Envio de Áudio Robusto (upload → media_id) + Integração no Chat
 
-Baseado no site www.gessogilmar.com.br, a identidade visual da GG usa **vermelho como cor primária**, fundo escuro, e o logo com selo circular + texto "GG Gesso, Forros e Iluminação".
+### Problema com `audio.link`
 
-### 1. Substituir logos e ícones
-- **Sidebar**: Trocar `icon-via.png` e `logo-via-white.png` pelo logo GG (selo + logo horizontal branco do site)
-- **Página de Login (Auth.tsx)**: Trocar o ícone VIA pelo logo GG
-- **Favicon**: Atualizar para o selo GG
-- Salvar os assets do CDN da GG no projeto (`src/assets/logo-gg.png`, `src/assets/logo-gg-white.svg`, `src/assets/icon-gg.png`)
+O `whatsapp-sender` usa `audio: { link: media_url }` para áudio. Isso depende de URL 100% pública e falha com signed URLs ou buckets privados. O WhatsApp Cloud API rejeita URLs que não são diretamente acessíveis.
 
-### 2. Paleta de cores (index.css)
-Atualizar as CSS variables para refletir o vermelho da GG:
-- `--primary`: de cyan (`187 85% 53%`) para vermelho GG (~`0 72% 50%`)
-- `--accent`: ajustar para um tom complementar (vermelho escuro ou dourado)
-- `--ring`: acompanhar o primary
-- Atualizar sidebar variables correspondentes
+### Solução: modo robusto no `whatsapp-sender`
 
-### 3. Referências hardcoded de cores
-Vários componentes usam cores cyan/teal diretamente (classes Tailwind como `text-cyan-400`, `bg-cyan-500`, etc.):
-- **Dashboard.tsx**: gradientes, tooltips, glows
-- **Sidebar.tsx e ui/sidebar.tsx**: active states, hover colors, glow effects
-- **Auth.tsx**: gradient do logo container
-- **index.css**: scrollbar colors
+Alterar o case `audio` (e opcionalmente `image`/`document`) no `whatsapp-sender` para:
 
-Trocar todas as referências `cyan`/`teal` por `red`/cores da GG.
+1. **Baixar o arquivo do Storage** usando service role (já disponível)
+2. **Upload no WhatsApp Cloud API**: `POST /{phone_number_id}/media` com `multipart/form-data`
+3. **Enviar mensagem** com `audio: { id: media_id }` em vez de `audio: { link: ... }`
+4. **Salvar `whatsapp_media_id`** no metadata da mensagem
 
-### 4. Textos e título
-- **index.html**: Atualizar `<title>` para "GG | Sistema de Gestão"
-- **Sidebar**: Default company name de "Minha Empresa" para "GG"
-- **Auth.tsx**: Atualizar textos de boas-vindas se necessário
+### Arquivos alterados
 
-### 5. Corrigir erros de build existentes
-Há diversos erros TypeScript pré-existentes (null vs undefined) em Team.tsx, api.ts, etc. que precisam ser corrigidos para o app funcionar.
+| Arquivo | Mudança |
+|---|---|
+| `supabase/functions/whatsapp-sender/index.ts` | Case `audio`: download do Storage → upload WhatsApp media → envio com `audio.id`. Nova helper `uploadMediaToWhatsApp()` |
+| `src/services/api.ts` | Novo método `sendAudioMessage(conversationId, blob)`: upload blob → Storage, insert `messages` + `send_queue`, trigger sender |
+| `src/components/AudioRecorder.tsx` | Remover `simulate-audio-webhook`, chamar `onSend(blob)` |
+| `src/components/ChatInterface.tsx` | Conectar `AudioRecorder.onSend` → `api.sendAudioMessage` |
+| `src/hooks/useConversations.ts` | Expor `sendAudioMessage` com optimistic update |
 
-### Arquivos a modificar
-- `src/index.css` — paleta de cores
-- `src/components/Sidebar.tsx` — logos + cores
-- `src/components/ui/sidebar.tsx` — cores hardcoded
-- `src/pages/Auth.tsx` — logo + cores
-- `src/components/Dashboard.tsx` — cores hardcoded
-- `index.html` — título
-- Assets novos: logos GG baixados do CDN
-- Correções TypeScript em `src/services/api.ts`, `src/components/Team.tsx`, `src/components/TeamConfigModal.tsx`, etc.
+### Detalhes técnicos
+
+#### 1. `whatsapp-sender` — helper `uploadMediaToWhatsApp`
+
+```ts
+async function uploadMediaToWhatsApp(
+  settings: any, supabase: any, mediaUrl: string, mimeType: string
+): Promise<string> {
+  // 1. Parse storage path from mediaUrl
+  const storagePath = mediaUrl.split('/whatsapp-media/')[1];
+  
+  // 2. Download from Storage (service role bypasses RLS)
+  const { data, error } = await supabase.storage
+    .from('whatsapp-media').download(storagePath);
+  
+  // 3. Upload to WhatsApp: POST /{phone_number_id}/media
+  const form = new FormData();
+  form.append('file', new Blob([data], { type: mimeType }), 'audio.ogg');
+  form.append('type', mimeType);
+  form.append('messaging_product', 'whatsapp');
+  
+  const res = await fetch(
+    `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/media`,
+    { method: 'POST', headers: { Authorization: `Bearer ${settings.whatsapp_access_token}` }, body: form }
+  );
+  
+  const { id: mediaId } = await res.json();
+  return mediaId;
+}
+```
+
+Case `audio` atualizado:
+```ts
+case 'audio':
+  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, 'audio/ogg');
+  payload.type = 'audio';
+  payload.audio = { id: mediaId };
+  break;
+```
+
+#### 2. `api.sendAudioMessage` — padrão igual a `sendFileMessage`
+
+- Upload blob para `whatsapp-media/chat-uploads/{convId}/{ts}.webm`
+- Get public URL
+- Insert `messages`: `type: 'audio'`, `from_type: 'human'`, `status: 'processing'`
+- Insert `send_queue`: `message_type: 'audio'`, `media_url`, `message_id`, `from_type: 'human'`
+- Invoke `whatsapp-sender`
+
+#### 3. `AudioRecorder` simplificado
+
+- Remove import de `supabase` e chamada a `simulate-audio-webhook`
+- Props: `onSend(blob: Blob)` e `onCancel`
+- Ao clicar enviar: chama `onSend(blob)` com o blob gravado
+
+#### 4. `ChatInterface` conecta tudo
+
+```ts
+const handleAudioSend = async (blob: Blob) => {
+  await sendAudioMessage(activeChat.id, blob);
+  setIsRecording(false);
+};
+```
+
+### Checklist de teste
+
+1. Gravar áudio → aparece no chat como "enviando" → status muda para "sent"
+2. Cliente recebe áudio no WhatsApp (número diferente do business)
+3. Nina NÃO responde automaticamente
+4. Conferir no log do sender: "Uploaded media to WhatsApp, ID: ..."
 
