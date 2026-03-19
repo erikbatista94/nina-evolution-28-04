@@ -285,10 +285,24 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
       };
       break;
     
-    case 'audio':
+    case 'audio': {
+      // Robust mode: download from Storage → upload to WhatsApp → send with media ID
+      const mediaId = await uploadMediaToWhatsApp(
+        settings, supabase, queueItem.media_url,
+        (queueItem.metadata as any)?.audio_mime_type || 'audio/ogg'
+      );
       payload.type = 'audio';
-      payload.audio = { link: queueItem.media_url };
+      payload.audio = { id: mediaId };
+
+      // Save whatsapp_media_id in message metadata for audit
+      if (queueItem.message_id) {
+        const existingMeta = (queueItem.metadata && typeof queueItem.metadata === 'object') ? queueItem.metadata : {};
+        await supabase.from('messages').update({
+          metadata: { ...existingMeta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
       break;
+    }
     
     case 'document':
       payload.type = 'document';
