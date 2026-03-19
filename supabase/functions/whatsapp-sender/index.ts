@@ -227,6 +227,56 @@ async function resolveAgentName(supabase: any, senderUserId: string): Promise<st
   return profile?.full_name || null;
 }
 
+async function uploadMediaToWhatsApp(
+  settings: any, supabase: any, mediaUrl: string, mimeType: string
+): Promise<string> {
+  // 1. Parse storage path from the public URL
+  const parts = mediaUrl.split('/object/public/whatsapp-media/');
+  if (parts.length < 2) {
+    throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
+  }
+  const storagePath = decodeURIComponent(parts[1]);
+  console.log(`[Sender] Downloading from Storage: ${storagePath}`);
+
+  // 2. Download from Storage (service role bypasses RLS)
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from('whatsapp-media')
+    .download(storagePath);
+
+  if (downloadError || !fileData) {
+    console.error('[Sender] Error downloading from Storage:', downloadError);
+    throw new Error(`Failed to download media from Storage: ${downloadError?.message || 'no data'}`);
+  }
+
+  console.log(`[Sender] Downloaded ${fileData.size} bytes, uploading to WhatsApp...`);
+
+  // 3. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
+  const form = new FormData();
+  const extension = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
+  form.append('file', new Blob([fileData], { type: mimeType }), `audio.${extension}`);
+  form.append('type', mimeType);
+  form.append('messaging_product', 'whatsapp');
+
+  const uploadRes = await fetch(
+    `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/media`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${settings.whatsapp_access_token}` },
+      body: form,
+    }
+  );
+
+  const uploadData = await uploadRes.json();
+
+  if (!uploadRes.ok || !uploadData.id) {
+    console.error('[Sender] WhatsApp media upload error:', uploadData);
+    throw new Error(uploadData.error?.message || 'WhatsApp media upload failed');
+  }
+
+  console.log('[Sender] Uploaded media to WhatsApp, ID:', uploadData.id);
+  return uploadData.id;
+}
+
 async function sendMessage(supabase: any, settings: any, queueItem: any) {
   console.log(`[Sender] Sending message: ${queueItem.id}`);
 
