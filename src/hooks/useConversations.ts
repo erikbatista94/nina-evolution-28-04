@@ -566,7 +566,9 @@ export function useConversations() {
       status: 'sent' as const,
       fromType: 'human',
       senderUserId: currentUser?.id || null,
-      senderName: null
+      senderName: null,
+      mediaUrl: null,
+      whatsappMessageId: null
     };
 
     setConversations(prev => prev.map(conv => {

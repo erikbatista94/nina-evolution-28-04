@@ -805,10 +805,10 @@ const ChatInterface: React.FC = () => {
               {isRecording && activeChat ? (
                 <div className="max-w-4xl mx-auto">
                   <AudioRecorder
-                    conversationId={activeChat.id}
-                    contactPhone={activeChat.contactPhone}
-                    contactName={activeChat.contactName}
-                    onSent={() => { setIsRecording(false); refetch(); }}
+                    onSend={async (blob) => {
+                      await sendAudioMessage(activeChat.id, blob);
+                      setIsRecording(false);
+                    }}
                     onCancel={() => setIsRecording(false)}
                   />
                 </div>
