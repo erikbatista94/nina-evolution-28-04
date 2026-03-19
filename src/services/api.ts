@@ -1471,6 +1471,103 @@ export const api = {
   },
 
   /**
+   * Send an audio message (upload blob to storage, create message + send_queue, trigger sender)
+   */
+  sendAudioMessage: async (conversationId: string, audioBlob: Blob): Promise<string> => {
+    console.log(`[API] Sending audio message to conversation ${conversationId}, size: ${audioBlob.size}`);
+
+    // Get conversation to find contact_id
+    const { data: conversation, error: convError } = await supabase
+      .from('conversations')
+      .select('contact_id')
+      .eq('id', conversationId)
+      .single();
+
+    if (convError || !conversation) {
+      console.error('[API] Error getting conversation:', convError);
+      throw new Error('Conversation not found');
+    }
+
+    // Upload blob to Supabase Storage
+    const ext = audioBlob.type.includes('mp4') ? 'mp4' : audioBlob.type.includes('ogg') ? 'ogg' : 'webm';
+    const filePath = `chat-uploads/${conversationId}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
+
+    console.log('[API] Uploading audio to storage:', filePath);
+    const { error: uploadError } = await supabase.storage
+      .from('whatsapp-media')
+      .upload(filePath, audioBlob, { contentType: audioBlob.type, upsert: false });
+
+    if (uploadError) {
+      console.error('[API] Error uploading audio:', uploadError);
+      throw new Error('Failed to upload audio');
+    }
+
+    const { data: urlData } = supabase.storage
+      .from('whatsapp-media')
+      .getPublicUrl(filePath);
+
+    const publicUrl = urlData.publicUrl;
+    console.log('[API] Audio uploaded, public URL:', publicUrl);
+
+    // Get current user
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    // Create message record
+    const { data: msgData, error: msgError } = await supabase
+      .from('messages')
+      .insert({
+        conversation_id: conversationId,
+        content: null,
+        type: 'audio',
+        from_type: 'human',
+        status: 'processing',
+        media_url: publicUrl,
+        media_type: audioBlob.type,
+        sent_at: new Date().toISOString(),
+        sender_user_id: currentUser?.id || null
+      } as any)
+      .select('id')
+      .single();
+
+    if (msgError || !msgData) {
+      console.error('[API] Error creating audio message record:', msgError);
+      throw new Error('Failed to create message record');
+    }
+
+    console.log('[API] Audio message created with ID:', msgData.id);
+
+    // Queue for sending
+    const { error: sendError } = await supabase
+      .from('send_queue')
+      .insert({
+        conversation_id: conversationId,
+        contact_id: conversation.contact_id,
+        content: null,
+        from_type: 'human',
+        message_type: 'audio',
+        media_url: publicUrl,
+        priority: 2,
+        message_id: msgData.id,
+        metadata: { audio_mime_type: audioBlob.type }
+      });
+
+    if (sendError) {
+      console.error('[API] Error queuing audio message:', sendError);
+      throw sendError;
+    }
+
+    // Trigger whatsapp-sender
+    try {
+      console.log('[API] Triggering whatsapp-sender for audio...');
+      await supabase.functions.invoke('whatsapp-sender');
+    } catch (err) {
+      console.error('[API] Failed to trigger whatsapp-sender:', err);
+    }
+
+    return msgData.id;
+  },
+
+  /**
    * Update conversation status (nina/human/paused)
    */
   updateConversationStatus: async (

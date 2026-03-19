@@ -552,6 +552,52 @@ export function useConversations() {
     }
   }, [conversations]);
 
+  // Send audio message
+  const sendAudioMessage = useCallback(async (conversationId: string, audioBlob: Blob) => {
+    const tempId = `temp-audio-${Date.now()}`;
+    const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+    const tempMessage: UIMessage = {
+      id: tempId,
+      content: '',
+      type: MessageType.AUDIO,
+      direction: MessageDirection.OUTGOING,
+      timestamp: 'Agora',
+      status: 'sent' as const,
+      fromType: 'human',
+      senderUserId: currentUser?.id || null,
+      senderName: null,
+      mediaUrl: null,
+      whatsappMessageId: null
+    };
+
+    setConversations(prev => prev.map(conv => {
+      if (conv.id === conversationId) {
+        return {
+          ...conv,
+          messages: [...conv.messages, tempMessage],
+          lastMessage: '🎤 Áudio',
+          lastMessageTime: 'Agora'
+        };
+      }
+      return conv;
+    }));
+
+    try {
+      await api.sendAudioMessage(conversationId, audioBlob);
+      console.log('[useConversations] Audio message sent successfully');
+    } catch (err) {
+      console.error('[useConversations] Error sending audio:', err);
+      toast.error('Erro ao enviar áudio');
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          return { ...conv, messages: conv.messages.filter(m => m.id !== tempId) };
+        }
+        return conv;
+      }));
+    }
+  }, []);
+
   return {
     conversations,
     loading,
@@ -559,6 +605,7 @@ export function useConversations() {
     realtimeConnected,
     sendMessage,
     sendFileMessage,
+    sendAudioMessage,
     updateStatus,
     markAsRead,
     assignConversation,

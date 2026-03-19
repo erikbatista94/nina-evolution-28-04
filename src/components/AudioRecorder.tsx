@@ -1,23 +1,13 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Trash2, Send, Mic } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { Trash2, Send } from 'lucide-react';
 import { toast } from 'sonner';
 
 interface AudioRecorderProps {
-  conversationId: string;
-  contactPhone: string;
-  contactName?: string;
-  onSent: () => void;
+  onSend: (blob: Blob) => void;
   onCancel: () => void;
 }
 
-const AudioRecorder: React.FC<AudioRecorderProps> = ({
-  conversationId,
-  contactPhone,
-  contactName,
-  onSent,
-  onCancel,
-}) => {
+const AudioRecorder: React.FC<AudioRecorderProps> = ({ onSend, onCancel }) => {
   const [seconds, setSeconds] = useState(0);
   const [sending, setSending] = useState(false);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -77,7 +67,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     const recorder = mediaRecorderRef.current;
     if (!recorder || recorder.state === 'inactive') { setSending(false); return; }
 
-    // Wait for final data
     const blob = await new Promise<Blob>((resolve) => {
       recorder.onstop = () => {
         const finalMime = recorder.mimeType || 'audio/webm';
@@ -89,31 +78,10 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
     stopStream();
 
     try {
-      // Convert to base64
-      const buffer = await blob.arrayBuffer();
-      const bytes = new Uint8Array(buffer);
-      let binary = '';
-      for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-      const base64 = btoa(binary);
-
-      const { data, error } = await supabase.functions.invoke('simulate-audio-webhook', {
-        body: {
-          phone: contactPhone,
-          name: contactName || null,
-          audio_base64: base64,
-          audio_mime_type: blob.type || 'audio/webm',
-        },
-      });
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      toast.success('Áudio enviado');
-      onSent();
+      onSend(blob);
     } catch (err: any) {
       console.error('Error sending audio:', err);
       toast.error(err.message || 'Erro ao enviar áudio');
-      onCancel();
     }
   };
 
@@ -125,7 +93,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
 
   return (
     <div className="flex items-center gap-3 w-full">
-      {/* Trash / Cancel */}
       <button
         type="button"
         onClick={handleCancel}
@@ -134,15 +101,12 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         <Trash2 className="w-5 h-5" />
       </button>
 
-      {/* Recording indicator */}
       <div className="flex-1 flex items-center gap-3 bg-slate-950 rounded-2xl border border-destructive/30 px-4 py-3">
-        {/* Pulsing red dot */}
         <span className="relative flex h-3 w-3">
           <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75"></span>
           <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive"></span>
         </span>
 
-        {/* Waveform bars */}
         <div className="flex items-center gap-0.5 h-6">
           {Array.from({ length: 20 }).map((_, i) => (
             <div
@@ -160,7 +124,6 @@ const AudioRecorder: React.FC<AudioRecorderProps> = ({
         <span className="text-sm font-mono text-slate-300 ml-auto">{formatTime(seconds)}</span>
       </div>
 
-      {/* Send */}
       <button
         type="button"
         onClick={handleSend}

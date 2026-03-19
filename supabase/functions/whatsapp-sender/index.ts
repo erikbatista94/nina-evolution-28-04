@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v18.0";
+const WHATSAPP_API_URL = "https://graph.facebook.com/v19.0";
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -227,6 +227,56 @@ async function resolveAgentName(supabase: any, senderUserId: string): Promise<st
   return profile?.full_name || null;
 }
 
+async function uploadMediaToWhatsApp(
+  settings: any, supabase: any, mediaUrl: string, mimeType: string
+): Promise<string> {
+  // 1. Parse storage path from the public URL
+  const parts = mediaUrl.split('/object/public/whatsapp-media/');
+  if (parts.length < 2) {
+    throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
+  }
+  const storagePath = decodeURIComponent(parts[1]);
+  console.log(`[Sender] Downloading from Storage: ${storagePath}`);
+
+  // 2. Download from Storage (service role bypasses RLS)
+  const { data: fileData, error: downloadError } = await supabase.storage
+    .from('whatsapp-media')
+    .download(storagePath);
+
+  if (downloadError || !fileData) {
+    console.error('[Sender] Error downloading from Storage:', downloadError);
+    throw new Error(`Failed to download media from Storage: ${downloadError?.message || 'no data'}`);
+  }
+
+  console.log(`[Sender] Downloaded ${fileData.size} bytes, uploading to WhatsApp...`);
+
+  // 3. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
+  const form = new FormData();
+  const extension = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
+  form.append('file', new Blob([fileData], { type: mimeType }), `audio.${extension}`);
+  form.append('type', mimeType);
+  form.append('messaging_product', 'whatsapp');
+
+  const uploadRes = await fetch(
+    `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/media`,
+    {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${settings.whatsapp_access_token}` },
+      body: form,
+    }
+  );
+
+  const uploadData = await uploadRes.json();
+
+  if (!uploadRes.ok || !uploadData.id) {
+    console.error('[Sender] WhatsApp media upload error:', uploadData);
+    throw new Error(uploadData.error?.message || 'WhatsApp media upload failed');
+  }
+
+  console.log('[Sender] Uploaded media to WhatsApp, ID:', uploadData.id);
+  return uploadData.id;
+}
+
 async function sendMessage(supabase: any, settings: any, queueItem: any) {
   console.log(`[Sender] Sending message: ${queueItem.id}`);
 
@@ -285,10 +335,24 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
       };
       break;
     
-    case 'audio':
+    case 'audio': {
+      // Robust mode: download from Storage → upload to WhatsApp → send with media ID
+      const mediaId = await uploadMediaToWhatsApp(
+        settings, supabase, queueItem.media_url,
+        (queueItem.metadata as any)?.audio_mime_type || 'audio/ogg'
+      );
       payload.type = 'audio';
-      payload.audio = { link: queueItem.media_url };
+      payload.audio = { id: mediaId };
+
+      // Save whatsapp_media_id in message metadata for audit
+      if (queueItem.message_id) {
+        const existingMeta = (queueItem.metadata && typeof queueItem.metadata === 'object') ? queueItem.metadata : {};
+        await supabase.from('messages').update({
+          metadata: { ...existingMeta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
       break;
+    }
     
     case 'document':
       payload.type = 'document';
