@@ -1452,7 +1452,7 @@ export const api = {
         content: file.name,
         type: messageType,
         from_type: 'human',
-        status: 'sent',
+        status: 'processing',
         media_url: publicUrl,
         media_type: file.type,
         sent_at: new Date().toISOString(),
@@ -1467,6 +1467,35 @@ export const api = {
     }
 
     console.log('[API] File message created with ID:', msgData.id);
+
+    // Queue for sending via WhatsApp
+    const { error: sendError } = await supabase
+      .from('send_queue')
+      .insert({
+        conversation_id: conversationId,
+        contact_id: conversation.contact_id,
+        content: file.name,
+        from_type: 'human',
+        message_type: messageType,
+        media_url: publicUrl,
+        priority: 2,
+        message_id: msgData.id,
+        metadata: { storage_path: filePath, filename: file.name, mime_type: file.type }
+      });
+
+    if (sendError) {
+      console.error('[API] Error queuing file message:', sendError);
+      throw sendError;
+    }
+
+    // Trigger whatsapp-sender
+    try {
+      console.log('[API] Triggering whatsapp-sender for file...');
+      await supabase.functions.invoke('whatsapp-sender');
+    } catch (err) {
+      console.error('[API] Failed to trigger whatsapp-sender:', err);
+    }
+
     return msgData.id;
   },
 
