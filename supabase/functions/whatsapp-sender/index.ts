@@ -228,20 +228,23 @@ async function resolveAgentName(supabase: any, senderUserId: string): Promise<st
 }
 
 async function uploadMediaToWhatsApp(
-  settings: any, supabase: any, mediaUrl: string, mimeType: string
+  settings: any, supabase: any, mediaUrl: string, mimeType: string, storagePath?: string
 ): Promise<string> {
-  // 1. Parse storage path from the public URL
-  const parts = mediaUrl.split('/object/public/whatsapp-media/');
-  if (parts.length < 2) {
-    throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
+  // 1. Resolve storage path: prefer explicit storagePath, fallback to parsing mediaUrl
+  let resolvedPath = storagePath;
+  if (!resolvedPath) {
+    const parts = mediaUrl.split('/object/public/whatsapp-media/');
+    if (parts.length < 2) {
+      throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
+    }
+    resolvedPath = decodeURIComponent(parts[1]);
   }
-  const storagePath = decodeURIComponent(parts[1]);
-  console.log(`[Sender] Downloading from Storage: ${storagePath}`);
+  console.log(`[Sender] Downloading from Storage: ${resolvedPath}`);
 
   // 2. Download from Storage (service role bypasses RLS)
   const { data: fileData, error: downloadError } = await supabase.storage
     .from('whatsapp-media')
-    .download(storagePath);
+    .download(resolvedPath);
 
   if (downloadError || !fileData) {
     console.error('[Sender] Error downloading from Storage:', downloadError);
@@ -250,10 +253,21 @@ async function uploadMediaToWhatsApp(
 
   console.log(`[Sender] Downloaded ${fileData.size} bytes, uploading to WhatsApp...`);
 
-  // 3. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
+  // 3. Map mimeType to a sensible filename
+  const extMap: Record<string, string> = {
+    'image/jpeg': 'media.jpg', 'image/png': 'media.png', 'image/webp': 'media.webp',
+    'video/mp4': 'video.mp4', 'video/3gpp': 'video.3gp',
+    'audio/ogg': 'audio.ogg', 'audio/mpeg': 'audio.mp3', 'audio/mp4': 'audio.mp4',
+    'audio/webm': 'audio.webm', 'audio/aac': 'audio.aac',
+    'application/pdf': 'document.pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document.docx',
+    'application/msword': 'document.doc',
+  };
+  const fileName = extMap[mimeType] || 'file.bin';
+
+  // 4. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
   const form = new FormData();
-  const extension = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
-  form.append('file', new Blob([fileData], { type: mimeType }), `audio.${extension}`);
+  form.append('file', new Blob([fileData], { type: mimeType }), fileName);
   form.append('type', mimeType);
   form.append('messaging_product', 'whatsapp');
 
@@ -327,40 +341,64 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
       payload.text = { body: finalContent };
       break;
     
-    case 'image':
+    case 'image': {
+      const meta = (queueItem.metadata as any) || {};
+      const mimeType = meta.mime_type || 'image/jpeg';
+      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
       payload.type = 'image';
-      payload.image = { 
-        link: queueItem.media_url,
-        caption: finalContent || undefined
-      };
-      break;
-    
-    case 'audio': {
-      // Robust mode: download from Storage → upload to WhatsApp → send with media ID
-      const mediaId = await uploadMediaToWhatsApp(
-        settings, supabase, queueItem.media_url,
-        (queueItem.metadata as any)?.audio_mime_type || 'audio/ogg'
-      );
-      payload.type = 'audio';
-      payload.audio = { id: mediaId };
-
-      // Save whatsapp_media_id in message metadata for audit
+      payload.image = { id: mediaId, caption: finalContent?.trim() || undefined };
       if (queueItem.message_id) {
-        const existingMeta = (queueItem.metadata && typeof queueItem.metadata === 'object') ? queueItem.metadata : {};
         await supabase.from('messages').update({
-          metadata: { ...existingMeta, whatsapp_media_id: mediaId }
+          metadata: { ...meta, whatsapp_media_id: mediaId }
         }).eq('id', queueItem.message_id);
       }
       break;
     }
     
-    case 'document':
-      payload.type = 'document';
-      payload.document = { 
-        link: queueItem.media_url,
-        filename: queueItem.content || 'document'
-      };
+    case 'audio': {
+      const meta = (queueItem.metadata as any) || {};
+      const mediaId = await uploadMediaToWhatsApp(
+        settings, supabase, queueItem.media_url,
+        meta.audio_mime_type || meta.mime_type || 'audio/ogg',
+        meta.storage_path
+      );
+      payload.type = 'audio';
+      payload.audio = { id: mediaId };
+      if (queueItem.message_id) {
+        await supabase.from('messages').update({
+          metadata: { ...meta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
       break;
+    }
+    
+    case 'document': {
+      const meta = (queueItem.metadata as any) || {};
+      const mimeType = meta.mime_type || 'application/pdf';
+      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
+      payload.type = 'document';
+      payload.document = { id: mediaId, filename: meta.filename || 'document.pdf' };
+      if (queueItem.message_id) {
+        await supabase.from('messages').update({
+          metadata: { ...meta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
+      break;
+    }
+
+    case 'video': {
+      const meta = (queueItem.metadata as any) || {};
+      const mimeType = meta.mime_type || 'video/mp4';
+      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
+      payload.type = 'video';
+      payload.video = { id: mediaId, caption: finalContent?.trim() || undefined };
+      if (queueItem.message_id) {
+        await supabase.from('messages').update({
+          metadata: { ...meta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
+      break;
+    }
     
     default:
       payload.type = 'text';
