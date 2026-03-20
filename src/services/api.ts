@@ -1577,7 +1577,7 @@ export const api = {
         media_url: publicUrl,
         priority: 2,
         message_id: msgData.id,
-        metadata: { audio_mime_type: audioBlob.type }
+        metadata: { audio_mime_type: audioBlob.type, storage_path: filePath }
       });
 
     if (sendError) {

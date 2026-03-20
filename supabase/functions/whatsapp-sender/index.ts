@@ -341,40 +341,64 @@ async function sendMessage(supabase: any, settings: any, queueItem: any) {
       payload.text = { body: finalContent };
       break;
     
-    case 'image':
+    case 'image': {
+      const meta = (queueItem.metadata as any) || {};
+      const mimeType = meta.mime_type || 'image/jpeg';
+      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
       payload.type = 'image';
-      payload.image = { 
-        link: queueItem.media_url,
-        caption: finalContent || undefined
-      };
-      break;
-    
-    case 'audio': {
-      // Robust mode: download from Storage → upload to WhatsApp → send with media ID
-      const mediaId = await uploadMediaToWhatsApp(
-        settings, supabase, queueItem.media_url,
-        (queueItem.metadata as any)?.audio_mime_type || 'audio/ogg'
-      );
-      payload.type = 'audio';
-      payload.audio = { id: mediaId };
-
-      // Save whatsapp_media_id in message metadata for audit
+      payload.image = { id: mediaId, caption: finalContent?.trim() || undefined };
       if (queueItem.message_id) {
-        const existingMeta = (queueItem.metadata && typeof queueItem.metadata === 'object') ? queueItem.metadata : {};
         await supabase.from('messages').update({
-          metadata: { ...existingMeta, whatsapp_media_id: mediaId }
+          metadata: { ...meta, whatsapp_media_id: mediaId }
         }).eq('id', queueItem.message_id);
       }
       break;
     }
     
-    case 'document':
-      payload.type = 'document';
-      payload.document = { 
-        link: queueItem.media_url,
-        filename: queueItem.content || 'document'
-      };
+    case 'audio': {
+      const meta = (queueItem.metadata as any) || {};
+      const mediaId = await uploadMediaToWhatsApp(
+        settings, supabase, queueItem.media_url,
+        meta.audio_mime_type || meta.mime_type || 'audio/ogg',
+        meta.storage_path
+      );
+      payload.type = 'audio';
+      payload.audio = { id: mediaId };
+      if (queueItem.message_id) {
+        await supabase.from('messages').update({
+          metadata: { ...meta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
       break;
+    }
+    
+    case 'document': {
+      const meta = (queueItem.metadata as any) || {};
+      const mimeType = meta.mime_type || 'application/pdf';
+      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
+      payload.type = 'document';
+      payload.document = { id: mediaId, filename: meta.filename || 'document.pdf' };
+      if (queueItem.message_id) {
+        await supabase.from('messages').update({
+          metadata: { ...meta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
+      break;
+    }
+
+    case 'video': {
+      const meta = (queueItem.metadata as any) || {};
+      const mimeType = meta.mime_type || 'video/mp4';
+      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
+      payload.type = 'video';
+      payload.video = { id: mediaId, caption: finalContent?.trim() || undefined };
+      if (queueItem.message_id) {
+        await supabase.from('messages').update({
+          metadata: { ...meta, whatsapp_media_id: mediaId }
+        }).eq('id', queueItem.message_id);
+      }
+      break;
+    }
     
     default:
       payload.type = 'text';
