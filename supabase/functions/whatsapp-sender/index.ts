@@ -228,20 +228,23 @@ async function resolveAgentName(supabase: any, senderUserId: string): Promise<st
 }
 
 async function uploadMediaToWhatsApp(
-  settings: any, supabase: any, mediaUrl: string, mimeType: string
+  settings: any, supabase: any, mediaUrl: string, mimeType: string, storagePath?: string
 ): Promise<string> {
-  // 1. Parse storage path from the public URL
-  const parts = mediaUrl.split('/object/public/whatsapp-media/');
-  if (parts.length < 2) {
-    throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
+  // 1. Resolve storage path: prefer explicit storagePath, fallback to parsing mediaUrl
+  let resolvedPath = storagePath;
+  if (!resolvedPath) {
+    const parts = mediaUrl.split('/object/public/whatsapp-media/');
+    if (parts.length < 2) {
+      throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
+    }
+    resolvedPath = decodeURIComponent(parts[1]);
   }
-  const storagePath = decodeURIComponent(parts[1]);
-  console.log(`[Sender] Downloading from Storage: ${storagePath}`);
+  console.log(`[Sender] Downloading from Storage: ${resolvedPath}`);
 
   // 2. Download from Storage (service role bypasses RLS)
   const { data: fileData, error: downloadError } = await supabase.storage
     .from('whatsapp-media')
-    .download(storagePath);
+    .download(resolvedPath);
 
   if (downloadError || !fileData) {
     console.error('[Sender] Error downloading from Storage:', downloadError);
@@ -250,10 +253,21 @@ async function uploadMediaToWhatsApp(
 
   console.log(`[Sender] Downloaded ${fileData.size} bytes, uploading to WhatsApp...`);
 
-  // 3. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
+  // 3. Map mimeType to a sensible filename
+  const extMap: Record<string, string> = {
+    'image/jpeg': 'media.jpg', 'image/png': 'media.png', 'image/webp': 'media.webp',
+    'video/mp4': 'video.mp4', 'video/3gpp': 'video.3gp',
+    'audio/ogg': 'audio.ogg', 'audio/mpeg': 'audio.mp3', 'audio/mp4': 'audio.mp4',
+    'audio/webm': 'audio.webm', 'audio/aac': 'audio.aac',
+    'application/pdf': 'document.pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document.docx',
+    'application/msword': 'document.doc',
+  };
+  const fileName = extMap[mimeType] || 'file.bin';
+
+  // 4. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
   const form = new FormData();
-  const extension = mimeType.includes('ogg') ? 'ogg' : mimeType.includes('mp4') ? 'mp4' : 'webm';
-  form.append('file', new Blob([fileData], { type: mimeType }), `audio.${extension}`);
+  form.append('file', new Blob([fileData], { type: mimeType }), fileName);
   form.append('type', mimeType);
   form.append('messaging_product', 'whatsapp');
 
