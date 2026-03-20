@@ -1,97 +1,107 @@
 
 
-## Plano: Envio de Áudio Robusto (upload → media_id) + Integração no Chat
+## Plano: Envio robusto de mídia para TODOS os tipos + 3 ajustes obrigatórios
 
-### Problema com `audio.link`
+### Auditoria atual
 
-O `whatsapp-sender` usa `audio: { link: media_url }` para áudio. Isso depende de URL 100% pública e falha com signed URLs ou buckets privados. O WhatsApp Cloud API rejeita URLs que não são diretamente acessíveis.
+| Tipo | Modo atual | Problema |
+|---|---|---|
+| `audio` | `uploadMediaToWhatsApp` → `audio: { id }` | OK (robusto) |
+| `image` | `image: { link: media_url }` | Falha com bucket privado |
+| `document` | `document: { link: media_url, filename: content }` | Falha + filename errado |
+| `video` | Não tratado (cai no default text) | Falha |
 
-### Solução: modo robusto no `whatsapp-sender`
+### 3 ajustes incorporados
 
-Alterar o case `audio` (e opcionalmente `image`/`document`) no `whatsapp-sender` para:
+1. **`storage_path` em vez de `media_url`**: O `uploadMediaToWhatsApp` passa a usar `metadata.storage_path` (caminho direto no bucket) como fonte primária, com fallback para parsear `media_url`. O `sendFileMessage` e `sendAudioMessage` salvam `storage_path` no metadata da `send_queue`.
 
-1. **Baixar o arquivo do Storage** usando service role (já disponível)
-2. **Upload no WhatsApp Cloud API**: `POST /{phone_number_id}/media` com `multipart/form-data`
-3. **Enviar mensagem** com `audio: { id: media_id }` em vez de `audio: { link: ... }`
-4. **Salvar `whatsapp_media_id`** no metadata da mensagem
+2. **`filename` do document via metadata**: `sendFileMessage` salva `metadata.filename = file.name`. O sender usa `metadata.filename || 'document.pdf'` em vez de `queueItem.content`.
+
+3. **`caption` do video**: Só seta `caption` se `finalContent?.trim()` tiver conteúdo, senão `undefined`.
+
+### Mudanças por arquivo
+
+#### 1. `supabase/functions/whatsapp-sender/index.ts`
+
+**Helper `uploadMediaToWhatsApp`** — aceitar `storagePath` direto:
+- Novo parâmetro opcional `storagePath?: string`
+- Se `storagePath` fornecido, usar direto; senão fallback para parsear `mediaUrl`
+- Filename genérico baseado no mimeType (não hardcodar `audio.ogg`)
+
+**Case `image`** — modo robusto:
+```ts
+case 'image': {
+  const meta = (queueItem.metadata as any) || {};
+  const mimeType = meta.mime_type || 'image/jpeg';
+  const sp = meta.storage_path;
+  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, sp);
+  payload.type = 'image';
+  payload.image = { id: mediaId, caption: finalContent?.trim() || undefined };
+  if (queueItem.message_id) { /* save whatsapp_media_id */ }
+  break;
+}
+```
+
+**Case `document`** — modo robusto + filename de metadata:
+```ts
+case 'document': {
+  const meta = (queueItem.metadata as any) || {};
+  const mimeType = meta.mime_type || 'application/pdf';
+  const sp = meta.storage_path;
+  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, sp);
+  payload.type = 'document';
+  payload.document = { id: mediaId, filename: meta.filename || 'document.pdf' };
+  if (queueItem.message_id) { /* save whatsapp_media_id */ }
+  break;
+}
+```
+
+**Novo case `video`** — modo robusto + caption condicional:
+```ts
+case 'video': {
+  const meta = (queueItem.metadata as any) || {};
+  const mimeType = meta.mime_type || 'video/mp4';
+  const sp = meta.storage_path;
+  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, sp);
+  payload.type = 'video';
+  payload.video = { id: mediaId, caption: finalContent?.trim() || undefined };
+  if (queueItem.message_id) { /* save whatsapp_media_id */ }
+  break;
+}
+```
+
+**Case `audio`** — atualizar para usar `storage_path`:
+```ts
+const meta = (queueItem.metadata as any) || {};
+const sp = meta.storage_path;
+const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, meta.audio_mime_type || 'audio/ogg', sp);
+```
+
+#### 2. `src/services/api.ts`
+
+**`sendFileMessage`** — adicionar `storage_path`, `filename`, `mime_type` no metadata + inserir na `send_queue`:
+- Atualmente NÃO insere na `send_queue` (bug! arquivo não é enviado ao WhatsApp)
+- Adicionar insert na `send_queue` + trigger `whatsapp-sender` (igual `sendAudioMessage`)
+- Metadata: `{ storage_path: filePath, filename: file.name, mime_type: file.type }`
+
+**`sendAudioMessage`** — adicionar `storage_path` no metadata:
+- Metadata: `{ audio_mime_type: audioBlob.type, storage_path: filePath }`
 
 ### Arquivos alterados
 
 | Arquivo | Mudança |
 |---|---|
-| `supabase/functions/whatsapp-sender/index.ts` | Case `audio`: download do Storage → upload WhatsApp media → envio com `audio.id`. Nova helper `uploadMediaToWhatsApp()` |
-| `src/services/api.ts` | Novo método `sendAudioMessage(conversationId, blob)`: upload blob → Storage, insert `messages` + `send_queue`, trigger sender |
-| `src/components/AudioRecorder.tsx` | Remover `simulate-audio-webhook`, chamar `onSend(blob)` |
-| `src/components/ChatInterface.tsx` | Conectar `AudioRecorder.onSend` → `api.sendAudioMessage` |
-| `src/hooks/useConversations.ts` | Expor `sendAudioMessage` com optimistic update |
+| `supabase/functions/whatsapp-sender/index.ts` | Cases image/document/video usam upload robusto por ID via `storage_path`. Helper genérico. Filename de metadata. Caption condicional. |
+| `src/services/api.ts` | `sendFileMessage` insere na `send_queue` com metadata (storage_path, filename, mime_type). `sendAudioMessage` adiciona storage_path. |
 
-### Detalhes técnicos
+### Bug crítico descoberto
 
-#### 1. `whatsapp-sender` — helper `uploadMediaToWhatsApp`
-
-```ts
-async function uploadMediaToWhatsApp(
-  settings: any, supabase: any, mediaUrl: string, mimeType: string
-): Promise<string> {
-  // 1. Parse storage path from mediaUrl
-  const storagePath = mediaUrl.split('/whatsapp-media/')[1];
-  
-  // 2. Download from Storage (service role bypasses RLS)
-  const { data, error } = await supabase.storage
-    .from('whatsapp-media').download(storagePath);
-  
-  // 3. Upload to WhatsApp: POST /{phone_number_id}/media
-  const form = new FormData();
-  form.append('file', new Blob([data], { type: mimeType }), 'audio.ogg');
-  form.append('type', mimeType);
-  form.append('messaging_product', 'whatsapp');
-  
-  const res = await fetch(
-    `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/media`,
-    { method: 'POST', headers: { Authorization: `Bearer ${settings.whatsapp_access_token}` }, body: form }
-  );
-  
-  const { id: mediaId } = await res.json();
-  return mediaId;
-}
-```
-
-Case `audio` atualizado:
-```ts
-case 'audio':
-  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, 'audio/ogg');
-  payload.type = 'audio';
-  payload.audio = { id: mediaId };
-  break;
-```
-
-#### 2. `api.sendAudioMessage` — padrão igual a `sendFileMessage`
-
-- Upload blob para `whatsapp-media/chat-uploads/{convId}/{ts}.webm`
-- Get public URL
-- Insert `messages`: `type: 'audio'`, `from_type: 'human'`, `status: 'processing'`
-- Insert `send_queue`: `message_type: 'audio'`, `media_url`, `message_id`, `from_type: 'human'`
-- Invoke `whatsapp-sender`
-
-#### 3. `AudioRecorder` simplificado
-
-- Remove import de `supabase` e chamada a `simulate-audio-webhook`
-- Props: `onSend(blob: Blob)` e `onCancel`
-- Ao clicar enviar: chama `onSend(blob)` com o blob gravado
-
-#### 4. `ChatInterface` conecta tudo
-
-```ts
-const handleAudioSend = async (blob: Blob) => {
-  await sendAudioMessage(activeChat.id, blob);
-  setIsRecording(false);
-};
-```
+O `sendFileMessage` atual **não insere na `send_queue`** e **não triggera o `whatsapp-sender`**. Isso explica por que arquivos nunca chegam ao WhatsApp. A correção adiciona essa inserção seguindo o mesmo padrão do `sendAudioMessage`.
 
 ### Checklist de teste
-
-1. Gravar áudio → aparece no chat como "enviando" → status muda para "sent"
-2. Cliente recebe áudio no WhatsApp (número diferente do business)
-3. Nina NÃO responde automaticamente
-4. Conferir no log do sender: "Uploaded media to WhatsApp, ID: ..."
+1. Enviar PDF no chat → chega no WhatsApp como documento com nome correto
+2. Enviar imagem JPG/PNG → chega no WhatsApp
+3. Enviar áudio gravado → chega (regressão)
+4. Status muda de processing → sent
+5. Em caso de erro, log mostra response body do WhatsApp
 
