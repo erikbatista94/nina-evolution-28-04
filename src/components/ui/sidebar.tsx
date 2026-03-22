@@ -214,10 +214,18 @@ export const SidebarLink = ({
         <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary rounded-l-md shadow-[0_0_10px_hsl(var(--primary)/0.5)]" />
       )}
       <span className={cn(
-        "flex-shrink-0 transition-colors",
+        "flex-shrink-0 transition-colors relative",
         isActive ? "text-primary" : "text-slate-500 group-hover/sidebar:text-slate-300"
       )}>
         {link.icon}
+        {link.badge && !open && (
+          <span className={cn(
+            "absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center",
+            link.badgeColor || "bg-red-500"
+          )}>
+            {link.badge > 9 ? '9+' : link.badge}
+          </span>
+        )}
       </span>
       <motion.span
         animate={{
@@ -229,12 +237,20 @@ export const SidebarLink = ({
           ease: "easeInOut",
         }}
         className={cn(
-          "text-sm font-medium group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre",
+          "text-sm font-medium group-hover/sidebar:translate-x-1 transition duration-150 whitespace-pre flex-1",
           isActive && "text-white"
         )}
       >
         {link.label}
       </motion.span>
+      {link.badge && open && (
+        <span className={cn(
+          "w-5 h-5 rounded-full text-[10px] font-bold text-white flex items-center justify-center flex-shrink-0",
+          link.badgeColor || "bg-red-500"
+        )}>
+          {link.badge > 9 ? '9+' : link.badge}
+        </span>
+      )}
     </Link>
   );
 };

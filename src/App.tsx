@@ -53,6 +53,7 @@ const App: React.FC = () => {
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/pipeline" element={<Kanban />} />
               <Route path="/chat" element={<ChatInterface />} />
+              <Route path="/alerts" element={<AlertsPanel />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/scheduling" element={<Scheduling />} />
               <Route path="/team" element={<Team />} />
