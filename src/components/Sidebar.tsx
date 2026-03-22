@@ -72,6 +72,8 @@ const SidebarContent = () => {
     label: item.label,
     href: `/${item.id}`,
     icon: <item.icon className="h-5 w-5" />,
+    badge: item.id === 'alerts' && alertCount > 0 ? alertCount : undefined,
+    badgeColor: item.id === 'alerts' ? (hasStalled ? 'bg-red-500' : hasLossRisk ? 'bg-orange-500' : 'bg-yellow-500') : undefined,
   }));
 
   const handleLogout = async () => {
