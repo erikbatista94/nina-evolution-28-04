@@ -10,6 +10,8 @@ interface Links {
   label: string;
   href: string;
   icon: React.JSX.Element | React.ReactNode;
+  badge?: number;
+  badgeColor?: string;
 }
 
 interface SidebarContextProps {
