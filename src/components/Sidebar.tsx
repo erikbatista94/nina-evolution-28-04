@@ -64,6 +64,7 @@ const SidebarContent = () => {
   const navigate = useNavigate();
   const currentPath = location.pathname.substring(1) || 'dashboard';
   const { open, setOpen } = useSidebar();
+  const { alertCount, hasStalled, hasLossRisk } = useAlerts();
 
   const menuItems = allMenuItems.filter(item => !item.adminOnly || isAdmin);
 
