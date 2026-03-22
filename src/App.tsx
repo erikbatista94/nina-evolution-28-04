@@ -8,6 +8,7 @@ import Settings from './components/Settings';
 import Team from './components/Team';
 import Scheduling from './components/Scheduling';
 import Kanban from './components/Kanban';
+import AlertsPanel from './components/AlertsPanel';
 import Auth from './pages/Auth';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
