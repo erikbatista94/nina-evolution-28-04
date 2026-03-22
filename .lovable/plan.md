@@ -1,107 +1,118 @@
 
 
-## Plano: Envio robusto de mídia para TODOS os tipos + 3 ajustes obrigatórios
+## Plano: SLA de Atendimento + Alertas (com 4 ajustes incorporados)
 
-### Auditoria atual
+### 1. Migration — Tabela `sla_alerts`
 
-| Tipo | Modo atual | Problema |
-|---|---|---|
-| `audio` | `uploadMediaToWhatsApp` → `audio: { id }` | OK (robusto) |
-| `image` | `image: { link: media_url }` | Falha com bucket privado |
-| `document` | `document: { link: media_url, filename: content }` | Falha + filename errado |
-| `video` | Não tratado (cai no default text) | Falha |
+```sql
+CREATE TYPE sla_level AS ENUM ('respond_now', 'loss_risk', 'stalled');
 
-### 3 ajustes incorporados
+CREATE TABLE public.sla_alerts (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
+  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
+  assigned_user_id UUID,
+  level sla_level NOT NULL,
+  resolved BOOLEAN NOT NULL DEFAULT false,
+  resolved_at TIMESTAMPTZ,
+  suggested_message TEXT,
+  last_client_message_at TIMESTAMPTZ NOT NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
-1. **`storage_path` em vez de `media_url`**: O `uploadMediaToWhatsApp` passa a usar `metadata.storage_path` (caminho direto no bucket) como fonte primária, com fallback para parsear `media_url`. O `sendFileMessage` e `sendAudioMessage` salvam `storage_path` no metadata da `send_queue`.
+ALTER TABLE public.sla_alerts ENABLE ROW LEVEL SECURITY;
 
-2. **`filename` do document via metadata**: `sendFileMessage` salva `metadata.filename = file.name`. O sender usa `metadata.filename || 'document.pdf'` em vez de `queueItem.content`.
+-- Unique parcial: evita duplicação de alertas abertos
+CREATE UNIQUE INDEX idx_sla_alerts_unique_open
+  ON public.sla_alerts (conversation_id, level)
+  WHERE resolved = false;
 
-3. **`caption` do video**: Só seta `caption` se `finalContent?.trim()` tiver conteúdo, senão `undefined`.
+-- SELECT: vendedor vê os dele, admin vê tudo
+CREATE POLICY "Users can select own alerts"
+  ON public.sla_alerts FOR SELECT TO authenticated
+  USING (assigned_user_id = auth.uid() OR public.has_role(auth.uid(), 'admin'));
 
-### Mudanças por arquivo
+-- UPDATE: vendedor só pode resolver os dele (resolved=true)
+CREATE POLICY "Users can resolve own alerts"
+  ON public.sla_alerts FOR UPDATE TO authenticated
+  USING (assigned_user_id = auth.uid())
+  WITH CHECK (resolved = true);
 
-#### 1. `supabase/functions/whatsapp-sender/index.ts`
+-- INSERT/DELETE: somente service role (sem policy = bloqueado para authenticated)
+-- Edge functions usam service role, que bypassa RLS
 
-**Helper `uploadMediaToWhatsApp`** — aceitar `storagePath` direto:
-- Novo parâmetro opcional `storagePath?: string`
-- Se `storagePath` fornecido, usar direto; senão fallback para parsear `mediaUrl`
-- Filename genérico baseado no mimeType (não hardcodar `audio.ogg`)
-
-**Case `image`** — modo robusto:
-```ts
-case 'image': {
-  const meta = (queueItem.metadata as any) || {};
-  const mimeType = meta.mime_type || 'image/jpeg';
-  const sp = meta.storage_path;
-  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, sp);
-  payload.type = 'image';
-  payload.image = { id: mediaId, caption: finalContent?.trim() || undefined };
-  if (queueItem.message_id) { /* save whatsapp_media_id */ }
-  break;
-}
+-- Realtime
+ALTER PUBLICATION supabase_realtime ADD TABLE public.sla_alerts;
 ```
 
-**Case `document`** — modo robusto + filename de metadata:
-```ts
-case 'document': {
-  const meta = (queueItem.metadata as any) || {};
-  const mimeType = meta.mime_type || 'application/pdf';
-  const sp = meta.storage_path;
-  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, sp);
-  payload.type = 'document';
-  payload.document = { id: mediaId, filename: meta.filename || 'document.pdf' };
-  if (queueItem.message_id) { /* save whatsapp_media_id */ }
-  break;
-}
+**Ajuste 1**: Sem policy FOR ALL. INSERT/UPDATE/DELETE bloqueados para usuários normais. Service role (edge functions) bypassa RLS naturalmente.
+
+**Ajuste 2**: `public.has_role(auth.uid(), 'admin')` com schema explícito.
+
+**Ajuste 3**: Unique index parcial `(conversation_id, level) WHERE resolved = false` + UPSERT no checker.
+
+### 2. Edge Function `sla-checker`
+
+Query usa `sent_at` (timestamp real do envio, não `created_at` que é quando o registro foi inserido):
+
+```sql
+SELECT c.id, c.contact_id, c.assigned_user_id,
+  MAX(m.sent_at) FILTER (WHERE m.from_type = 'user') as last_client_msg,
+  MAX(m.sent_at) FILTER (WHERE m.from_type = 'human') as last_human_msg,
+  ct.name as contact_name
+FROM conversations c
+JOIN messages m ON m.conversation_id = c.id
+JOIN contacts ct ON ct.id = c.contact_id
+WHERE c.is_active = true AND c.status = 'human'
+GROUP BY c.id, c.contact_id, c.assigned_user_id, ct.name
+HAVING MAX(m.sent_at) FILTER (WHERE m.from_type = 'user') >
+       COALESCE(MAX(m.sent_at) FILTER (WHERE m.from_type = 'human'), '1970-01-01')
 ```
 
-**Novo case `video`** — modo robusto + caption condicional:
-```ts
-case 'video': {
-  const meta = (queueItem.metadata as any) || {};
-  const mimeType = meta.mime_type || 'video/mp4';
-  const sp = meta.storage_path;
-  const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, sp);
-  payload.type = 'video';
-  payload.video = { id: mediaId, caption: finalContent?.trim() || undefined };
-  if (queueItem.message_id) { /* save whatsapp_media_id */ }
-  break;
-}
-```
+**Ajuste 4**: Usa `sent_at` consistentemente.
 
-**Case `audio`** — atualizar para usar `storage_path`:
-```ts
-const meta = (queueItem.metadata as any) || {};
-const sp = meta.storage_path;
-const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, meta.audio_mime_type || 'audio/ogg', sp);
-```
+Lógica:
+- Calcula `diffMinutes` desde `last_client_msg`
+- Determina nível: ≥1440min → `stalled`, ≥120min → `loss_risk`, ≥10min → `respond_now`
+- UPSERT com `ON CONFLICT (conversation_id, level) WHERE resolved = false DO UPDATE SET updated_at = now()`
+- Para `stalled`: gera `suggested_message` = "Olá {nome}, tudo bem? Vi que ficamos sem falar. Posso ajudar?"
+- Auto-resolve: marca `resolved = true` onde conversa já tem resposta humana posterior
+- Usa service role client (bypassa RLS)
 
-#### 2. `src/services/api.ts`
+### 3. Hook `useAlerts`
 
-**`sendFileMessage`** — adicionar `storage_path`, `filename`, `mime_type` no metadata + inserir na `send_queue`:
-- Atualmente NÃO insere na `send_queue` (bug! arquivo não é enviado ao WhatsApp)
-- Adicionar insert na `send_queue` + trigger `whatsapp-sender` (igual `sendAudioMessage`)
-- Metadata: `{ storage_path: filePath, filename: file.name, mime_type: file.type }`
+- Query `sla_alerts` WHERE `resolved = false`, ordenado por `level` (stalled > loss_risk > respond_now)
+- Subscribe realtime em `sla_alerts`
+- Expõe: `alerts[]`, `alertCount`, `resolveAlert(id)` (update `resolved = true`)
+- RLS filtra automaticamente por role
 
-**`sendAudioMessage`** — adicionar `storage_path` no metadata:
-- Metadata: `{ audio_mime_type: audioBlob.type, storage_path: filePath }`
+### 4. UI
 
-### Arquivos alterados
+**Sidebar** (`src/components/Sidebar.tsx`):
+- Novo item "Alertas" com ícone Bell + badge de contagem
+- Badge vermelho se houver alertas `stalled`, amarelo se `loss_risk`/`respond_now`
+
+**Componente `AlertsPanel`** (`src/components/AlertsPanel.tsx`):
+- Lista de alertas com cores: vermelho (`stalled`), laranja (`loss_risk`), amarelo (`respond_now`)
+- Cada card: nome do contato, tempo sem resposta, nível
+- Ações: "Abrir Conversa" (navega para `/chat?conversation=ID`), "Enviar Follow-up" (stalled: abre chat com mensagem sugerida)
+- Admin: filtro por vendedor
+
+**Rota**: `/alerts` em `App.tsx`
+
+### 5. Agendamento (pg_cron ou invocação manual)
+
+Configurar chamada periódica (a cada 5 min) via cron ou trigger. A edge function `sla-checker` será invocada com service role.
+
+### Arquivos
 
 | Arquivo | Mudança |
 |---|---|
-| `supabase/functions/whatsapp-sender/index.ts` | Cases image/document/video usam upload robusto por ID via `storage_path`. Helper genérico. Filename de metadata. Caption condicional. |
-| `src/services/api.ts` | `sendFileMessage` insere na `send_queue` com metadata (storage_path, filename, mime_type). `sendAudioMessage` adiciona storage_path. |
-
-### Bug crítico descoberto
-
-O `sendFileMessage` atual **não insere na `send_queue`** e **não triggera o `whatsapp-sender`**. Isso explica por que arquivos nunca chegam ao WhatsApp. A correção adiciona essa inserção seguindo o mesmo padrão do `sendAudioMessage`.
-
-### Checklist de teste
-1. Enviar PDF no chat → chega no WhatsApp como documento com nome correto
-2. Enviar imagem JPG/PNG → chega no WhatsApp
-3. Enviar áudio gravado → chega (regressão)
-4. Status muda de processing → sent
-5. Em caso de erro, log mostra response body do WhatsApp
+| Migration SQL | Tabela + RLS + unique index + realtime |
+| `supabase/functions/sla-checker/index.ts` | Novo: varredura + UPSERT + auto-resolve |
+| `src/hooks/useAlerts.ts` | Novo: query + realtime + resolveAlert |
+| `src/components/AlertsPanel.tsx` | Novo: UI de alertas |
+| `src/components/Sidebar.tsx` | Badge de contagem |
+| `src/App.tsx` | Rota `/alerts` |
 
