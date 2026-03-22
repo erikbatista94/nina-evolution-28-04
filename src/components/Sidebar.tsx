@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell } from 'lucide-react';
+import { useAlerts } from '@/hooks/useAlerts';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
@@ -14,6 +15,7 @@ const allMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
   { id: 'pipeline', label: 'Pipeline', icon: Kanban, adminOnly: false },
   { id: 'chat', label: 'Chat Ao Vivo', icon: MessageSquare, adminOnly: false },
+  { id: 'alerts', label: 'Alertas', icon: Bell, adminOnly: false },
   { id: 'contacts', label: 'Contatos', icon: Users, adminOnly: false },
   { id: 'scheduling', label: 'Agendamentos', icon: Calendar, adminOnly: false },
   { id: 'team', label: 'Equipe', icon: ShieldCheck, adminOnly: false },
@@ -62,6 +64,7 @@ const SidebarContent = () => {
   const navigate = useNavigate();
   const currentPath = location.pathname.substring(1) || 'dashboard';
   const { open, setOpen } = useSidebar();
+  const { alertCount, hasStalled, hasLossRisk } = useAlerts();
 
   const menuItems = allMenuItems.filter(item => !item.adminOnly || isAdmin);
 
@@ -69,6 +72,8 @@ const SidebarContent = () => {
     label: item.label,
     href: `/${item.id}`,
     icon: <item.icon className="h-5 w-5" />,
+    badge: item.id === 'alerts' && alertCount > 0 ? alertCount : undefined,
+    badgeColor: item.id === 'alerts' ? (hasStalled ? 'bg-red-500' : hasLossRisk ? 'bg-orange-500' : 'bg-yellow-500') : undefined,
   }));
 
   const handleLogout = async () => {

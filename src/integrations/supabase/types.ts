@@ -1059,6 +1059,70 @@ export type Database = {
           },
         ]
       }
+      sla_alerts: {
+        Row: {
+          assigned_user_id: string | null
+          contact_id: string
+          conversation_id: string
+          created_at: string
+          id: string
+          last_client_message_at: string
+          level: Database["public"]["Enums"]["sla_level"]
+          resolved: boolean
+          resolved_at: string | null
+          suggested_message: string | null
+          updated_at: string
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          contact_id: string
+          conversation_id: string
+          created_at?: string
+          id?: string
+          last_client_message_at: string
+          level: Database["public"]["Enums"]["sla_level"]
+          resolved?: boolean
+          resolved_at?: string | null
+          suggested_message?: string | null
+          updated_at?: string
+        }
+        Update: {
+          assigned_user_id?: string | null
+          contact_id?: string
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          last_client_message_at?: string
+          level?: Database["public"]["Enums"]["sla_level"]
+          resolved?: boolean
+          resolved_at?: string | null
+          suggested_message?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sla_alerts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sla_alerts_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sla_alerts_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tag_definitions: {
         Row: {
           category: string
@@ -1438,6 +1502,7 @@ export type Database = {
       message_status: "sent" | "delivered" | "read" | "failed" | "processing"
       message_type: "text" | "audio" | "image" | "document" | "video"
       queue_status: "pending" | "processing" | "completed" | "failed"
+      sla_level: "respond_now" | "loss_risk" | "stalled"
       team_assignment: "mateus" | "igor" | "fe" | "vendas" | "suporte"
     }
     CompositeTypes: {
@@ -1575,6 +1640,7 @@ export const Constants = {
       message_status: ["sent", "delivered", "read", "failed", "processing"],
       message_type: ["text", "audio", "image", "document", "video"],
       queue_status: ["pending", "processing", "completed", "failed"],
+      sla_level: ["respond_now", "loss_risk", "stalled"],
       team_assignment: ["mateus", "igor", "fe", "vendas", "suporte"],
     },
   },
