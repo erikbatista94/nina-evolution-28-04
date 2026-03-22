@@ -15,6 +15,7 @@ const allMenuItems = [
   { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, adminOnly: false },
   { id: 'pipeline', label: 'Pipeline', icon: Kanban, adminOnly: false },
   { id: 'chat', label: 'Chat Ao Vivo', icon: MessageSquare, adminOnly: false },
+  { id: 'alerts', label: 'Alertas', icon: Bell, adminOnly: false },
   { id: 'contacts', label: 'Contatos', icon: Users, adminOnly: false },
   { id: 'scheduling', label: 'Agendamentos', icon: Calendar, adminOnly: false },
   { id: 'team', label: 'Equipe', icon: ShieldCheck, adminOnly: false },
