@@ -1,118 +1,86 @@
 
 
-## Plano: SLA de Atendimento + Alertas (com 4 ajustes incorporados)
+## Plano: Dashboard inteligente por role — "Meu Dia" + Admin SLA
 
-### 1. Migration — Tabela `sla_alerts`
+### Arquitetura
 
-```sql
-CREATE TYPE sla_level AS ENUM ('respond_now', 'loss_risk', 'stalled');
+`Dashboard.tsx` bifurca por `isAdmin`:
+- **Admin**: mantém dashboard atual + novo `DashboardSlaBlock`
+- **Vendedor**: novo `DashboardMyDay` com 3 blocos
 
-CREATE TABLE public.sla_alerts (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  conversation_id UUID NOT NULL REFERENCES conversations(id) ON DELETE CASCADE,
-  contact_id UUID NOT NULL REFERENCES contacts(id) ON DELETE CASCADE,
-  assigned_user_id UUID,
-  level sla_level NOT NULL,
-  resolved BOOLEAN NOT NULL DEFAULT false,
-  resolved_at TIMESTAMPTZ,
-  suggested_message TEXT,
-  last_client_message_at TIMESTAMPTZ NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
-);
+### Auditoria dos 3 pontos obrigatórios
 
-ALTER TABLE public.sla_alerts ENABLE ROW LEVEL SECURITY;
+1. **`conversations.last_message_at`**: Existe e é atualizado pelo trigger `update_conversation_last_message()` a cada mensagem. Confiável — usaremos direto.
 
--- Unique parcial: evita duplicação de alertas abertos
-CREATE UNIQUE INDEX idx_sla_alerts_unique_open
-  ON public.sla_alerts (conversation_id, level)
-  WHERE resolved = false;
+2. **`appointments`**: Schema tem `date` (tipo `date`) e `user_id` (UUID do responsável). Filtro: `.eq('date', todayStr)` onde `todayStr = new Date().toISOString().split('T')[0]`, e `.eq('user_id', userId)`.
 
--- SELECT: vendedor vê os dele, admin vê tudo
-CREATE POLICY "Users can select own alerts"
-  ON public.sla_alerts FOR SELECT TO authenticated
-  USING (assigned_user_id = auth.uid() OR public.has_role(auth.uid(), 'admin'));
-
--- UPDATE: vendedor só pode resolver os dele (resolved=true)
-CREATE POLICY "Users can resolve own alerts"
-  ON public.sla_alerts FOR UPDATE TO authenticated
-  USING (assigned_user_id = auth.uid())
-  WITH CHECK (resolved = true);
-
--- INSERT/DELETE: somente service role (sem policy = bloqueado para authenticated)
--- Edge functions usam service role, que bypassa RLS
-
--- Realtime
-ALTER PUBLICATION supabase_realtime ADD TABLE public.sla_alerts;
-```
-
-**Ajuste 1**: Sem policy FOR ALL. INSERT/UPDATE/DELETE bloqueados para usuários normais. Service role (edge functions) bypassa RLS naturalmente.
-
-**Ajuste 2**: `public.has_role(auth.uid(), 'admin')` com schema explícito.
-
-**Ajuste 3**: Unique index parcial `(conversation_id, level) WHERE resolved = false` + UPSERT no checker.
-
-### 2. Edge Function `sla-checker`
-
-Query usa `sent_at` (timestamp real do envio, não `created_at` que é quando o registro foi inserido):
-
-```sql
-SELECT c.id, c.contact_id, c.assigned_user_id,
-  MAX(m.sent_at) FILTER (WHERE m.from_type = 'user') as last_client_msg,
-  MAX(m.sent_at) FILTER (WHERE m.from_type = 'human') as last_human_msg,
-  ct.name as contact_name
-FROM conversations c
-JOIN messages m ON m.conversation_id = c.id
-JOIN contacts ct ON ct.id = c.contact_id
-WHERE c.is_active = true AND c.status = 'human'
-GROUP BY c.id, c.contact_id, c.assigned_user_id, ct.name
-HAVING MAX(m.sent_at) FILTER (WHERE m.from_type = 'user') >
-       COALESCE(MAX(m.sent_at) FILTER (WHERE m.from_type = 'human'), '1970-01-01')
-```
-
-**Ajuste 4**: Usa `sent_at` consistentemente.
-
-Lógica:
-- Calcula `diffMinutes` desde `last_client_msg`
-- Determina nível: ≥1440min → `stalled`, ≥120min → `loss_risk`, ≥10min → `respond_now`
-- UPSERT com `ON CONFLICT (conversation_id, level) WHERE resolved = false DO UPDATE SET updated_at = now()`
-- Para `stalled`: gera `suggested_message` = "Olá {nome}, tudo bem? Vi que ficamos sem falar. Posso ajudar?"
-- Auto-resolve: marca `resolved = true` onde conversa já tem resposta humana posterior
-- Usa service role client (bypassa RLS)
-
-### 3. Hook `useAlerts`
-
-- Query `sla_alerts` WHERE `resolved = false`, ordenado por `level` (stalled > loss_risk > respond_now)
-- Subscribe realtime em `sla_alerts`
-- Expõe: `alerts[]`, `alertCount`, `resolveAlert(id)` (update `resolved = true`)
-- RLS filtra automaticamente por role
-
-### 4. UI
-
-**Sidebar** (`src/components/Sidebar.tsx`):
-- Novo item "Alertas" com ícone Bell + badge de contagem
-- Badge vermelho se houver alertas `stalled`, amarelo se `loss_risk`/`respond_now`
-
-**Componente `AlertsPanel`** (`src/components/AlertsPanel.tsx`):
-- Lista de alertas com cores: vermelho (`stalled`), laranja (`loss_risk`), amarelo (`respond_now`)
-- Cada card: nome do contato, tempo sem resposta, nível
-- Ações: "Abrir Conversa" (navega para `/chat?conversation=ID`), "Enviar Follow-up" (stalled: abre chat com mensagem sugerida)
-- Admin: filtro por vendedor
-
-**Rota**: `/alerts` em `App.tsx`
-
-### 5. Agendamento (pg_cron ou invocação manual)
-
-Configurar chamada periódica (a cada 5 min) via cron ou trigger. A edge function `sla-checker` será invocada com service role.
+3. **Limite de alerts**: Adicionar `.limit(200)` na query do `useAlerts` para proteger performance.
 
 ### Arquivos
 
 | Arquivo | Mudança |
 |---|---|
-| Migration SQL | Tabela + RLS + unique index + realtime |
-| `supabase/functions/sla-checker/index.ts` | Novo: varredura + UPSERT + auto-resolve |
-| `src/hooks/useAlerts.ts` | Novo: query + realtime + resolveAlert |
-| `src/components/AlertsPanel.tsx` | Novo: UI de alertas |
-| `src/components/Sidebar.tsx` | Badge de contagem |
-| `src/App.tsx` | Rota `/alerts` |
+| `src/components/DashboardMyDay.tsx` | **Novo**: 3 blocos operacionais para vendedor |
+| `src/components/DashboardSlaBlock.tsx` | **Novo**: bloco SLA reutilizável |
+| `src/components/Dashboard.tsx` | Bifurcar: `isAdmin ? admin dashboard + SlaBlock : DashboardMyDay` |
+| `src/hooks/useAlerts.ts` | Adicionar `.limit(200)` na query |
+| `src/components/ChatInterface.tsx` | Ler query param `suggested` e preencher input |
+
+### DashboardMyDay.tsx
+
+**Bloco 1 — Minhas conversas pendentes**
+```ts
+supabase.from('conversations')
+  .select('*, contacts(name, call_name, phone_number)')
+  .eq('assigned_user_id', userId)
+  .eq('is_active', true)
+  .order('last_message_at', { ascending: false })
+  .limit(10)
+```
+Cada item: nome contato, tempo relativo desde `last_message_at`, ação "Abrir" → `/chat?conversation={id}`
+
+**Bloco 2 — Agendamentos de hoje**
+```ts
+const todayStr = new Date().toISOString().split('T')[0];
+supabase.from('appointments')
+  .select('*, contacts(name, call_name)')
+  .eq('date', todayStr)
+  .eq('user_id', userId)
+  .order('time', { ascending: true })
+```
+
+**Bloco 3 — Leads em risco (SLA)**
+- Reutiliza `useAlerts()` (RLS filtra por vendedor)
+- Agrupa por nível, mostra contagem + top 5
+- "Inserir follow-up" navega para `/chat?conversation={id}&suggested={encodeURIComponent(msg)}`
+
+### DashboardSlaBlock.tsx
+
+- Recebe alerts do `useAlerts()`
+- 3 mini-cards com contagem por nível
+- Lista top 10 com nome do contato, nível, tempo, responsável
+- Ação: "Abrir conversa"
+
+### Dashboard.tsx
+
+```tsx
+if (!isAdmin) return <DashboardMyDay />;
+// ... existing admin dashboard ...
+// + <DashboardSlaBlock /> ao final
+```
+
+### useAlerts.ts — `.limit(200)`
+
+Adicionar limit na query para evitar sobrecarga.
+
+### ChatInterface.tsx — preencher input com `suggested`
+
+Na inicialização, ler `searchParams.get('suggested')` e setar no `newMessage` state. Limpar o param da URL após preencher.
+
+### Checklist de teste
+1. Login vendedor → /dashboard mostra "Meu Dia" com dados filtrados
+2. Login admin → /dashboard mostra dashboard geral + bloco SLA
+3. "Abrir conversa" navega corretamente
+4. "Inserir follow-up" preenche input do chat sem enviar
+5. Performance OK com muitos alerts (limit 200)
 
