@@ -268,6 +268,9 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* SLA Block for Admin */}
+      <DashboardSlaBlock />
     </div>
   );
 };
