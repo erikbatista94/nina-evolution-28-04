@@ -89,6 +89,10 @@ const Dashboard: React.FC = () => {
     return baseLabel;
   };
 
+  if (!isAdmin) {
+    return <DashboardMyDay />;
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center h-full bg-slate-950">
