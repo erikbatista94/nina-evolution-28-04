@@ -91,6 +91,13 @@ const ChatInterface: React.FC = () => {
     
     if (conversationParam && conversations.some(c => c.id === conversationParam)) {
       setSelectedChatId(conversationParam);
+      // Check for suggested message param
+      const suggestedMsg = urlParams.get('suggested');
+      if (suggestedMsg) {
+        setInputText(decodeURIComponent(suggestedMsg));
+        // Clean URL params after using
+        window.history.replaceState({}, '', window.location.pathname + '?conversation=' + conversationParam);
+      }
     } else if (conversations.length > 0 && !selectedChatId) {
       setSelectedChatId(conversations[0].id);
     }

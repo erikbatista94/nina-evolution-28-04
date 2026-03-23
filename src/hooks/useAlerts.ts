@@ -29,7 +29,8 @@ export function useAlerts() {
       .from('sla_alerts')
       .select('*, contacts(name, call_name, phone_number)')
       .eq('resolved', false)
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error) {
       console.error('[useAlerts] fetch error:', error.message);
