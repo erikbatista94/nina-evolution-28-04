@@ -6,6 +6,8 @@ import { api } from '../services/api';
 import { SystemHealthCard } from './SystemHealthCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import DashboardMyDay from './DashboardMyDay';
+import DashboardSlaBlock from './DashboardSlaBlock';
 
 type PeriodFilter = 'today' | '7days' | '30days';
 
