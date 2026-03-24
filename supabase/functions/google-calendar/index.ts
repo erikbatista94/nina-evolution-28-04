@@ -361,6 +361,72 @@ serve(async (req) => {
         break;
       }
 
+      case 'update-event': {
+        const { googleEventId, title, date, time, duration, description, location, clientName, clientPhone } = body;
+        if (!googleEventId) throw new Error('googleEventId é obrigatório');
+
+        const startDateTime = `${date}T${time}:00`;
+        const startDate = new Date(`${startDateTime}-03:00`);
+        const endDate = new Date(startDate.getTime() + (duration || settings.default_visit_duration) * 60000);
+
+        let fullDescription = description || '';
+        if (clientName || clientPhone) {
+          fullDescription += '\n\n---\n';
+          if (clientName) fullDescription += `Cliente: ${clientName}\n`;
+          if (clientPhone) fullDescription += `Telefone: ${clientPhone}\n`;
+          fullDescription += 'Origem: Nina\n';
+        }
+
+        const updateResp = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(settings.google_calendar_id)}/events/${encodeURIComponent(googleEventId)}`,
+          {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${accessToken}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              summary: title,
+              description: fullDescription,
+              location: location || '',
+              start: { dateTime: startDate.toISOString(), timeZone: 'America/Sao_Paulo' },
+              end: { dateTime: endDate.toISOString(), timeZone: 'America/Sao_Paulo' },
+            }),
+          }
+        );
+
+        if (!updateResp.ok) {
+          const err = await updateResp.text();
+          console.error('[GCal] Update event error:', err);
+          throw new Error('Erro ao atualizar evento no Google Calendar');
+        }
+
+        result = await updateResp.json();
+        break;
+      }
+
+      case 'delete-event': {
+        const { googleEventId: deleteEventId } = body;
+        if (!deleteEventId) throw new Error('googleEventId é obrigatório');
+
+        const deleteResp = await fetch(
+          `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(settings.google_calendar_id)}/events/${encodeURIComponent(deleteEventId)}`,
+          {
+            method: 'DELETE',
+            headers: { 'Authorization': `Bearer ${accessToken}` },
+          }
+        );
+
+        if (!deleteResp.ok && deleteResp.status !== 410) {
+          const err = await deleteResp.text();
+          console.error('[GCal] Delete event error:', err);
+          throw new Error('Erro ao excluir evento do Google Calendar');
+        }
+
+        result = { deleted: true };
+        break;
+      }
+
       default:
         throw new Error(`Ação desconhecida: ${action}`);
     }
