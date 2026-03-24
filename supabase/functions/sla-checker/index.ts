@@ -110,10 +110,31 @@ Deno.serve(async (req) => {
       }
 
       for (const { level, suggestedMessage } of levels) {
-        const { error: upsertError } = await supabase
+        // Check if open alert already exists (partial unique index workaround)
+        const { data: existing } = await supabase
           .from('sla_alerts')
-          .upsert(
-            {
+          .select('id')
+          .eq('conversation_id', conv.id)
+          .eq('level', level)
+          .eq('resolved', false)
+          .maybeSingle();
+
+        if (existing) {
+          // Update existing alert
+          await supabase
+            .from('sla_alerts')
+            .update({
+              last_client_message_at: lastClientMsg.sent_at,
+              suggested_message: suggestedMessage,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existing.id);
+          console.log(`[sla-checker] Updated existing alert: ${conv.id} / ${level}`);
+        } else {
+          // Insert new alert
+          const { error: insertError } = await supabase
+            .from('sla_alerts')
+            .insert({
               conversation_id: conv.id,
               contact_id: conv.contact_id,
               assigned_user_id: conv.assigned_user_id,
@@ -122,22 +143,13 @@ Deno.serve(async (req) => {
               suggested_message: suggestedMessage,
               last_client_message_at: lastClientMsg.sent_at,
               updated_at: new Date().toISOString(),
-            },
-            {
-              onConflict: 'conversation_id,level',
-              ignoreDuplicates: false,
-            }
-          );
+            });
 
-        if (upsertError) {
-          // If conflict on partial index, it means alert already exists — that's fine
-          if (upsertError.code === '23505') {
-            console.log(`[sla-checker] Alert already exists: ${conv.id} / ${level}`);
+          if (insertError) {
+            console.error(`[sla-checker] Insert error for ${conv.id}/${level}:`, insertError.message);
           } else {
-            console.error(`[sla-checker] Upsert error for ${conv.id}/${level}:`, upsertError.message);
+            alertsCreated++;
           }
-        } else {
-          alertsCreated++;
         }
       }
     }
