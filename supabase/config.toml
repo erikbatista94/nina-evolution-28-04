@@ -1,1 +1,7 @@
 project_id = "uefigzidfyrppunygrpo"
+
+[functions.google-calendar]
+verify_jwt = false
+
+[functions.sla-checker]
+verify_jwt = false
