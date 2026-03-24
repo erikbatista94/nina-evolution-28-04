@@ -294,6 +294,21 @@ const Scheduling: React.FC = () => {
   const handleDeleteAppointment = async (id: string) => {
     if (!confirm('Tem certeza que deseja excluir este agendamento?')) return;
     try {
+      // Try to delete from Google Calendar first
+      const appointmentToDelete = appointments.find(a => a.id === id);
+      if ((appointmentToDelete as any)?.google_event_id) {
+        try {
+          await supabase.functions.invoke('google-calendar', {
+            body: {
+              action: 'delete-event',
+              googleEventId: (appointmentToDelete as any).google_event_id,
+            }
+          });
+        } catch {
+          console.warn('Could not delete from Google Calendar');
+        }
+      }
+
       await api.deleteAppointment(id);
       toast.success('Agendamento excluído com sucesso!');
       setSelectedAppointment(null);
