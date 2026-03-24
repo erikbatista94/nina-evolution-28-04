@@ -354,7 +354,31 @@ const Scheduling: React.FC = () => {
         contact_id: editContactId || undefined
       });
 
-      toast.success('Agendamento atualizado com sucesso!');
+      // Try to update Google Calendar event
+      if ((selectedAppointment as any)?.google_event_id) {
+        try {
+          const contact = contacts.find(c => c.id === editContactId);
+          await supabase.functions.invoke('google-calendar', {
+            body: {
+              action: 'update-event',
+              googleEventId: (selectedAppointment as any).google_event_id,
+              title: editFormData.title,
+              date: editFormData.date,
+              time: editFormData.time,
+              duration: editFormData.duration,
+              description: editFormData.description,
+              location: editAddressField || undefined,
+              clientName: contact?.name || undefined,
+              clientPhone: contact?.phone || undefined,
+            }
+          });
+          toast.success('Agendamento atualizado e sincronizado com Google Calendar!');
+        } catch {
+          toast.success('Agendamento atualizado! (Erro ao sincronizar com Google Calendar)');
+        }
+      } else {
+        toast.success('Agendamento atualizado com sucesso!');
+      }
       setShowEditModal(false);
       setSelectedAppointment(null);
     } catch (error) {
