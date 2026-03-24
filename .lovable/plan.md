@@ -1,86 +1,37 @@
 
 
-## Plano: Dashboard inteligente por role — "Meu Dia" + Admin SLA
+## Plano: Corrigir Google Calendar + Bug SLA-Checker
 
-### Arquitetura
+Encontrei 2 problemas durante a auditoria:
 
-`Dashboard.tsx` bifurca por `isAdmin`:
-- **Admin**: mantém dashboard atual + novo `DashboardSlaBlock`
-- **Vendedor**: novo `DashboardMyDay` com 3 blocos
+### Problema 1 — Google Calendar sem logs (não está sendo chamado)
 
-### Auditoria dos 3 pontos obrigatórios
+A edge function `google-calendar` não tem nenhum log, o que indica que as chamadas estão falhando antes de chegar ao código. A causa provável é que `verify_jwt` não está configurado como `false` no `config.toml`, e a função não faz validação interna de JWT. Conforme o memory do projeto, todas as edge functions precisam de `verify_jwt = false`.
 
-1. **`conversations.last_message_at`**: Existe e é atualizado pelo trigger `update_conversation_last_message()` a cada mensagem. Confiável — usaremos direto.
+**Correção:**
+- Adicionar bloco `[functions.google-calendar]` no `supabase/config.toml` com `verify_jwt = false`
+- Redeployar a função
 
-2. **`appointments`**: Schema tem `date` (tipo `date`) e `user_id` (UUID do responsável). Filtro: `.eq('date', todayStr)` onde `todayStr = new Date().toISOString().split('T')[0]`, e `.eq('user_id', userId)`.
+### Problema 2 — SLA-Checker UPSERT falhando (bug crítico em produção)
 
-3. **Limite de alerts**: Adicionar `.limit(200)` na query do `useAlerts` para proteger performance.
+Os logs mostram dezenas de erros: `"there is no unique or exclusion constraint matching the ON CONFLICT specification"`. O index parcial `idx_sla_alerts_unique_open` existe (`WHERE resolved = false`), mas o Supabase JS client não suporta partial unique indexes no `onConflict` — o PostgreSQL não consegue fazer match.
 
-### Arquivos
+**Correção:**
+- No `sla-checker/index.ts`, trocar o `upsert` por lógica de check-then-insert:
+  1. Verificar se já existe alerta aberto para `(conversation_id, level, resolved=false)`
+  2. Se existe: update `updated_at` + `last_client_message_at` + `suggested_message`
+  3. Se não existe: insert novo alerta
+
+### Arquivos alterados
 
 | Arquivo | Mudança |
 |---|---|
-| `src/components/DashboardMyDay.tsx` | **Novo**: 3 blocos operacionais para vendedor |
-| `src/components/DashboardSlaBlock.tsx` | **Novo**: bloco SLA reutilizável |
-| `src/components/Dashboard.tsx` | Bifurcar: `isAdmin ? admin dashboard + SlaBlock : DashboardMyDay` |
-| `src/hooks/useAlerts.ts` | Adicionar `.limit(200)` na query |
-| `src/components/ChatInterface.tsx` | Ler query param `suggested` e preencher input |
-
-### DashboardMyDay.tsx
-
-**Bloco 1 — Minhas conversas pendentes**
-```ts
-supabase.from('conversations')
-  .select('*, contacts(name, call_name, phone_number)')
-  .eq('assigned_user_id', userId)
-  .eq('is_active', true)
-  .order('last_message_at', { ascending: false })
-  .limit(10)
-```
-Cada item: nome contato, tempo relativo desde `last_message_at`, ação "Abrir" → `/chat?conversation={id}`
-
-**Bloco 2 — Agendamentos de hoje**
-```ts
-const todayStr = new Date().toISOString().split('T')[0];
-supabase.from('appointments')
-  .select('*, contacts(name, call_name)')
-  .eq('date', todayStr)
-  .eq('user_id', userId)
-  .order('time', { ascending: true })
-```
-
-**Bloco 3 — Leads em risco (SLA)**
-- Reutiliza `useAlerts()` (RLS filtra por vendedor)
-- Agrupa por nível, mostra contagem + top 5
-- "Inserir follow-up" navega para `/chat?conversation={id}&suggested={encodeURIComponent(msg)}`
-
-### DashboardSlaBlock.tsx
-
-- Recebe alerts do `useAlerts()`
-- 3 mini-cards com contagem por nível
-- Lista top 10 com nome do contato, nível, tempo, responsável
-- Ação: "Abrir conversa"
-
-### Dashboard.tsx
-
-```tsx
-if (!isAdmin) return <DashboardMyDay />;
-// ... existing admin dashboard ...
-// + <DashboardSlaBlock /> ao final
-```
-
-### useAlerts.ts — `.limit(200)`
-
-Adicionar limit na query para evitar sobrecarga.
-
-### ChatInterface.tsx — preencher input com `suggested`
-
-Na inicialização, ler `searchParams.get('suggested')` e setar no `newMessage` state. Limpar o param da URL após preencher.
+| `supabase/config.toml` | Adicionar `verify_jwt = false` para `google-calendar` |
+| `supabase/functions/sla-checker/index.ts` | Trocar upsert por check-then-insert para funcionar com partial unique index |
 
 ### Checklist de teste
-1. Login vendedor → /dashboard mostra "Meu Dia" com dados filtrados
-2. Login admin → /dashboard mostra dashboard geral + bloco SLA
-3. "Abrir conversa" navega corretamente
-4. "Inserir follow-up" preenche input do chat sem enviar
-5. Performance OK com muitos alerts (limit 200)
+1. Criar agendamento na UI → verificar se aparece no Google Calendar
+2. Clicar "Sincronizar" → verificar se eventos do GCal aparecem localmente
+3. Verificar nos logs da edge function que `google-calendar` agora executa
+4. Verificar que `sla-checker` para de gerar erros de ON CONFLICT
 
