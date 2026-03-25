@@ -23,10 +23,15 @@ serve(async (req) => {
       });
     }
 
-    // Validate JWT
-    const authHeader = req.headers.get('Authorization');
+    // Support JWT from Authorization header OR ?token= query param (for <img>/<video>/<audio> tags)
+    let authHeader = req.headers.get('Authorization');
+    const tokenParam = url.searchParams.get('token');
+    if (!authHeader && tokenParam) {
+      authHeader = `Bearer ${tokenParam}`;
+    }
+
     if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+      return new Response(JSON.stringify({ error: 'Unauthorized: provide Authorization header or ?token= param' }), {
         status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
