@@ -1247,11 +1247,7 @@ const ChatInterface: React.FC = () => {
                               {day.freeSlots.map((slot: string) => (
                                 <button
                                   key={slot}
-                                  onClick={() => {
-                                    const msg = `Podemos agendar a visita para ${day.date.split('-').reverse().join('/')} às ${slot}?`;
-                                    setInputText(msg);
-                                    setAvailableSlots(null);
-                                  }}
+                                  onClick={() => handleSlotSelect(day.date, slot)}
                                   className="px-2 py-1 bg-emerald-500/10 text-emerald-300 text-xs rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
                                 >
                                   {slot}
