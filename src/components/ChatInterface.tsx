@@ -449,7 +449,7 @@ const ChatInterface: React.FC = () => {
     );
   };
 
-  // Helper to proxy media URLs through edge function
+  // Helper to proxy media URLs through edge function (with JWT for <img>/<video>/<audio>)
   const getProxiedUrl = (mediaUrl: string | null): string | null => {
     if (!mediaUrl) return null;
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -457,7 +457,17 @@ const ChatInterface: React.FC = () => {
     const storageMatch = mediaUrl.match(/\/object\/public\/whatsapp-media\/(.+)/);
     if (storageMatch) {
       const path = storageMatch[1];
-      return `${supabaseUrl}/functions/v1/media-proxy?path=${encodeURIComponent(decodeURIComponent(path))}`;
+      // Get current session token for auth
+      const session = supabase.auth as any;
+      // We'll use the stored session
+      const tokenPromise = supabase.auth.getSession();
+      // Synchronous approach: use localStorage token
+      const storedSession = localStorage.getItem('sb-uefigzidfyrppunygrpo-auth-token');
+      let token = '';
+      if (storedSession) {
+        try { token = JSON.parse(storedSession)?.access_token || ''; } catch {}
+      }
+      return `${supabaseUrl}/functions/v1/media-proxy?path=${encodeURIComponent(decodeURIComponent(path))}${token ? `&token=${token}` : ''}`;
     }
     // Already a proxy URL or external URL - return as-is
     return mediaUrl;
