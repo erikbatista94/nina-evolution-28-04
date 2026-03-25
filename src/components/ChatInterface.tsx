@@ -402,6 +402,8 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
+
   const handleViewFilterChange = (filter: 'all' | 'mine') => {
     setViewFilter(filter);
     localStorage.setItem('chat-view-filter', filter);
