@@ -449,6 +449,20 @@ const ChatInterface: React.FC = () => {
     );
   };
 
+  // Helper to proxy media URLs through edge function
+  const getProxiedUrl = (mediaUrl: string | null): string | null => {
+    if (!mediaUrl) return null;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    // Extract storage path from Supabase URL
+    const storageMatch = mediaUrl.match(/\/object\/public\/whatsapp-media\/(.+)/);
+    if (storageMatch) {
+      const path = storageMatch[1];
+      return `${supabaseUrl}/functions/v1/media-proxy?path=${encodeURIComponent(decodeURIComponent(path))}`;
+    }
+    // Already a proxy URL or external URL - return as-is
+    return mediaUrl;
+  };
+
   const renderMessageContent = (msg: UIMessage) => {
     if (msg.type === MessageType.IMAGE) {
       return (
