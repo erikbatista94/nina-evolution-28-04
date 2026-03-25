@@ -500,7 +500,7 @@ const ChatInterface: React.FC = () => {
         <div className="mb-1">
           {msg.mediaUrl ? (
             <video 
-              src={msg.mediaUrl} 
+              src={getProxiedUrl(msg.mediaUrl)!} 
               controls 
               className="rounded-lg max-w-full max-h-72 border border-slate-700/50 shadow-lg"
               preload="metadata"
