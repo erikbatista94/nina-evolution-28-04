@@ -119,6 +119,23 @@ const ChatInterface: React.FC = () => {
     }
   }, [activeChat?.id]);
 
+  // Load pending appointment for active conversation
+  useEffect(() => {
+    if (!activeChat) { setPendingAppointment(null); return; }
+    const loadPending = async () => {
+      const { data } = await supabase
+        .from('appointments')
+        .select('*, contact:contacts(id, name, phone_number, address_full)')
+        .eq('contact_id', activeChat.contactId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setPendingAppointment(data);
+    };
+    loadPending();
+  }, [activeChat?.id]);
+
   // Handle notes save on blur
   const handleNotesBlur = async () => {
     if (!activeChat || notesValue === (activeChat.notes || '')) return;
