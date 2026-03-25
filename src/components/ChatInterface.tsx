@@ -571,7 +571,7 @@ const ChatInterface: React.FC = () => {
           {msg.mediaUrl && (
             <audio
               ref={el => { if (el) audioRefs.current[msg.id] = el; }}
-              src={msg.mediaUrl}
+              src={getProxiedUrl(msg.mediaUrl)!}
               onLoadedMetadata={(e) => {
                 const audio = e.currentTarget;
                 setAudioDurations(prev => ({ ...prev, [msg.id]: audio.duration }));
