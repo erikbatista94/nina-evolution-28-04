@@ -477,9 +477,9 @@ const ChatInterface: React.FC = () => {
     if (msg.type === MessageType.IMAGE) {
       return (
         <div className="mb-1 group relative">
-          <a href={msg.mediaUrl || undefined} target="_blank" rel="noopener noreferrer">
+          <a href={getProxiedUrl(msg.mediaUrl) || undefined} target="_blank" rel="noopener noreferrer">
             <img 
-              src={msg.mediaUrl || msg.content} 
+              src={getProxiedUrl(msg.mediaUrl) || msg.content} 
               alt="Anexo" 
               className="rounded-lg max-w-full h-auto max-h-72 object-cover border border-slate-700/50 shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
               loading="lazy"
