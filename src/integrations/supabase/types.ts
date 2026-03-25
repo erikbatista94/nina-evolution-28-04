@@ -25,6 +25,7 @@ export type Database = {
           google_event_id: string | null
           google_sync_status: string | null
           id: string
+          location: string | null
           meeting_url: string | null
           metadata: Json | null
           status: string | null
@@ -44,6 +45,7 @@ export type Database = {
           google_event_id?: string | null
           google_sync_status?: string | null
           id?: string
+          location?: string | null
           meeting_url?: string | null
           metadata?: Json | null
           status?: string | null
@@ -63,6 +65,7 @@ export type Database = {
           google_event_id?: string | null
           google_sync_status?: string | null
           id?: string
+          location?: string | null
           meeting_url?: string | null
           metadata?: Json | null
           status?: string | null
