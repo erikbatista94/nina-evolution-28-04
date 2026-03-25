@@ -524,7 +524,7 @@ const ChatInterface: React.FC = () => {
         <div className="mb-1">
           {msg.mediaUrl ? (
             <a 
-              href={msg.mediaUrl} 
+              href={getProxiedUrl(msg.mediaUrl)!} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-3 py-3 px-4 bg-slate-700/30 rounded-lg border border-slate-700/50 hover:bg-slate-700/50 transition-colors group"
