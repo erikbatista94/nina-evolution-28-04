@@ -51,6 +51,8 @@ const ChatInterface: React.FC = () => {
   const [showQuickRepliesManager, setShowQuickRepliesManager] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [pendingAppointment, setPendingAppointment] = useState<any>(null);
+  const [confirmingAppointment, setConfirmingAppointment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
