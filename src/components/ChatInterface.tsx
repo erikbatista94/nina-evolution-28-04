@@ -292,7 +292,115 @@ const ChatInterface: React.FC = () => {
     }
   };
 
-  const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
+  // Create pending appointment from slot selection
+  const handleSlotSelect = async (date: string, slot: string) => {
+    if (!activeChat) return;
+    try {
+      // Find assigned team member name
+      const assignedMember = teamMembers.find(m => m.user_id === activeChat.assignedUserId);
+      const vendorName = assignedMember?.name?.split(' ')[0] || 'Vendedor';
+
+      // Get contact info
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('name, address_full, city, neighborhood')
+        .eq('id', activeChat.contactId)
+        .maybeSingle();
+
+      const clientName = contactData?.name || activeChat.contactName;
+      const locationShort = contactData?.address_full || contactData?.city || contactData?.neighborhood || '';
+      
+      let title = `${vendorName}: Visita - ${clientName}`;
+      if (locationShort) title += ` - ${locationShort}`;
+
+      const { data: newAppt, error } = await supabase
+        .from('appointments')
+        .insert({
+          title,
+          date,
+          time: slot,
+          duration: 90,
+          type: 'meeting',
+          contact_id: activeChat.contactId,
+          status: 'pending',
+          location: contactData?.address_full || null,
+          metadata: { source: 'chat_manual', conversation_id: activeChat.id }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setPendingAppointment(newAppt);
+      setAvailableSlots(null);
+      toast.success('Agendamento pendente criado! Confirme ou rejeite abaixo.');
+    } catch (err: any) {
+      console.error('[Chat] Error creating pending appointment:', err);
+      toast.error('Erro ao criar agendamento pendente');
+    }
+  };
+
+  // Confirm pending appointment -> create Google Calendar event
+  const handleConfirmAppointment = async () => {
+    if (!pendingAppointment || !activeChat) return;
+    setConfirmingAppointment(true);
+    try {
+      // Update status to confirmed
+      await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', pendingAppointment.id);
+
+      // Create Google Calendar event
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('name, phone_number, address_full')
+        .eq('id', activeChat.contactId)
+        .maybeSingle();
+
+      const assignedMember = teamMembers.find(m => m.user_id === activeChat.assignedUserId);
+
+      const { data: gcalData } = await supabase.functions.invoke('google-calendar', {
+        body: {
+          action: 'create-event',
+          appointmentId: pendingAppointment.id,
+          title: pendingAppointment.title,
+          date: pendingAppointment.date,
+          time: pendingAppointment.time,
+          duration: pendingAppointment.duration,
+          description: pendingAppointment.description || '',
+          location: pendingAppointment.location || contactData?.address_full || '',
+          vendorName: assignedMember?.name || undefined,
+          clientName: contactData?.name || activeChat.contactName,
+          clientPhone: contactData?.phone_number || activeChat.contactPhone,
+        }
+      });
+
+      if (gcalData?.google_event_id) {
+        await supabase.from('appointments').update({
+          google_event_id: gcalData.google_event_id,
+          google_sync_status: 'synced'
+        }).eq('id', pendingAppointment.id);
+        toast.success('✅ Agendamento confirmado e sincronizado com Google Calendar!');
+      } else {
+        toast.success('✅ Agendamento confirmado!');
+      }
+      setPendingAppointment(null);
+    } catch (err: any) {
+      console.error('[Chat] Error confirming appointment:', err);
+      toast.error('Erro ao confirmar agendamento');
+    } finally {
+      setConfirmingAppointment(false);
+    }
+  };
+
+  // Reject pending appointment
+  const handleRejectAppointment = async () => {
+    if (!pendingAppointment) return;
+    try {
+      await supabase.from('appointments').delete().eq('id', pendingAppointment.id);
+      setPendingAppointment(null);
+      toast.success('Agendamento rejeitado');
+    } catch (err) {
+      toast.error('Erro ao rejeitar agendamento');
+    }
+  };
 
   const handleViewFilterChange = (filter: 'all' | 'mine') => {
     setViewFilter(filter);
