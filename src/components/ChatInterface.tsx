@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -51,6 +51,8 @@ const ChatInterface: React.FC = () => {
   const [showQuickRepliesManager, setShowQuickRepliesManager] = useState(false);
   const [isRecording, setIsRecording] = useState(false);
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [pendingAppointment, setPendingAppointment] = useState<any>(null);
+  const [confirmingAppointment, setConfirmingAppointment] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -115,6 +117,23 @@ const ChatInterface: React.FC = () => {
     if (activeChat) {
       setNotesValue(activeChat.notes || '');
     }
+  }, [activeChat?.id]);
+
+  // Load pending appointment for active conversation
+  useEffect(() => {
+    if (!activeChat) { setPendingAppointment(null); return; }
+    const loadPending = async () => {
+      const { data } = await supabase
+        .from('appointments')
+        .select('*, contact:contacts(id, name, phone_number, address_full)')
+        .eq('contact_id', activeChat.contactId)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      setPendingAppointment(data);
+    };
+    loadPending();
   }, [activeChat?.id]);
 
   // Handle notes save on blur
@@ -273,6 +292,116 @@ const ChatInterface: React.FC = () => {
     }
   };
 
+  // Create pending appointment from slot selection
+  const handleSlotSelect = async (date: string, slot: string) => {
+    if (!activeChat) return;
+    try {
+      // Find assigned team member name
+      const assignedMember = teamMembers.find(m => m.user_id === activeChat.assignedUserId);
+      const vendorName = assignedMember?.name?.split(' ')[0] || 'Vendedor';
+
+      // Get contact info
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('name, address_full, city, neighborhood')
+        .eq('id', activeChat.contactId)
+        .maybeSingle();
+
+      const clientName = contactData?.name || activeChat.contactName;
+      const locationShort = contactData?.address_full || contactData?.city || contactData?.neighborhood || '';
+      
+      let title = `${vendorName}: Visita - ${clientName}`;
+      if (locationShort) title += ` - ${locationShort}`;
+
+      const { data: newAppt, error } = await supabase
+        .from('appointments')
+        .insert({
+          title,
+          date,
+          time: slot,
+          duration: 90,
+          type: 'meeting',
+          contact_id: activeChat.contactId,
+          status: 'pending',
+          location: contactData?.address_full || null,
+          metadata: { source: 'chat_manual', conversation_id: activeChat.id }
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+      setPendingAppointment(newAppt);
+      setAvailableSlots(null);
+      toast.success('Agendamento pendente criado! Confirme ou rejeite abaixo.');
+    } catch (err: any) {
+      console.error('[Chat] Error creating pending appointment:', err);
+      toast.error('Erro ao criar agendamento pendente');
+    }
+  };
+
+  // Confirm pending appointment -> create Google Calendar event
+  const handleConfirmAppointment = async () => {
+    if (!pendingAppointment || !activeChat) return;
+    setConfirmingAppointment(true);
+    try {
+      // Update status to confirmed
+      await supabase.from('appointments').update({ status: 'confirmed' }).eq('id', pendingAppointment.id);
+
+      // Create Google Calendar event
+      const { data: contactData } = await supabase
+        .from('contacts')
+        .select('name, phone_number, address_full')
+        .eq('id', activeChat.contactId)
+        .maybeSingle();
+
+      const assignedMember = teamMembers.find(m => m.user_id === activeChat.assignedUserId);
+
+      const { data: gcalData } = await supabase.functions.invoke('google-calendar', {
+        body: {
+          action: 'create-event',
+          appointmentId: pendingAppointment.id,
+          title: pendingAppointment.title,
+          date: pendingAppointment.date,
+          time: pendingAppointment.time,
+          duration: pendingAppointment.duration,
+          description: pendingAppointment.description || '',
+          location: pendingAppointment.location || contactData?.address_full || '',
+          vendorName: assignedMember?.name || undefined,
+          clientName: contactData?.name || activeChat.contactName,
+          clientPhone: contactData?.phone_number || activeChat.contactPhone,
+        }
+      });
+
+      if (gcalData?.google_event_id) {
+        await supabase.from('appointments').update({
+          google_event_id: gcalData.google_event_id,
+          google_sync_status: 'synced'
+        }).eq('id', pendingAppointment.id);
+        toast.success('✅ Agendamento confirmado e sincronizado com Google Calendar!');
+      } else {
+        toast.success('✅ Agendamento confirmado!');
+      }
+      setPendingAppointment(null);
+    } catch (err: any) {
+      console.error('[Chat] Error confirming appointment:', err);
+      toast.error('Erro ao confirmar agendamento');
+    } finally {
+      setConfirmingAppointment(false);
+    }
+  };
+
+  // Reject pending appointment
+  const handleRejectAppointment = async () => {
+    if (!pendingAppointment) return;
+    try {
+      await supabase.from('appointments').delete().eq('id', pendingAppointment.id);
+      setPendingAppointment(null);
+      toast.success('Agendamento rejeitado');
+    } catch (err) {
+      toast.error('Erro ao rejeitar agendamento');
+    }
+  };
+
   const myConversationsCount = conversations.filter(c => c.assignedUserId === user?.id).length;
 
   const handleViewFilterChange = (filter: 'all' | 'mine') => {
@@ -320,13 +449,37 @@ const ChatInterface: React.FC = () => {
     );
   };
 
+  // Helper to proxy media URLs through edge function (with JWT for <img>/<video>/<audio>)
+  const getProxiedUrl = (mediaUrl: string | null): string | null => {
+    if (!mediaUrl) return null;
+    const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+    // Extract storage path from Supabase URL
+    const storageMatch = mediaUrl.match(/\/object\/public\/whatsapp-media\/(.+)/);
+    if (storageMatch) {
+      const path = storageMatch[1];
+      // Get current session token for auth
+      const session = supabase.auth as any;
+      // We'll use the stored session
+      const tokenPromise = supabase.auth.getSession();
+      // Synchronous approach: use localStorage token
+      const storedSession = localStorage.getItem('sb-uefigzidfyrppunygrpo-auth-token');
+      let token = '';
+      if (storedSession) {
+        try { token = JSON.parse(storedSession)?.access_token || ''; } catch {}
+      }
+      return `${supabaseUrl}/functions/v1/media-proxy?path=${encodeURIComponent(decodeURIComponent(path))}${token ? `&token=${token}` : ''}`;
+    }
+    // Already a proxy URL or external URL - return as-is
+    return mediaUrl;
+  };
+
   const renderMessageContent = (msg: UIMessage) => {
     if (msg.type === MessageType.IMAGE) {
       return (
         <div className="mb-1 group relative">
-          <a href={msg.mediaUrl || undefined} target="_blank" rel="noopener noreferrer">
+          <a href={getProxiedUrl(msg.mediaUrl) || undefined} target="_blank" rel="noopener noreferrer">
             <img 
-              src={msg.mediaUrl || msg.content} 
+              src={getProxiedUrl(msg.mediaUrl) || msg.content} 
               alt="Anexo" 
               className="rounded-lg max-w-full h-auto max-h-72 object-cover border border-slate-700/50 shadow-lg cursor-pointer hover:opacity-90 transition-opacity"
               loading="lazy"
@@ -347,7 +500,7 @@ const ChatInterface: React.FC = () => {
         <div className="mb-1">
           {msg.mediaUrl ? (
             <video 
-              src={msg.mediaUrl} 
+              src={getProxiedUrl(msg.mediaUrl)!} 
               controls 
               className="rounded-lg max-w-full max-h-72 border border-slate-700/50 shadow-lg"
               preload="metadata"
@@ -371,7 +524,7 @@ const ChatInterface: React.FC = () => {
         <div className="mb-1">
           {msg.mediaUrl ? (
             <a 
-              href={msg.mediaUrl} 
+              href={getProxiedUrl(msg.mediaUrl)!} 
               target="_blank" 
               rel="noopener noreferrer"
               className="flex items-center gap-3 py-3 px-4 bg-slate-700/30 rounded-lg border border-slate-700/50 hover:bg-slate-700/50 transition-colors group"
@@ -418,7 +571,7 @@ const ChatInterface: React.FC = () => {
           {msg.mediaUrl && (
             <audio
               ref={el => { if (el) audioRefs.current[msg.id] = el; }}
-              src={msg.mediaUrl}
+              src={getProxiedUrl(msg.mediaUrl)!}
               onLoadedMetadata={(e) => {
                 const audio = e.currentTarget;
                 setAudioDurations(prev => ({ ...prev, [msg.id]: audio.duration }));
@@ -804,6 +957,47 @@ const ChatInterface: React.FC = () => {
                   })}
                 </>
               )}
+
+              {/* Pending Appointment CTA */}
+              {pendingAppointment && (
+                <div className="flex justify-center my-4 animate-in fade-in slide-in-from-bottom-2">
+                  <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 max-w-sm w-full space-y-3">
+                    <div className="flex items-center gap-2 text-amber-400">
+                      <Calendar className="w-4 h-4" />
+                      <span className="text-sm font-bold">Agendamento Pendente</span>
+                    </div>
+                    <div className="text-sm text-slate-300">
+                      <p className="font-medium">{pendingAppointment.title}</p>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {pendingAppointment.date?.split('-').reverse().join('/')} às {pendingAppointment.time} ({pendingAppointment.duration}min)
+                      </p>
+                      {pendingAppointment.location && (
+                        <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-1">
+                          <MapPin className="w-3 h-3" /> {pendingAppointment.location}
+                        </p>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleConfirmAppointment}
+                        disabled={confirmingAppointment}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded-lg text-sm text-emerald-400 font-medium transition-colors disabled:opacity-50"
+                      >
+                        {confirmingAppointment ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                        Confirmar
+                      </button>
+                      <button
+                        onClick={handleRejectAppointment}
+                        className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-400 font-medium transition-colors"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                        Rejeitar
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
+
               <div ref={messagesEndRef} />
             </div>
 
@@ -1118,11 +1312,7 @@ const ChatInterface: React.FC = () => {
                               {day.freeSlots.map((slot: string) => (
                                 <button
                                   key={slot}
-                                  onClick={() => {
-                                    const msg = `Podemos agendar a visita para ${day.date.split('-').reverse().join('/')} às ${slot}?`;
-                                    setInputText(msg);
-                                    setAvailableSlots(null);
-                                  }}
+                                  onClick={() => handleSlotSelect(day.date, slot)}
                                   className="px-2 py-1 bg-emerald-500/10 text-emerald-300 text-xs rounded border border-emerald-500/20 hover:bg-emerald-500/20 transition-colors"
                                 >
                                   {slot}

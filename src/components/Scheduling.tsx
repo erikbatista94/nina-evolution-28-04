@@ -947,17 +947,42 @@ const Scheduling: React.FC = () => {
                   </Button>
                 </div>
                 
-                <Button 
-                  className="w-full shadow-lg shadow-cyan-500/20 py-3" 
-                  size="lg"
-                  onClick={() => navigate(`/meeting/${selectedAppointment.id}`)}
-                >
-                  <Video className="w-5 h-5 mr-2" />
-                  Entrar na Sala de Reunião
-                </Button>
-                <p className="text-center text-xs text-slate-500">
-                  A sala estará disponível 5 minutos antes do horário.
-                </p>
+                {/* Address + Maps for presencial visits */}
+                {(selectedAppointment as any)?.location && (
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-bold uppercase text-slate-500 tracking-wider">Endereço</h4>
+                    <div className="flex items-start gap-2 bg-slate-950 p-3 rounded-lg border border-slate-800">
+                      <MapPin className="w-4 h-4 text-cyan-500 mt-0.5 flex-shrink-0" />
+                      <span className="text-sm text-slate-300">{(selectedAppointment as any).location}</span>
+                    </div>
+                    <a
+                      href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent((selectedAppointment as any).location)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex items-center justify-center gap-2 w-full px-3 py-2.5 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-sm text-emerald-400 transition-all"
+                    >
+                      <MapPin className="w-4 h-4" />
+                      Abrir no Google Maps
+                    </a>
+                  </div>
+                )}
+
+                {/* Show "Entrar na Sala" only for online meetings with meeting_url */}
+                {selectedAppointment.type === 'meeting' && (selectedAppointment as any)?.meeting_url && (
+                  <>
+                    <Button 
+                      className="w-full shadow-lg shadow-cyan-500/20 py-3" 
+                      size="lg"
+                      onClick={() => navigate(`/meeting/${selectedAppointment.id}`)}
+                    >
+                      <Video className="w-5 h-5 mr-2" />
+                      Entrar na Sala de Reunião
+                    </Button>
+                    <p className="text-center text-xs text-slate-500">
+                      A sala estará disponível 5 minutos antes do horário.
+                    </p>
+                  </>
+                )}
               </div>
             </div>
           </div>
