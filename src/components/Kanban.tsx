@@ -300,10 +300,33 @@ const Kanban: React.FC = () => {
     return deals;
   })();
 
-  const filteredDeals = ownerFilteredDeals.filter(deal => 
-    deal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    deal.company.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Derive filter options from deals
+  const uniqueCities = [...new Set(ownerFilteredDeals.map(d => d.contactCity).filter(Boolean))] as string[];
+  const uniqueCustomerTypes = [...new Set(ownerFilteredDeals.map(d => d.contactCustomerType).filter(Boolean))] as string[];
+  const uniqueServices = [...new Set(ownerFilteredDeals.flatMap(d => d.contactInterestServices || []).filter(Boolean))] as string[];
+
+  const hasActiveFilters = filterCity !== 'all' || filterCustomerType !== 'all' || filterService !== 'all' || filterTemperature !== 'all' || filterValueMin || filterValueMax;
+
+  const resetFilters = () => {
+    setFilterCity('all');
+    setFilterCustomerType('all');
+    setFilterService('all');
+    setFilterTemperature('all');
+    setFilterValueMin('');
+    setFilterValueMax('');
+  };
+
+  const filteredDeals = ownerFilteredDeals.filter(deal => {
+    const matchesSearch = deal.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      deal.company.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesCity = filterCity === 'all' || deal.contactCity === filterCity;
+    const matchesType = filterCustomerType === 'all' || deal.contactCustomerType === filterCustomerType;
+    const matchesService = filterService === 'all' || (deal.contactInterestServices || []).includes(filterService);
+    const matchesTemp = filterTemperature === 'all' || deal.contactLeadTemperature === filterTemperature;
+    const matchesMinValue = !filterValueMin || deal.value >= Number(filterValueMin);
+    const matchesMaxValue = !filterValueMax || deal.value <= Number(filterValueMax);
+    return matchesSearch && matchesCity && matchesType && matchesService && matchesTemp && matchesMinValue && matchesMaxValue;
+  });
 
   const getPriorityColor = (priority: string) => {
       switch(priority) {
