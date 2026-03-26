@@ -187,9 +187,10 @@ const Kanban: React.FC = () => {
   const handleOwnerChange = async (ownerId: string) => {
     if (!selectedDeal) return;
     try {
-      await api.updateDealOwner(selectedDeal.id, ownerId);
       const member = teamMembers.find(m => m.id === ownerId);
-      setSelectedDeal({ ...selectedDeal, ownerId, ownerName: member?.name });
+      // Pass auth user_id so deals.user_id is also updated
+      await api.updateDealOwner(selectedDeal.id, ownerId, member?.user_id || undefined);
+      setSelectedDeal({ ...selectedDeal, ownerId, ownerName: member?.name, userId: member?.user_id || undefined });
       toast.success("Proprietário atualizado");
     } catch (error) {
       console.error("Erro ao atualizar proprietário", error);
