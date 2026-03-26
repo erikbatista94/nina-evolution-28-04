@@ -2,7 +2,8 @@ import React, { useEffect, useState, useRef } from 'react';
 import { 
   Plus, Search, MoreHorizontal, DollarSign, Loader2, CalendarClock, Tag, X, 
   Building, User, Calendar, ArrowRight, CheckCircle2, Circle, 
-  FileText, Phone, Mail, Paperclip, Send, CheckSquare, Clock, Trash2, Settings, Brain, MessageSquare, Bot
+  FileText, Phone, Mail, Paperclip, Send, CheckSquare, Clock, Trash2, Settings, Brain, MessageSquare, Bot,
+  Filter, RotateCcw, MapPin, Briefcase, Thermometer
 } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
