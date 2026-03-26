@@ -282,11 +282,11 @@ const Kanban: React.FC = () => {
   // Role-based filtering: sellers see only their deals, admin sees all (or filtered)
   const ownerFilteredDeals = (() => {
     if (!isAdmin && user) {
-      // Seller: only their deals
-      return deals.filter(deal => deal.ownerId === user.id);
+      // Seller: only their deals (using auth user_id, not team_members.id)
+      return deals.filter(deal => deal.userId === user.id);
     }
     if (isAdmin && selectedOwnerFilter !== 'all') {
-      return deals.filter(deal => deal.ownerId === selectedOwnerFilter);
+      return deals.filter(deal => deal.userId === selectedOwnerFilter);
     }
     return deals;
   })();
