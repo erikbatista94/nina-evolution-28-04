@@ -1007,6 +1007,9 @@ async function processQueueItem(
     aiContent = 'Olá! Como posso ajudar você hoje? 😊';
   }
 
+  // Sanitize AI response - remove internal thinking/analysis tags
+  aiContent = sanitizeAIResponse(aiContent);
+
   console.log('[Nina] Final response length:', aiContent.length);
 
   // Calculate response time
