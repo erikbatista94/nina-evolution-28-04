@@ -782,13 +782,13 @@ export const api = {
       .from('deals')
       .select(`
         *,
-        contact:contacts(name, call_name, phone_number, email, client_memory),
+        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature),
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
 
     if (userId) {
-      query = query.eq('owner_id', userId);
+      query = query.eq('user_id', userId);
     }
 
     const { data, error } = await query;
