@@ -9,6 +9,19 @@ const corsHeaders = {
 const LOVABLE_AI_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 const ELEVENLABS_API_URL = "https://api.elevenlabs.io/v1/text-to-speech";
 
+// Sanitize AI response - remove internal thinking/analysis tags that may leak
+function sanitizeAIResponse(text: string): string {
+  return text
+    .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+    .replace(/<analysis>[\s\S]*?<\/analysis>/gi, '')
+    .replace(/<internal>[\s\S]*?<\/internal>/gi, '')
+    .replace(/<reasoning>[\s\S]*?<\/reasoning>/gi, '')
+    .replace(/<reflection>[\s\S]*?<\/reflection>/gi, '')
+    .replace(/<\/?(?:thinking|analysis|internal|reasoning|reflection)[^>]*>/gi, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+}
+
 // Tool definition for appointment creation
 const createAppointmentTool = {
   type: "function",
