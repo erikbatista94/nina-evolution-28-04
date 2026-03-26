@@ -147,6 +147,7 @@ export interface Deal {
   ownerAvatar: string;
   ownerId?: string;
   ownerName?: string;
+  userId?: string; // auth.uid() of the responsible seller
   tags: string[];
   dueDate?: string;
   priority: 'low' | 'medium' | 'high';
@@ -159,6 +160,13 @@ export interface Deal {
   lostReason?: string;
   clientMemory?: ClientMemory;
   conversationId?: string;
+  // Qualification fields from contact
+  contactCity?: string;
+  contactNeighborhood?: string;
+  contactCustomerType?: string;
+  contactInterestServices?: string[];
+  contactJobSize?: string;
+  contactLeadTemperature?: string;
 }
 
 export interface DealActivity {

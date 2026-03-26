@@ -324,12 +324,18 @@ export const api = {
   /**
    * Fetch contacts from database
    */
-  fetchContacts: async (): Promise<Contact[]> => {
-    const { data, error } = await supabase
+  fetchContacts: async (filterUserId?: string): Promise<Contact[]> => {
+    let query = supabase
       .from('contacts')
       .select('*')
       .order('last_activity', { ascending: false })
-      .limit(100);
+      .limit(500);
+
+    if (filterUserId) {
+      query = query.eq('assigned_user_id', filterUserId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[API] Error fetching contacts:', error);
@@ -782,13 +788,13 @@ export const api = {
       .from('deals')
       .select(`
         *,
-        contact:contacts(name, call_name, phone_number, email, client_memory),
+        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature),
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
 
     if (userId) {
-      query = query.eq('owner_id', userId);
+      query = query.eq('user_id', userId);
     }
 
     const { data, error } = await query;
@@ -818,6 +824,7 @@ export const api = {
       ownerAvatar: d.owner?.avatar || 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
       ownerId: d.owner_id,
       ownerName: d.owner?.name,
+      userId: d.user_id,
       tags: d.tags || [],
       dueDate: d.due_date,
       priority: (d.priority || 'medium') as 'low' | 'medium' | 'high',
@@ -830,6 +837,12 @@ export const api = {
       lostReason: d.lost_reason,
       clientMemory: d.contact?.client_memory || null,
       conversationId: convMap.get(d.contact_id) || undefined,
+      contactCity: d.contact?.city || null,
+      contactNeighborhood: d.contact?.neighborhood || null,
+      contactCustomerType: d.contact?.customer_type || null,
+      contactInterestServices: d.contact?.interest_services || [],
+      contactJobSize: d.contact?.job_size || null,
+      contactLeadTemperature: d.contact?.lead_temperature || null,
     }));
   },
 
@@ -1153,10 +1166,14 @@ export const api = {
   /**
    * Update deal owner
    */
-  updateDealOwner: async (dealId: string, ownerId: string): Promise<void> => {
+  updateDealOwner: async (dealId: string, ownerId: string, authUserId?: string): Promise<void> => {
+    const updates: any = { owner_id: ownerId };
+    if (authUserId) {
+      updates.user_id = authUserId;
+    }
     const { error } = await supabase
       .from('deals')
-      .update({ owner_id: ownerId })
+      .update(updates)
       .eq('id', dealId);
       
     if (error) {
@@ -1653,10 +1670,10 @@ export const api = {
       throw convError;
     }
 
-    // Update deal(s) with same contact_id
+    // Update deal(s) with same contact_id — set both owner_id and user_id
     const { error: dealError } = await supabase
       .from('deals')
-      .update({ owner_id: userId })
+      .update({ owner_id: userId, user_id: userId })
       .eq('contact_id', contactId);
 
     if (dealError) {

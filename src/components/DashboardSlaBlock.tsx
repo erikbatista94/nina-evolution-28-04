@@ -11,9 +11,17 @@ const levelConfig = {
   respond_now: { label: 'Responder Agora', color: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400' },
 };
 
-const DashboardSlaBlock: React.FC = () => {
+interface DashboardSlaBlockProps {
+  filterUserId?: string;
+}
+
+const DashboardSlaBlock: React.FC<DashboardSlaBlockProps> = ({ filterUserId }) => {
   const navigate = useNavigate();
-  const { alerts, loading } = useAlerts();
+  const { alerts: allAlerts, loading } = useAlerts();
+
+  const alerts = filterUserId 
+    ? allAlerts.filter(a => a.assigned_user_id === filterUserId) 
+    : allAlerts;
 
   const stalledCount = alerts.filter(a => a.level === 'stalled').length;
   const lossRiskCount = alerts.filter(a => a.level === 'loss_risk').length;

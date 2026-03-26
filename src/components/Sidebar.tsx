@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell, BarChart3 } from 'lucide-react';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -19,6 +19,7 @@ const allMenuItems = [
   { id: 'contacts', label: 'Contatos', icon: Users, adminOnly: false },
   { id: 'scheduling', label: 'Agendamentos', icon: Calendar, adminOnly: false },
   { id: 'team', label: 'Equipe', icon: ShieldCheck, adminOnly: false },
+  { id: 'reports', label: 'Relatórios', icon: BarChart3, adminOnly: true },
   { id: 'settings', label: 'Configurações', icon: SettingsIcon, adminOnly: true },
 ];
 
