@@ -1160,10 +1160,14 @@ export const api = {
   /**
    * Update deal owner
    */
-  updateDealOwner: async (dealId: string, ownerId: string): Promise<void> => {
+  updateDealOwner: async (dealId: string, ownerId: string, authUserId?: string): Promise<void> => {
+    const updates: any = { owner_id: ownerId };
+    if (authUserId) {
+      updates.user_id = authUserId;
+    }
     const { error } = await supabase
       .from('deals')
-      .update({ owner_id: ownerId })
+      .update(updates)
       .eq('id', dealId);
       
     if (error) {
