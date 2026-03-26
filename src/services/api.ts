@@ -1660,10 +1660,10 @@ export const api = {
       throw convError;
     }
 
-    // Update deal(s) with same contact_id
+    // Update deal(s) with same contact_id — set both owner_id and user_id
     const { error: dealError } = await supabase
       .from('deals')
-      .update({ owner_id: userId })
+      .update({ owner_id: userId, user_id: userId })
       .eq('contact_id', contactId);
 
     if (dealError) {
