@@ -53,6 +53,7 @@ const ChatInterface: React.FC = () => {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [pendingAppointment, setPendingAppointment] = useState<any>(null);
   const [confirmingAppointment, setConfirmingAppointment] = useState(false);
+  const [contactDetails, setContactDetails] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
