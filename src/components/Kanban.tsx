@@ -374,7 +374,15 @@ const Kanban: React.FC = () => {
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none placeholder:text-slate-600"
              />
-          </div>
+           </div>
+          <Button 
+            variant="outline" 
+            className={`border-slate-700 text-slate-300 hover:bg-slate-800 ${hasActiveFilters ? 'border-cyan-500 text-cyan-400' : ''}`}
+            onClick={() => setShowFilters(!showFilters)}
+          >
+            <Filter className="w-4 h-4 mr-2" />
+            Filtros {hasActiveFilters && '•'}
+          </Button>
           <Button 
             variant="outline" 
             className="border-slate-700 text-slate-300 hover:bg-slate-800"
@@ -389,6 +397,54 @@ const Kanban: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Advanced Filters Panel */}
+      {showFilters && (
+        <div className="flex-shrink-0 mb-4 p-4 bg-slate-900/50 border border-slate-800 rounded-xl flex flex-wrap gap-3 items-end">
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-slate-500 uppercase font-medium">Cidade</label>
+            <select value={filterCity} onChange={e => setFilterCity(e.target.value)} className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none">
+              <option value="all">Todas</option>
+              {uniqueCities.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-slate-500 uppercase font-medium">Tipo Cliente</label>
+            <select value={filterCustomerType} onChange={e => setFilterCustomerType(e.target.value)} className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none">
+              <option value="all">Todos</option>
+              {uniqueCustomerTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-slate-500 uppercase font-medium">Serviço</label>
+            <select value={filterService} onChange={e => setFilterService(e.target.value)} className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none">
+              <option value="all">Todos</option>
+              {uniqueServices.map(s => <option key={s} value={s}>{s}</option>)}
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-slate-500 uppercase font-medium">Temperatura</label>
+            <select value={filterTemperature} onChange={e => setFilterTemperature(e.target.value)} className="px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none">
+              <option value="all">Todas</option>
+              <option value="quente">🔥 Quente</option>
+              <option value="morno">🌤 Morno</option>
+              <option value="frio">❄️ Frio</option>
+            </select>
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-[10px] text-slate-500 uppercase font-medium">Valor (R$)</label>
+            <div className="flex gap-1">
+              <input type="number" placeholder="Min" value={filterValueMin} onChange={e => setFilterValueMin(e.target.value)} className="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none" />
+              <input type="number" placeholder="Max" value={filterValueMax} onChange={e => setFilterValueMax(e.target.value)} className="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none" />
+            </div>
+          </div>
+          {hasActiveFilters && (
+            <button onClick={resetFilters} className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">
+              <RotateCcw className="w-3 h-3" /> Limpar
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Board Scroll Container */}
       <div className="flex-1 overflow-x-auto overflow-y-hidden pb-4">
