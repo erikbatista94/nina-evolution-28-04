@@ -324,12 +324,18 @@ export const api = {
   /**
    * Fetch contacts from database
    */
-  fetchContacts: async (): Promise<Contact[]> => {
-    const { data, error } = await supabase
+  fetchContacts: async (filterUserId?: string): Promise<Contact[]> => {
+    let query = supabase
       .from('contacts')
       .select('*')
       .order('last_activity', { ascending: false })
-      .limit(100);
+      .limit(500);
+
+    if (filterUserId) {
+      query = query.eq('assigned_user_id', filterUserId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       console.error('[API] Error fetching contacts:', error);
