@@ -270,7 +270,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* SLA Block for Admin */}
-      <DashboardSlaBlock />
+      <DashboardSlaBlock filterUserId={selectedSeller !== 'all' ? selectedSeller : undefined} />
     </div>
   );
 };
