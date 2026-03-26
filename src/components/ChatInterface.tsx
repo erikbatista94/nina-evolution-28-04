@@ -121,8 +121,7 @@ const ChatInterface: React.FC = () => {
         .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full')
         .eq('id', activeChat.contactId)
         .single()
-        .then(({ data }) => setContactDetails(data))
-        .catch(() => setContactDetails(null));
+        .then(({ data }) => { setContactDetails(data); });
     } else {
       setContactDetails(null);
     }
