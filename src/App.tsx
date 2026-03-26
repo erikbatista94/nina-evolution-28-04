@@ -58,6 +58,7 @@ const App: React.FC = () => {
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/scheduling" element={<Scheduling />} />
               <Route path="/team" element={<Team />} />
+              <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
               <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
             </Route>
             
