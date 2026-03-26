@@ -37,6 +37,13 @@ const Kanban: React.FC = () => {
   const [newActivityDescription, setNewActivityDescription] = useState('');
   const [conversationMessages, setConversationMessages] = useState<any[]>([]);
   const [loadingMessages, setLoadingMessages] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterCity, setFilterCity] = useState<string>('all');
+  const [filterCustomerType, setFilterCustomerType] = useState<string>('all');
+  const [filterService, setFilterService] = useState<string>('all');
+  const [filterTemperature, setFilterTemperature] = useState<string>('all');
+  const [filterValueMin, setFilterValueMin] = useState<string>('');
+  const [filterValueMax, setFilterValueMax] = useState<string>('');
   
   const dragItem = useRef<string | null>(null);
   
