@@ -1228,7 +1228,69 @@ const ChatInterface: React.FC = () => {
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
 
-                {/* AI Memory Section */}
+                {/* Lead Summary Section */}
+                {contactDetails && (
+                  <div className="space-y-3">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      📋 Resumo do Lead
+                    </h4>
+                    <div className="grid grid-cols-2 gap-2">
+                      {contactDetails.customer_type && (
+                        <div className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-[10px] text-slate-500">Tipo</span>
+                          <p className="text-xs text-slate-200 font-medium">{contactDetails.customer_type}</p>
+                        </div>
+                      )}
+                      {contactDetails.city && (
+                        <div className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-[10px] text-slate-500">Cidade</span>
+                          <p className="text-xs text-slate-200 font-medium">{contactDetails.city}{contactDetails.neighborhood ? ` - ${contactDetails.neighborhood}` : ''}</p>
+                        </div>
+                      )}
+                      {contactDetails.lead_temperature && (
+                        <div className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-[10px] text-slate-500">Temperatura</span>
+                          <p className="text-xs text-slate-200 font-medium">
+                            {contactDetails.lead_temperature === 'quente' ? '🔥 Quente' : contactDetails.lead_temperature === 'morno' ? '🌤 Morno' : '❄️ Frio'}
+                          </p>
+                        </div>
+                      )}
+                      {contactDetails.lead_status && (
+                        <div className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-[10px] text-slate-500">Status</span>
+                          <p className="text-xs text-slate-200 font-medium">{contactDetails.lead_status}</p>
+                        </div>
+                      )}
+                      {contactDetails.job_size && (
+                        <div className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-[10px] text-slate-500">Metragem</span>
+                          <p className="text-xs text-slate-200 font-medium">{contactDetails.job_size}</p>
+                        </div>
+                      )}
+                      {contactDetails.start_timeframe && (
+                        <div className="p-2 rounded-lg bg-slate-800/50 border border-slate-700/50">
+                          <span className="text-[10px] text-slate-500">Prazo</span>
+                          <p className="text-xs text-slate-200 font-medium">{contactDetails.start_timeframe}</p>
+                        </div>
+                      )}
+                    </div>
+                    {contactDetails.interest_services?.length > 0 && (
+                      <div className="flex flex-wrap gap-1">
+                        {contactDetails.interest_services.map((s: string) => (
+                          <span key={s} className="px-2 py-0.5 bg-cyan-500/10 text-cyan-400 text-[10px] rounded border border-cyan-500/20">{s}</span>
+                        ))}
+                      </div>
+                    )}
+                    {contactDetails.has_project !== null && (
+                      <div className="text-xs text-slate-400">
+                        Projeto: {contactDetails.has_project ? '✅ Sim' : '❌ Não'}
+                        {contactDetails.source && ` • Origem: ${contactDetails.source}`}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="h-px bg-slate-800/50 w-full"></div>
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                     <Brain className="w-4 h-4" />
