@@ -818,6 +818,7 @@ export const api = {
       ownerAvatar: d.owner?.avatar || 'https://ui-avatars.com/api/?name=NA&background=334155&color=fff',
       ownerId: d.owner_id,
       ownerName: d.owner?.name,
+      userId: d.user_id,
       tags: d.tags || [],
       dueDate: d.due_date,
       priority: (d.priority || 'medium') as 'low' | 'medium' | 'high',
@@ -830,6 +831,12 @@ export const api = {
       lostReason: d.lost_reason,
       clientMemory: d.contact?.client_memory || null,
       conversationId: convMap.get(d.contact_id) || undefined,
+      contactCity: d.contact?.city || null,
+      contactNeighborhood: d.contact?.neighborhood || null,
+      contactCustomerType: d.contact?.customer_type || null,
+      contactInterestServices: d.contact?.interest_services || [],
+      contactJobSize: d.contact?.job_size || null,
+      contactLeadTemperature: d.contact?.lead_temperature || null,
     }));
   },
 
