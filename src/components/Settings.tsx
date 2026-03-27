@@ -72,6 +72,12 @@ const Settings: React.FC = () => {
               <Plug className="w-4 h-4" />
               APIs
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="objections" className="gap-2">
+                <Swords className="w-4 h-4" />
+                Objeções
+              </TabsTrigger>
+            )}
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
