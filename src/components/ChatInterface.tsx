@@ -54,6 +54,8 @@ const ChatInterface: React.FC = () => {
   const [pendingAppointment, setPendingAppointment] = useState<any>(null);
   const [confirmingAppointment, setConfirmingAppointment] = useState(false);
   const [contactDetails, setContactDetails] = useState<any>(null);
+  const [objectionSuggestions, setObjectionSuggestions] = useState<{title: string; response_text: string}[]>([]);
+  const [pendingFollowup, setPendingFollowup] = useState<any>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
