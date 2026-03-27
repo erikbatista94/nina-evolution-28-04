@@ -136,6 +136,28 @@ const ChatInterface: React.FC = () => {
     }
   }, [activeChat?.id]);
 
+  // Load objection suggestions when last client message changes
+  useEffect(() => {
+    if (!activeChat) { setObjectionSuggestions([]); return; }
+    const lastClientMsg = [...activeChat.messages].reverse().find(m => m.fromType === 'user');
+    if (!lastClientMsg?.content) { setObjectionSuggestions([]); return; }
+    const msgLower = lastClientMsg.content.toLowerCase();
+    supabase.from('objections_playbook').select('title, triggers, response_text').eq('is_active', true)
+      .then(({ data }) => {
+        const matches = (data as any[] || []).filter((obj: any) =>
+          (obj.triggers || []).some((t: string) => msgLower.includes(t.toLowerCase()))
+        ).slice(0, 3);
+        setObjectionSuggestions(matches);
+      });
+  }, [activeChat?.messages?.length]);
+
+  // Load pending followup for active conversation
+  useEffect(() => {
+    if (!activeChat) { setPendingFollowup(null); return; }
+    supabase.from('followup_tasks').select('*').eq('conversation_id', activeChat.id).eq('status', 'pending').maybeSingle()
+      .then(({ data }) => setPendingFollowup(data));
+  }, [activeChat?.id]);
+
   // Load pending appointment for active conversation
   useEffect(() => {
     if (!activeChat) { setPendingAppointment(null); return; }
