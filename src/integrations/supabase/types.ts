@@ -113,6 +113,7 @@ export type Database = {
           job_size: string | null
           last_activity: string
           last_interaction_at: string | null
+          lead_score: number | null
           lead_status: string | null
           lead_temperature: string | null
           name: string | null
@@ -148,6 +149,7 @@ export type Database = {
           job_size?: string | null
           last_activity?: string
           last_interaction_at?: string | null
+          lead_score?: number | null
           lead_status?: string | null
           lead_temperature?: string | null
           name?: string | null
@@ -183,6 +185,7 @@ export type Database = {
           job_size?: string | null
           last_activity?: string
           last_interaction_at?: string | null
+          lead_score?: number | null
           lead_status?: string | null
           lead_temperature?: string | null
           name?: string | null
@@ -367,6 +370,7 @@ export type Database = {
       deals: {
         Row: {
           company: string | null
+          conditions: string | null
           contact_id: string | null
           created_at: string | null
           due_date: string | null
@@ -376,6 +380,10 @@ export type Database = {
           notes: string | null
           owner_id: string | null
           priority: string | null
+          proposal_file_path: string | null
+          proposal_sent_at: string | null
+          proposal_status: string | null
+          scope: string | null
           stage: string | null
           stage_id: string
           tags: string[] | null
@@ -387,6 +395,7 @@ export type Database = {
         }
         Insert: {
           company?: string | null
+          conditions?: string | null
           contact_id?: string | null
           created_at?: string | null
           due_date?: string | null
@@ -396,6 +405,10 @@ export type Database = {
           notes?: string | null
           owner_id?: string | null
           priority?: string | null
+          proposal_file_path?: string | null
+          proposal_sent_at?: string | null
+          proposal_status?: string | null
+          scope?: string | null
           stage?: string | null
           stage_id: string
           tags?: string[] | null
@@ -407,6 +420,7 @@ export type Database = {
         }
         Update: {
           company?: string | null
+          conditions?: string | null
           contact_id?: string | null
           created_at?: string | null
           due_date?: string | null
@@ -416,6 +430,10 @@ export type Database = {
           notes?: string | null
           owner_id?: string | null
           priority?: string | null
+          proposal_file_path?: string | null
+          proposal_sent_at?: string | null
+          proposal_status?: string | null
+          scope?: string | null
           stage?: string | null
           stage_id?: string
           tags?: string[] | null
@@ -452,6 +470,53 @@ export type Database = {
             columns: ["stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      followup_tasks: {
+        Row: {
+          assigned_user_id: string | null
+          contact_id: string
+          conversation_id: string
+          created_at: string | null
+          due_at: string
+          id: string
+          status: string
+          suggested_message: string | null
+          temperature: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          contact_id: string
+          conversation_id: string
+          created_at?: string | null
+          due_at: string
+          id?: string
+          status?: string
+          suggested_message?: string | null
+          temperature?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_user_id?: string | null
+          contact_id?: string
+          conversation_id?: string
+          created_at?: string | null
+          due_at?: string
+          id?: string
+          status?: string
+          suggested_message?: string | null
+          temperature?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_tasks_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
             referencedColumns: ["id"]
           },
         ]
@@ -764,6 +829,7 @@ export type Database = {
           ai_scheduling_enabled: boolean | null
           async_booking_enabled: boolean | null
           audio_response_enabled: boolean | null
+          auto_followup_enabled: boolean | null
           auto_response_enabled: boolean
           available_time_slots: Json
           business_days: number[]
@@ -790,6 +856,7 @@ export type Database = {
           response_delay_max: number
           response_delay_min: number
           route_all_to_receiver_enabled: boolean
+          scoring_weights: Json | null
           sdr_name: string | null
           system_prompt_override: string | null
           test_phone_numbers: Json | null
@@ -808,6 +875,7 @@ export type Database = {
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
+          auto_followup_enabled?: boolean | null
           auto_response_enabled?: boolean
           available_time_slots?: Json
           business_days?: number[]
@@ -834,6 +902,7 @@ export type Database = {
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
+          scoring_weights?: Json | null
           sdr_name?: string | null
           system_prompt_override?: string | null
           test_phone_numbers?: Json | null
@@ -852,6 +921,7 @@ export type Database = {
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
+          auto_followup_enabled?: boolean | null
           auto_response_enabled?: boolean
           available_time_slots?: Json
           business_days?: number[]
@@ -878,6 +948,7 @@ export type Database = {
           response_delay_max?: number
           response_delay_min?: number
           route_all_to_receiver_enabled?: boolean
+          scoring_weights?: Json | null
           sdr_name?: string | null
           system_prompt_override?: string | null
           test_phone_numbers?: Json | null
@@ -889,6 +960,39 @@ export type Database = {
           whatsapp_business_account_id?: string | null
           whatsapp_phone_number_id?: string | null
           whatsapp_verify_token?: string | null
+        }
+        Relationships: []
+      }
+      objections_playbook: {
+        Row: {
+          category: string
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          response_text: string
+          title: string
+          triggers: string[]
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          response_text: string
+          title: string
+          triggers?: string[]
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          response_text?: string
+          title?: string
+          triggers?: string[]
+          updated_at?: string | null
         }
         Relationships: []
       }
@@ -963,6 +1067,38 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      proposals: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          deal_id: string
+          file_path: string
+          id: string
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          deal_id: string
+          file_path: string
+          id?: string
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          deal_id?: string
+          file_path?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "proposals_deal_id_fkey"
+            columns: ["deal_id"]
+            isOneToOne: false
+            referencedRelation: "deals"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       quick_replies: {
         Row: {

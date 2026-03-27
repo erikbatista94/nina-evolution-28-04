@@ -331,7 +331,43 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
       });
 
       // === SYNC STRUCTURED CRM FIELDS TO CONTACTS ===
-      const leadTemp = insights.qualification_score > 70 ? 'quente' : insights.qualification_score > 40 ? 'morno' : 'frio';
+      // Calculate lead score from scoring weights
+      let leadScore = insights.qualification_score || 0;
+      
+      // Try to get scoring weights from settings
+      const { data: scoringSettings } = await supabase
+        .from('nina_settings')
+        .select('scoring_weights')
+        .limit(1)
+        .maybeSingle();
+      
+      const weights = (scoringSettings as any)?.scoring_weights || {};
+      
+      // Apply weights based on extracted data
+      if (insights.customer_type && weights[insights.customer_type]) {
+        leadScore += weights[insights.customer_type];
+      }
+      if (insights.has_project && weights.has_project) {
+        leadScore += weights.has_project;
+      }
+      // Timeframe scoring
+      const timeframeKey = insights.decision_timeline === 'immediate' ? 'imediato' :
+                          insights.decision_timeline === '1month' ? '30d' :
+                          insights.decision_timeline === '3months' ? '60d' :
+                          insights.decision_timeline === '6months+' ? '90d' : null;
+      if (timeframeKey && weights[timeframeKey]) {
+        leadScore += weights[timeframeKey];
+      }
+      // City scoring
+      if (insights.city) {
+        const cityKey = insights.city.toLowerCase().replace(/\s+/g, '');
+        if (weights[cityKey]) leadScore += weights[cityKey];
+      }
+      
+      // Clamp score to 0-100
+      leadScore = Math.max(0, Math.min(100, leadScore));
+      
+      const leadTemp = leadScore > 70 ? 'quente' : leadScore > 40 ? 'morno' : 'frio';
       const startTimeframe = insights.decision_timeline === 'immediate' ? 'imediato' :
                              insights.decision_timeline === '1month' ? '30d' :
                              insights.decision_timeline === '3months' ? '60d' :
@@ -339,6 +375,7 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
 
       const structuredUpdate: Record<string, any> = {
         lead_temperature: leadTemp,
+        lead_score: leadScore,
         next_best_action: insights.next_best_action,
         last_interaction_at: new Date().toISOString(),
       };
@@ -362,7 +399,7 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
       if (updateError) {
         console.error('[Analyze] Error syncing structured fields:', updateError);
       } else {
-        console.log('[Analyze] ✅ Structured CRM fields synced:', Object.keys(structuredUpdate));
+        console.log('[Analyze] ✅ Structured CRM fields synced (score:', leadScore, '):', Object.keys(structuredUpdate));
       }
 
       console.log('[Analyze] Memory updated successfully');

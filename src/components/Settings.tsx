@@ -1,8 +1,9 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock, Swords } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
+import ObjectionsPlaybook from './settings/ObjectionsPlaybook';
 import SystemRoadmap from './SystemRoadmap';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
@@ -71,6 +72,12 @@ const Settings: React.FC = () => {
               <Plug className="w-4 h-4" />
               APIs
             </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="objections" className="gap-2">
+                <Swords className="w-4 h-4" />
+                Objeções
+              </TabsTrigger>
+            )}
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
@@ -122,6 +129,14 @@ const Settings: React.FC = () => {
         <TabsContent value="apis">
           <ApiSettings ref={apiRef} />
         </TabsContent>
+
+        {isAdmin && (
+          <TabsContent value="objections">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+              <ObjectionsPlaybook />
+            </div>
+          </TabsContent>
+        )}
 
         <TabsContent value="docs">
           <SystemRoadmap />
