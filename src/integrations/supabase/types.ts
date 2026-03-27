@@ -456,6 +456,53 @@ export type Database = {
           },
         ]
       }
+      followup_tasks: {
+        Row: {
+          assigned_user_id: string | null
+          contact_id: string
+          conversation_id: string
+          created_at: string | null
+          due_at: string
+          id: string
+          status: string
+          suggested_message: string | null
+          temperature: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_user_id?: string | null
+          contact_id: string
+          conversation_id: string
+          created_at?: string | null
+          due_at: string
+          id?: string
+          status?: string
+          suggested_message?: string | null
+          temperature?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_user_id?: string | null
+          contact_id?: string
+          conversation_id?: string
+          created_at?: string | null
+          due_at?: string
+          id?: string
+          status?: string
+          suggested_message?: string | null
+          temperature?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "followup_tasks_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       knowledge_chunks: {
         Row: {
           chunk_index: number
@@ -764,6 +811,7 @@ export type Database = {
           ai_scheduling_enabled: boolean | null
           async_booking_enabled: boolean | null
           audio_response_enabled: boolean | null
+          auto_followup_enabled: boolean | null
           auto_response_enabled: boolean
           available_time_slots: Json
           business_days: number[]
@@ -808,6 +856,7 @@ export type Database = {
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
+          auto_followup_enabled?: boolean | null
           auto_response_enabled?: boolean
           available_time_slots?: Json
           business_days?: number[]
@@ -852,6 +901,7 @@ export type Database = {
           ai_scheduling_enabled?: boolean | null
           async_booking_enabled?: boolean | null
           audio_response_enabled?: boolean | null
+          auto_followup_enabled?: boolean | null
           auto_response_enabled?: boolean
           available_time_slots?: Json
           business_days?: number[]
