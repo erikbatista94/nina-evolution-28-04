@@ -1040,6 +1040,31 @@ const ChatInterface: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
+             {/* Objection Suggestions */}
+            {objectionSuggestions.length > 0 && (
+              <div className="px-4 py-2 bg-amber-500/5 border-t border-amber-500/20 flex items-center gap-2 overflow-x-auto">
+                <span className="text-[10px] text-amber-400 font-medium whitespace-nowrap">💡 Sugestão:</span>
+                {objectionSuggestions.map((s, i) => (
+                  <button key={i} onClick={() => setInputText(s.response_text)} className="px-2.5 py-1 bg-amber-500/10 border border-amber-500/20 text-amber-300 text-xs rounded-lg hover:bg-amber-500/20 transition-colors whitespace-nowrap" title={s.title}>
+                    {s.title}
+                  </button>
+                ))}
+              </div>
+            )}
+
+            {/* Follow-up Button */}
+            {pendingFollowup && (
+              <div className="px-4 py-2 bg-blue-500/5 border-t border-blue-500/20 flex items-center gap-2">
+                <span className="text-[10px] text-blue-400 font-medium">🔄 Follow-up:</span>
+                <button onClick={() => { setInputText(pendingFollowup.suggested_message || ''); }} className="px-2.5 py-1 bg-blue-500/10 border border-blue-500/20 text-blue-300 text-xs rounded-lg hover:bg-blue-500/20 transition-colors truncate max-w-[200px]">
+                  Inserir sugestão
+                </button>
+                <button onClick={async () => { await supabase.from('followup_tasks').update({ status: 'dismissed' }).eq('id', pendingFollowup.id); setPendingFollowup(null); }} className="px-2 py-1 text-slate-500 hover:text-slate-300 text-xs">
+                  Dispensar
+                </button>
+              </div>
+            )}
+
              {/* Input Area */}
             <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
               {isRecording && activeChat ? (

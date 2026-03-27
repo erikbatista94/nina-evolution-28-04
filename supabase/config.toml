@@ -11,3 +11,9 @@ verify_jwt = false
 
 [functions.google-calendar-sync]
 verify_jwt = false
+
+[functions.followup-checker]
+verify_jwt = false
+
+[functions.generate-proposal-pdf]
+verify_jwt = false

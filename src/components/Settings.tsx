@@ -130,6 +130,14 @@ const Settings: React.FC = () => {
           <ApiSettings ref={apiRef} />
         </TabsContent>
 
+        {isAdmin && (
+          <TabsContent value="objections">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+              <ObjectionsPlaybook />
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="docs">
           <SystemRoadmap />
         </TabsContent>
