@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Calendar, AlertTriangle, Clock, ExternalLink, Loader2, MessageCircle } from 'lucide-react';
+import { MessageSquare, Calendar, AlertTriangle, Clock, ExternalLink, Loader2, MessageCircle, RotateCcw, Star } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAlerts } from '@/hooks/useAlerts';
@@ -23,6 +23,24 @@ interface TodayAppointment {
   contact_name: string | null;
 }
 
+interface FollowupTask {
+  id: string;
+  conversation_id: string;
+  contact_id: string;
+  suggested_message: string | null;
+  temperature: string | null;
+  due_at: string;
+  contact_name?: string;
+}
+
+interface TopLead {
+  id: string;
+  name: string | null;
+  lead_score: number;
+  lead_temperature: string | null;
+  city: string | null;
+}
+
 const levelConfig = {
   stalled: { label: 'Lead Parado', color: 'bg-red-500/10 border-red-500/30 text-red-400' },
   loss_risk: { label: 'Risco de Perda', color: 'bg-orange-500/10 border-orange-500/30 text-orange-400' },
@@ -37,6 +55,8 @@ const DashboardMyDay: React.FC = () => {
 
   const [conversations, setConversations] = useState<PendingConversation[]>([]);
   const [appointments, setAppointments] = useState<TodayAppointment[]>([]);
+  const [followups, setFollowups] = useState<FollowupTask[]>([]);
+  const [topLeads, setTopLeads] = useState<TopLead[]>([]);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingAppts, setLoadingAppts] = useState(true);
 
@@ -84,8 +104,42 @@ const DashboardMyDay: React.FC = () => {
       setLoadingAppts(false);
     };
 
+    const fetchFollowups = async () => {
+      const todayEnd = new Date();
+      todayEnd.setHours(23, 59, 59, 999);
+      const { data } = await supabase
+        .from('followup_tasks')
+        .select('id, conversation_id, contact_id, suggested_message, temperature, due_at')
+        .eq('assigned_user_id', user.id)
+        .eq('status', 'pending')
+        .lte('due_at', todayEnd.toISOString())
+        .order('due_at', { ascending: true })
+        .limit(10);
+
+      if (data && data.length > 0) {
+        // Fetch contact names
+        const contactIds = [...new Set(data.map((f: any) => f.contact_id))];
+        const { data: contacts } = await supabase.from('contacts').select('id, name, call_name').in('id', contactIds);
+        const contactMap = new Map((contacts || []).map((c: any) => [c.id, c.call_name || c.name || 'Desconhecido']));
+        setFollowups(data.map((f: any) => ({ ...f, contact_name: contactMap.get(f.contact_id) || 'Desconhecido' })));
+      }
+    };
+
+    const fetchTopLeads = async () => {
+      const { data } = await supabase
+        .from('contacts')
+        .select('id, name, lead_score, lead_temperature, city')
+        .eq('assigned_user_id', user.id)
+        .gt('lead_score', 0)
+        .order('lead_score', { ascending: false })
+        .limit(5);
+      setTopLeads((data as TopLead[]) || []);
+    };
+
     fetchConversations();
     fetchAppointments();
+    fetchFollowups();
+    fetchTopLeads();
   }, [user]);
 
   const stalledAlerts = alerts.filter(a => a.level === 'stalled');
@@ -171,6 +225,65 @@ const DashboardMyDay: React.FC = () => {
           )}
         </div>
       </div>
+
+      {/* Follow-ups de Hoje */}
+      {followups.length > 0 && (
+        <div className="rounded-2xl border border-blue-500/30 bg-blue-500/5 p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <RotateCcw className="h-5 w-5 text-blue-400" />
+            <h3 className="text-lg font-semibold">Follow-ups de Hoje</h3>
+            <span className="ml-auto text-xs text-muted-foreground">{followups.length}</span>
+          </div>
+          <div className="space-y-2">
+            {followups.map(f => (
+              <div key={f.id} className="flex items-center justify-between p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{f.contact_name}</p>
+                  <p className="text-xs text-muted-foreground truncate">{f.suggested_message?.substring(0, 60)}...</p>
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  {f.temperature && (
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{f.temperature}</span>
+                  )}
+                  <button
+                    onClick={() => navigate(`/chat?conversation=${f.conversation_id}&suggested=${encodeURIComponent(f.suggested_message || '')}`)}
+                    className="text-xs text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <MessageCircle className="h-3 w-3" /> Abrir
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Top Leads by Score */}
+      {topLeads.length > 0 && (
+        <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <Star className="h-5 w-5 text-amber-400" />
+            <h3 className="text-lg font-semibold">Top Leads</h3>
+          </div>
+          <div className="space-y-2">
+            {topLeads.map((lead, i) => (
+              <div key={lead.id} className="flex items-center gap-3 p-2 rounded-lg bg-amber-500/5">
+                <span className="text-lg font-bold text-amber-400 w-6 text-center">{i + 1}</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{lead.name || 'Sem nome'}</p>
+                  <p className="text-xs text-muted-foreground">{lead.city || '—'}</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] px-1.5 py-0.5 rounded ${lead.lead_temperature === 'quente' ? 'bg-red-500/10 text-red-400' : lead.lead_temperature === 'morno' ? 'bg-yellow-500/10 text-yellow-400' : 'bg-blue-500/10 text-blue-400'}`}>
+                    {lead.lead_temperature || 'frio'}
+                  </span>
+                  <span className="text-sm font-bold text-amber-400">{lead.lead_score}pts</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bloco 3 — Leads em Risco (SLA) */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-lg">
