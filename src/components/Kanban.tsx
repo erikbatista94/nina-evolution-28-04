@@ -314,6 +314,7 @@ const Kanban: React.FC = () => {
     setFilterTemperature('all');
     setFilterValueMin('');
     setFilterValueMax('');
+    setFilterHighPriority(false);
   };
 
   const filteredDeals = ownerFilteredDeals.filter(deal => {
