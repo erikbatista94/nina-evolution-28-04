@@ -440,6 +440,12 @@ const Kanban: React.FC = () => {
               <input type="number" placeholder="Max" value={filterValueMax} onChange={e => setFilterValueMax(e.target.value)} className="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none" />
             </div>
           </div>
+          <button
+            onClick={() => setFilterHighPriority(!filterHighPriority)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${filterHighPriority ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'}`}
+          >
+            <Star className="w-3 h-3" /> Alta prioridade (score &gt; 70)
+          </button>
           {hasActiveFilters && (
             <button onClick={resetFilters} className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">
               <RotateCcw className="w-3 h-3" /> Limpar
