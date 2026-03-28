@@ -305,7 +305,7 @@ const Kanban: React.FC = () => {
   const uniqueCustomerTypes = [...new Set(ownerFilteredDeals.map(d => d.contactCustomerType).filter(Boolean))] as string[];
   const uniqueServices = [...new Set(ownerFilteredDeals.flatMap(d => d.contactInterestServices || []).filter(Boolean))] as string[];
 
-  const hasActiveFilters = filterCity !== 'all' || filterCustomerType !== 'all' || filterService !== 'all' || filterTemperature !== 'all' || filterValueMin || filterValueMax;
+  const hasActiveFilters = filterCity !== 'all' || filterCustomerType !== 'all' || filterService !== 'all' || filterTemperature !== 'all' || filterValueMin || filterValueMax || filterHighPriority;
 
   const resetFilters = () => {
     setFilterCity('all');
