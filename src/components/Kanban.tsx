@@ -523,7 +523,16 @@ const Kanban: React.FC = () => {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${getPriorityColor(deal.priority)}`}>
                            {deal.priority === 'high' ? 'Alta' : deal.priority === 'medium' ? 'Média' : 'Baixa'}
                         </span>
-                        <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
+                        {(deal.contactLeadScore || 0) > 0 && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${
+                            (deal.contactLeadScore || 0) > 70 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                            (deal.contactLeadScore || 0) > 40 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
+                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                          }`}>
+                            ★ {deal.contactLeadScore}
+                          </span>
+                        )}
+                        <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100 ml-auto">
                            <MoreHorizontal className="w-3.5 h-3.5" />
                         </button>
                       </div>
