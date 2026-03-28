@@ -326,7 +326,8 @@ const Kanban: React.FC = () => {
     const matchesTemp = filterTemperature === 'all' || deal.contactLeadTemperature === filterTemperature;
     const matchesMinValue = !filterValueMin || deal.value >= Number(filterValueMin);
     const matchesMaxValue = !filterValueMax || deal.value <= Number(filterValueMax);
-    return matchesSearch && matchesCity && matchesType && matchesService && matchesTemp && matchesMinValue && matchesMaxValue;
+    const matchesHighPriority = !filterHighPriority || (deal.contactLeadScore || 0) > 70;
+    return matchesSearch && matchesCity && matchesType && matchesService && matchesTemp && matchesMinValue && matchesMaxValue && matchesHighPriority;
   });
 
   const getPriorityColor = (priority: string) => {
