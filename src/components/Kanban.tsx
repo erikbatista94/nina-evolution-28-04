@@ -44,7 +44,7 @@ const Kanban: React.FC = () => {
   const [filterTemperature, setFilterTemperature] = useState<string>('all');
   const [filterValueMin, setFilterValueMin] = useState<string>('');
   const [filterValueMax, setFilterValueMax] = useState<string>('');
-  
+  const [filterHighPriority, setFilterHighPriority] = useState(false);
   const dragItem = useRef<string | null>(null);
   
   const handleDealCreated = async () => {
