@@ -3,7 +3,7 @@ import {
   Plus, Search, MoreHorizontal, DollarSign, Loader2, CalendarClock, Tag, X, 
   Building, User, Calendar, ArrowRight, CheckCircle2, Circle, 
   FileText, Phone, Mail, Paperclip, Send, CheckSquare, Clock, Trash2, Settings, Brain, MessageSquare, Bot,
-  Filter, RotateCcw, MapPin, Briefcase, Thermometer
+  Filter, RotateCcw, MapPin, Briefcase, Thermometer, Star
 } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
@@ -44,7 +44,7 @@ const Kanban: React.FC = () => {
   const [filterTemperature, setFilterTemperature] = useState<string>('all');
   const [filterValueMin, setFilterValueMin] = useState<string>('');
   const [filterValueMax, setFilterValueMax] = useState<string>('');
-  
+  const [filterHighPriority, setFilterHighPriority] = useState(false);
   const dragItem = useRef<string | null>(null);
   
   const handleDealCreated = async () => {
@@ -305,7 +305,7 @@ const Kanban: React.FC = () => {
   const uniqueCustomerTypes = [...new Set(ownerFilteredDeals.map(d => d.contactCustomerType).filter(Boolean))] as string[];
   const uniqueServices = [...new Set(ownerFilteredDeals.flatMap(d => d.contactInterestServices || []).filter(Boolean))] as string[];
 
-  const hasActiveFilters = filterCity !== 'all' || filterCustomerType !== 'all' || filterService !== 'all' || filterTemperature !== 'all' || filterValueMin || filterValueMax;
+  const hasActiveFilters = filterCity !== 'all' || filterCustomerType !== 'all' || filterService !== 'all' || filterTemperature !== 'all' || filterValueMin || filterValueMax || filterHighPriority;
 
   const resetFilters = () => {
     setFilterCity('all');
@@ -314,6 +314,7 @@ const Kanban: React.FC = () => {
     setFilterTemperature('all');
     setFilterValueMin('');
     setFilterValueMax('');
+    setFilterHighPriority(false);
   };
 
   const filteredDeals = ownerFilteredDeals.filter(deal => {
@@ -325,7 +326,8 @@ const Kanban: React.FC = () => {
     const matchesTemp = filterTemperature === 'all' || deal.contactLeadTemperature === filterTemperature;
     const matchesMinValue = !filterValueMin || deal.value >= Number(filterValueMin);
     const matchesMaxValue = !filterValueMax || deal.value <= Number(filterValueMax);
-    return matchesSearch && matchesCity && matchesType && matchesService && matchesTemp && matchesMinValue && matchesMaxValue;
+    const matchesHighPriority = !filterHighPriority || (deal.contactLeadScore || 0) > 70;
+    return matchesSearch && matchesCity && matchesType && matchesService && matchesTemp && matchesMinValue && matchesMaxValue && matchesHighPriority;
   });
 
   const getPriorityColor = (priority: string) => {
@@ -438,6 +440,12 @@ const Kanban: React.FC = () => {
               <input type="number" placeholder="Max" value={filterValueMax} onChange={e => setFilterValueMax(e.target.value)} className="w-20 px-2 py-1.5 bg-slate-900 border border-slate-700 rounded text-xs text-slate-200 outline-none" />
             </div>
           </div>
+          <button
+            onClick={() => setFilterHighPriority(!filterHighPriority)}
+            className={`flex items-center gap-1 px-3 py-1.5 rounded text-xs font-medium border transition-colors ${filterHighPriority ? 'bg-amber-500/20 text-amber-400 border-amber-500/30' : 'bg-slate-900 text-slate-400 border-slate-700 hover:text-white'}`}
+          >
+            <Star className="w-3 h-3" /> Alta prioridade (score &gt; 70)
+          </button>
           {hasActiveFilters && (
             <button onClick={resetFilters} className="flex items-center gap-1 px-2 py-1.5 text-xs text-slate-400 hover:text-white transition-colors">
               <RotateCcw className="w-3 h-3" /> Limpar
@@ -515,7 +523,16 @@ const Kanban: React.FC = () => {
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${getPriorityColor(deal.priority)}`}>
                            {deal.priority === 'high' ? 'Alta' : deal.priority === 'medium' ? 'Média' : 'Baixa'}
                         </span>
-                        <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100">
+                        {(deal.contactLeadScore || 0) > 0 && (
+                          <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${
+                            (deal.contactLeadScore || 0) > 70 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
+                            (deal.contactLeadScore || 0) > 40 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
+                            'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                          }`}>
+                            ★ {deal.contactLeadScore}
+                          </span>
+                        )}
+                        <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100 ml-auto">
                            <MoreHorizontal className="w-3.5 h-3.5" />
                         </button>
                       </div>
@@ -677,6 +694,75 @@ const Kanban: React.FC = () => {
 
                 {/* 2. Content Area */}
                 <div className="flex-1 overflow-y-auto bg-slate-950 custom-scrollbar">
+
+                    {/* Budget & Proposal Section */}
+                    <div className="p-6 border-b border-slate-800 bg-slate-900/30">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider mb-3 flex items-center gap-2">
+                        <DollarSign className="w-3.5 h-3.5 text-emerald-500" /> Orçamento & Proposta
+                      </h4>
+                      <div className="grid grid-cols-2 gap-3 mb-3">
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase mb-1 block">Escopo</label>
+                          <textarea
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 outline-none resize-none min-h-[60px] focus:ring-1 focus:ring-cyan-500/50"
+                            placeholder="Descreva o escopo..."
+                            defaultValue={selectedDeal.scope || ''}
+                            onBlur={async (e) => {
+                              if (e.target.value !== (selectedDeal.scope || '')) {
+                                await supabase.from('deals').update({ scope: e.target.value }).eq('id', selectedDeal.id);
+                                setSelectedDeal({ ...selectedDeal, scope: e.target.value });
+                              }
+                            }}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase mb-1 block">Condições</label>
+                          <textarea
+                            className="w-full bg-slate-900 border border-slate-800 rounded-lg p-2 text-xs text-slate-200 outline-none resize-none min-h-[60px] focus:ring-1 focus:ring-cyan-500/50"
+                            placeholder="Condições comerciais..."
+                            defaultValue={selectedDeal.conditions || ''}
+                            onBlur={async (e) => {
+                              if (e.target.value !== (selectedDeal.conditions || '')) {
+                                await supabase.from('deals').update({ conditions: e.target.value }).eq('id', selectedDeal.id);
+                                setSelectedDeal({ ...selectedDeal, conditions: e.target.value });
+                              }
+                            }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-xs border-slate-700 text-slate-300 hover:bg-slate-800"
+                          onClick={async () => {
+                            try {
+                              toast.info('Gerando PDF...');
+                              const { data, error } = await supabase.functions.invoke('generate-proposal-pdf', {
+                                body: { deal_id: selectedDeal.id }
+                              });
+                              if (error) throw error;
+                              toast.success('Proposta gerada com sucesso!');
+                              // Refresh deal data
+                              const updated = await api.fetchPipeline();
+                              setDeals(updated);
+                              const refreshed = updated.find(d => d.id === selectedDeal.id);
+                              if (refreshed) setSelectedDeal(refreshed);
+                            } catch (err: any) {
+                              console.error('PDF generation error:', err);
+                              toast.error('Erro ao gerar PDF: ' + (err.message || 'desconhecido'));
+                            }
+                          }}
+                        >
+                          <FileText className="w-3 h-3 mr-1" /> Gerar PDF
+                        </Button>
+                        {selectedDeal.proposalFilePath && (
+                          <span className="text-[10px] text-emerald-400 flex items-center gap-1">
+                            ✓ Proposta gerada
+                          </span>
+                        )}
+                      </div>
+                    </div>
                     
                     {/* Action Composer */}
                     <div className="p-6 border-b border-slate-800 bg-slate-900/30">

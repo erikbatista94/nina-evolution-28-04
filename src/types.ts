@@ -167,6 +167,11 @@ export interface Deal {
   contactInterestServices?: string[];
   contactJobSize?: string;
   contactLeadTemperature?: string;
+  contactLeadScore?: number;
+  scope?: string;
+  conditions?: string;
+  proposalStatus?: string;
+  proposalFilePath?: string;
 }
 
 export interface DealActivity {

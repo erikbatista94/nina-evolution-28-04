@@ -788,7 +788,7 @@ export const api = {
       .from('deals')
       .select(`
         *,
-        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature),
+        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature, lead_score),
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
@@ -843,6 +843,11 @@ export const api = {
       contactInterestServices: d.contact?.interest_services || [],
       contactJobSize: d.contact?.job_size || null,
       contactLeadTemperature: d.contact?.lead_temperature || null,
+      contactLeadScore: d.contact?.lead_score || 0,
+      scope: d.scope || '',
+      conditions: d.conditions || '',
+      proposalStatus: d.proposal_status || 'none',
+      proposalFilePath: d.proposal_file_path || null,
     }));
   },
 
