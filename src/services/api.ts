@@ -843,6 +843,11 @@ export const api = {
       contactInterestServices: d.contact?.interest_services || [],
       contactJobSize: d.contact?.job_size || null,
       contactLeadTemperature: d.contact?.lead_temperature || null,
+      contactLeadScore: d.contact?.lead_score || 0,
+      scope: d.scope || '',
+      conditions: d.conditions || '',
+      proposalStatus: d.proposal_status || 'none',
+      proposalFilePath: d.proposal_file_path || null,
     }));
   },
 
