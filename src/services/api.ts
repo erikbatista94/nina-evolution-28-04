@@ -788,7 +788,7 @@ export const api = {
       .from('deals')
       .select(`
         *,
-        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature),
+        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature, lead_score),
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
