@@ -1719,13 +1719,21 @@ export const api = {
     }
 
     // Log ownership change
-    const action = previousUserId ? 'transferred' : 'assumed';
-    await supabase.from('conversation_ownership_log').insert({
-      conversation_id: conversationId,
-      user_id: userId,
-      action,
-      previous_user_id: previousUserId,
-    });
+    // Log ownership change (non-critical)
+    try {
+      await (supabase as any).from('conversation_ownership_log').insert({
+        conversation_id: conversationId,
+        user_id: userId,
+        action,
+        previous_user_id: previousUserId,
+      });
+      await (supabase as any).from('conversation_events').insert({
+        conversation_id: conversationId,
+        contact_id: contactId,
+        event_type: action === 'transferred' ? 'transferred' : 'human_takeover',
+        event_data: { from_user: previousUserId, to_user: userId }
+      });
+    } catch (e) { console.error('[API] Ownership log error:', e); }
 
     // Update deal(s) with same contact_id
     const { error: dealError } = await supabase
@@ -1737,14 +1745,6 @@ export const api = {
       console.error('[API] Error updating deal owner:', dealError);
       throw dealError;
     }
-
-    // Log conversation event
-    await supabase.from('conversation_events').insert({
-      conversation_id: conversationId,
-      contact_id: contactId,
-      event_type: action === 'transferred' ? 'transferred' : 'human_takeover',
-      event_data: { from_user: previousUserId, to_user: userId }
-    }).catch(() => {});
 
     console.log(`[API] Conversation ${conversationId} and deals assigned to user ${userId}`);
   },
