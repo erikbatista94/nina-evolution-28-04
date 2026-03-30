@@ -1718,19 +1718,19 @@ export const api = {
       throw convError;
     }
 
-    // Log ownership change
     // Log ownership change (non-critical)
+    const ownershipAction = previousUserId ? 'transferred' : 'assumed';
     try {
       await (supabase as any).from('conversation_ownership_log').insert({
         conversation_id: conversationId,
         user_id: userId,
-        action,
+        action: ownershipAction,
         previous_user_id: previousUserId,
       });
       await (supabase as any).from('conversation_events').insert({
         conversation_id: conversationId,
         contact_id: contactId,
-        event_type: action === 'transferred' ? 'transferred' : 'human_takeover',
+        event_type: ownershipAction === 'transferred' ? 'transferred' : 'human_takeover',
         event_data: { from_user: previousUserId, to_user: userId }
       });
     } catch (e) { console.error('[API] Ownership log error:', e); }
