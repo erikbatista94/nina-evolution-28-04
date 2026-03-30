@@ -1,25 +1,52 @@
+## Plano: Bug Status + 5 Melhorias Estratégicas
 
+### Status: ✅ Implementado (Partes 1-4, 6)
 
-## Plano: Agendamentos 100% + Mídia 100% Confiável
+### Parte 1 — Bug de Status ✅
+**Hipótese validada**: Race condition no sender — `whatsapp_message_id` salvo após envio (linha 434-451), mas webhook de status chega antes.
+**Correção**: Retry com delay (2.5s, até 3 tentativas) no `whatsapp-webhook` quando `UPDATE ... WHERE whatsapp_message_id=X` retorna 0 rows.
+**Logs**: `[Webhook] No message found for WA ID X, retrying...` e `[Webhook] Status DROPPED` quando falha após 3 tentativas.
 
-### Status: ✅ Implementado
+### Parte 2 — Radar de Gaps ✅
+**Regra**: Gaps só detectados após `interactionCount >= 3` (configurável via `GAP_MIN_INTERACTIONS`).
+**Categorias**: `missing` (campo não informado), `vague` (resposta vaga detectada por padrões), `contradictory` (futuro).
+**Campos monitorados**: city, customer_type, interest_services, job_size, has_project.
+**UI**: Bloco "⚠ Informações Pendentes" no sidebar do chat.
+
+### Parte 3 — Retomada Inteligente ✅
+**Classificação**: `sem_retorno`, `sem_retorno_orcamento`, `aguardando_medidas`, `aguardando_decisao`, `interesse_sem_avanco`, `lead_abandonado`.
+**Mensagens sugeridas**: contextuais por stall_reason.
+**Followup só criado após 24h** de inatividade.
+
+### Parte 4 — Controle de Dono ✅
+**Tabela**: `conversation_ownership_log` (action: assumed/transferred).
+**Campos**: `conversations.human_status`, `conversations.last_human_interaction_at`.
+**RLS**: Admin vê tudo, vendedor vê apenas logs onde é user_id ou previous_user_id.
+
+### Parte 5 — Painel de Qualidade
+**Status**: Pendente (próxima iteração). Dados base já disponíveis via `conversation_events`.
+**Regra de lead qualificado**: mínimo 3 campos preenchidos (city + customer_type + interest_services) + lead_score >= 40.
+
+### Parte 6 — Aprendizado Contínuo ✅
+**Tabela**: `conversation_events` com índices em conversation_id, contact_id, event_type, created_at.
+**Eventos logados**: analyzed, qualified, high_score, stage_moved, won, lost, stalled, human_takeover, transferred.
+**RLS**: Somente admin lê.
+
+### Migration aplicada
+- `contacts.qualification_gaps` (JSONB)
+- `followup_tasks`: stall_reason, attempt_count, result, history
+- `conversations`: human_status, last_human_interaction_at
+- `conversation_ownership_log` (nova tabela + RLS)
+- `conversation_events` (nova tabela + RLS + 4 índices)
+- `idx_followup_unique_pending` (unique index)
 
 ### Arquivos alterados
-
 | Arquivo | Mudança |
 |---|---|
-| `src/components/ChatInterface.tsx` | Pending appointment CTA (confirmar/rejeitar), media-proxy URLs, slot → cria appointment pendente |
-| `src/components/Scheduling.tsx` | Endereço + Maps no modal de detalhes, "Entrar na sala" só para meetings online |
-| `supabase/functions/media-proxy/index.ts` | **Novo** — proxy de mídia com JWT + permissão por conversa |
-| `supabase/functions/google-calendar-sync/index.ts` | **Novo** — auto-sync protegido por x-cron-secret |
-| `supabase/config.toml` | Adicionado media-proxy e google-calendar-sync |
-| Migration | Coluna `location` em `appointments` |
-| pg_cron | Auto-sync a cada 5 min com vault secret |
-
-### Checklist de teste
-1. Chat: escolher horário → CTA pendente aparece → confirmar cria evento Nina + Google
-2. Rejeitar → appointment removido
-3. Cron: eventos do Google aparecem sem clicar "Sincronizar" (aguardar 5 min)
-4. Título sempre no formato "Vendedor: Visita - Cliente - Endereço"
-5. Modal de detalhes mostra endereço + botão Maps (não mostra "Entrar na sala" para visitas)
-6. Clicar em anexo na Nina → abre sem ERR_BLOCKED_BY_CLIENT (via media-proxy)
+| `supabase/functions/whatsapp-webhook/index.ts` | Retry com delay para status updates (race condition fix) |
+| `supabase/functions/whatsapp-sender/index.ts` | Já salva whatsapp_message_id antes de outros processos |
+| `supabase/functions/analyze-conversation/index.ts` | Qualification gaps + conversation_events logging |
+| `supabase/functions/followup-checker/index.ts` | Stall reason classification + contextual messages |
+| `src/services/api.ts` | Ownership log + events em assignConversation, markDealWon, markDealLost |
+| `src/components/ChatInterface.tsx` | Bloco "Informações Pendentes" + qualification_gaps no select |
+| Migration SQL | 5 alterações de schema + 2 tabelas novas + índices |
