@@ -1126,6 +1126,8 @@ export const api = {
       throw new Error('Stage "Ganho" not found in pipeline');
     }
     
+    const { data: deal } = await supabase.from('deals').select('contact_id').eq('id', dealId).single();
+    
     const { error } = await supabase
       .from('deals')
       .update({ 
@@ -1138,6 +1140,19 @@ export const api = {
     if (error) {
       console.error('[API] Error marking deal as won:', error);
       throw error;
+    }
+
+    // Log event (non-critical)
+    if (deal?.contact_id) {
+      try {
+        const { data: conv } = await supabase.from('conversations').select('id').eq('contact_id', deal.contact_id).eq('is_active', true).limit(1).maybeSingle();
+        await (supabase as any).from('conversation_events').insert({
+          conversation_id: conv?.id || null,
+          contact_id: deal.contact_id,
+          event_type: 'won',
+          event_data: { deal_id: dealId }
+        });
+      } catch (e) { console.error('[API] Event log error:', e); }
     }
   },
 
@@ -1152,6 +1167,8 @@ export const api = {
       throw new Error('Stage "Perdido" not found in pipeline');
     }
     
+    const { data: deal } = await supabase.from('deals').select('contact_id').eq('id', dealId).single();
+    
     const { error } = await supabase
       .from('deals')
       .update({ 
@@ -1165,6 +1182,19 @@ export const api = {
     if (error) {
       console.error('[API] Error marking deal as lost:', error);
       throw error;
+    }
+
+    // Log event (non-critical)
+    if (deal?.contact_id) {
+      try {
+        const { data: conv } = await supabase.from('conversations').select('id').eq('contact_id', deal.contact_id).eq('is_active', true).limit(1).maybeSingle();
+        await (supabase as any).from('conversation_events').insert({
+          conversation_id: conv?.id || null,
+          contact_id: deal.contact_id,
+          event_type: 'lost',
+          event_data: { deal_id: dealId, reason }
+        });
+      } catch (e) { console.error('[API] Event log error:', e); }
     }
   },
 
@@ -1664,10 +1694,23 @@ export const api = {
    * Assign conversation to a team member and sync with deal
    */
   assignConversation: async (conversationId: string, userId: string | null, contactId: string): Promise<void> => {
+    // Get current assignment for ownership log
+    const { data: currentConv } = await supabase
+      .from('conversations')
+      .select('assigned_user_id')
+      .eq('id', conversationId)
+      .single();
+
+    const previousUserId = currentConv?.assigned_user_id || null;
+
     // Update conversation
     const { error: convError } = await supabase
       .from('conversations')
-      .update({ assigned_user_id: userId })
+      .update({ 
+        assigned_user_id: userId,
+        last_human_interaction_at: new Date().toISOString(),
+        human_status: userId ? 'active' : 'active'
+      })
       .eq('id', conversationId);
 
     if (convError) {
@@ -1675,7 +1718,24 @@ export const api = {
       throw convError;
     }
 
-    // Update deal(s) with same contact_id — set both owner_id and user_id
+    // Log ownership change (non-critical)
+    const ownershipAction = previousUserId ? 'transferred' : 'assumed';
+    try {
+      await (supabase as any).from('conversation_ownership_log').insert({
+        conversation_id: conversationId,
+        user_id: userId,
+        action: ownershipAction,
+        previous_user_id: previousUserId,
+      });
+      await (supabase as any).from('conversation_events').insert({
+        conversation_id: conversationId,
+        contact_id: contactId,
+        event_type: ownershipAction === 'transferred' ? 'transferred' : 'human_takeover',
+        event_data: { from_user: previousUserId, to_user: userId }
+      });
+    } catch (e) { console.error('[API] Ownership log error:', e); }
+
+    // Update deal(s) with same contact_id
     const { error: dealError } = await supabase
       .from('deals')
       .update({ owner_id: userId, user_id: userId })

@@ -391,6 +391,61 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
       if (insights.source) structuredUpdate.source = insights.source;
       if (startTimeframe) structuredUpdate.start_timeframe = startTimeframe;
 
+      // === QUALIFICATION GAPS DETECTION ===
+      // Only generate gaps after 3+ interactions (configurable threshold)
+      const GAP_MIN_INTERACTIONS = 3;
+      const gaps: { field: string; status: string; label: string }[] = [];
+      
+      if (interactionCount >= GAP_MIN_INTERACTIONS) {
+        // Define critical fields and their current values
+        const gapChecks = [
+          { field: 'city', label: 'Cidade', val: insights.city || structuredUpdate.city },
+          { field: 'customer_type', label: 'Tipo de cliente', val: insights.customer_type || structuredUpdate.customer_type },
+          { field: 'interest_services', label: 'Serviços de interesse', val: insights.interest_services?.length ? insights.interest_services : null },
+          { field: 'job_size', label: 'Tamanho da obra', val: insights.job_size || structuredUpdate.job_size },
+          { field: 'has_project', label: 'Tem projeto', val: insights.has_project },
+        ];
+
+        // Fetch current contact data to check existing values
+        const { data: currentContact } = await supabase
+          .from('contacts')
+          .select('city, customer_type, interest_services, job_size, has_project')
+          .eq('id', contact_id)
+          .maybeSingle();
+
+        for (const check of gapChecks) {
+          const existingVal = currentContact?.[check.field as keyof typeof currentContact];
+          const newVal = check.val;
+          
+          // Missing: neither existing nor newly extracted
+          if (!existingVal && !newVal) {
+            gaps.push({ field: check.field, status: 'missing', label: check.label });
+          }
+        }
+
+        // Check for vague responses in conversation text
+        const vaguePatterns = ['talvez', 'não sei', 'ainda não decidi', 'vou ver', 'depois eu vejo', 'mais ou menos'];
+        const userMsgLower = (user_message || '').toLowerCase();
+        for (const pattern of vaguePatterns) {
+          if (userMsgLower.includes(pattern)) {
+            // Find which field might be vague based on context
+            if (!insights.decision_timeline || insights.decision_timeline === 'unknown') {
+              const existing = gaps.find(g => g.field === 'start_timeframe');
+              if (!existing) gaps.push({ field: 'start_timeframe', status: 'vague', label: 'Prazo/timeline' });
+            }
+            break;
+          }
+        }
+
+        if (gaps.length > 0) {
+          structuredUpdate.qualification_gaps = gaps;
+          console.log('[Analyze] ⚠️ Qualification gaps detected:', gaps.map(g => `${g.field}:${g.status}`));
+        } else {
+          // Clear gaps if all filled
+          structuredUpdate.qualification_gaps = [];
+        }
+      }
+
       const { error: updateError } = await supabase
         .from('contacts')
         .update(structuredUpdate)
@@ -400,6 +455,28 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
         console.error('[Analyze] Error syncing structured fields:', updateError);
       } else {
         console.log('[Analyze] ✅ Structured CRM fields synced (score:', leadScore, '):', Object.keys(structuredUpdate));
+      }
+
+      // === LOG CONVERSATION EVENT ===
+      try {
+        const eventType = dealMoved ? 'stage_moved' : 
+                          insights.lead_status === 'qualificado' ? 'qualified' :
+                          insights.qualification_score > 70 ? 'high_score' : 'analyzed';
+        
+        await supabase.from('conversation_events').insert({
+          conversation_id,
+          contact_id,
+          event_type: eventType,
+          event_data: {
+            score: leadScore,
+            temperature: leadTemp,
+            gaps: gaps.length,
+            next_action: insights.next_best_action,
+            ...(dealMoved && stageResult ? { new_stage: stageResult.suggested_stage_id, confidence: stageResult.confidence } : {})
+          }
+        });
+      } catch (evErr) {
+        console.error('[Analyze] Event logging error:', evErr);
       }
 
       console.log('[Analyze] Memory updated successfully');

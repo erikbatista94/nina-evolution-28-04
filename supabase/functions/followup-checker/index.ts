@@ -11,7 +11,6 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Verify cron secret
   const cronSecret = Deno.env.get('CRON_SECRET');
   const reqSecret = req.headers.get('x-cron-secret');
   if (cronSecret && reqSecret !== cronSecret) {
@@ -23,7 +22,6 @@ serve(async (req) => {
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    // Load settings
     const { data: settings } = await supabase.from('nina_settings').select('business_hours_start, business_hours_end, business_days, auto_followup_enabled, timezone').limit(1).maybeSingle();
     if (!settings) {
       return new Response(JSON.stringify({ message: 'No settings found' }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -37,10 +35,9 @@ serve(async (req) => {
     const businessDays = settings.business_days || [1,2,3,4,5];
     const isBusinessHours = businessDays.includes(currentDay) && currentHour >= startHour && currentHour < endHour;
 
-    // Find conversations where last client msg has no human reply after it
     const { data: conversations, error: convError } = await supabase
       .from('conversations')
-      .select('id, contact_id, assigned_user_id, last_message_at')
+      .select('id, contact_id, assigned_user_id, last_message_at, status')
       .eq('is_active', true)
       .not('assigned_user_id', 'is', null);
 
@@ -54,7 +51,7 @@ serve(async (req) => {
       // Get last message from client
       const { data: lastClientMsg } = await supabase
         .from('messages')
-        .select('sent_at')
+        .select('sent_at, content')
         .eq('conversation_id', conv.id)
         .eq('from_type', 'user')
         .order('sent_at', { ascending: false })
@@ -63,19 +60,19 @@ serve(async (req) => {
 
       if (!lastClientMsg) continue;
 
-      // Get last human response after that
-      const { data: lastHumanMsg } = await supabase
+      // Get last human/nina response after that
+      const { data: lastResponse } = await supabase
         .from('messages')
-        .select('sent_at')
+        .select('sent_at, from_type')
         .eq('conversation_id', conv.id)
-        .eq('from_type', 'human')
+        .in('from_type', ['human', 'nina'])
         .gte('sent_at', lastClientMsg.sent_at)
         .order('sent_at', { ascending: false })
         .limit(1)
         .maybeSingle();
 
-      // If human responded, resolve any pending followup
-      if (lastHumanMsg) {
+      // If responded, resolve pending followups
+      if (lastResponse) {
         const { count } = await supabase
           .from('followup_tasks')
           .update({ status: 'dismissed', updated_at: new Date().toISOString() })
@@ -90,44 +87,61 @@ serve(async (req) => {
       const clientMsgTime = new Date(lastClientMsg.sent_at);
       const hoursInactive = (now.getTime() - clientMsgTime.getTime()) / (1000 * 60 * 60);
 
-      if (hoursInactive < 0.17) continue; // Less than 10 min, skip
+      if (hoursInactive < 24) continue; // Only create followups after 24h
 
-      // Get contact temperature
+      // Get contact info
       const { data: contact } = await supabase
         .from('contacts')
-        .select('lead_temperature, name, call_name')
+        .select('lead_temperature, name, call_name, lead_status')
         .eq('id', conv.contact_id)
         .maybeSingle();
 
       const temp = contact?.lead_temperature || 'frio';
       const contactName = contact?.call_name || contact?.name || 'cliente';
 
-      let suggested = '';
-      let taskTemp = temp;
+      // Determine stall reason
+      let stallReason = 'sem_retorno';
+      const lastMsgLower = (lastClientMsg.content || '').toLowerCase();
+      
+      // Check deal status for context
+      const { data: deal } = await supabase
+        .from('deals')
+        .select('proposal_status, stage')
+        .eq('contact_id', conv.contact_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-      if (hoursInactive >= 168) { // 7 days
-        suggested = `Olá ${contactName}! Notei que faz um tempinho que conversamos. Tudo bem? Se ainda tiver interesse, estou à disposição para ajudar. 😊`;
-        taskTemp = 'frio';
+      if (deal?.proposal_status === 'sent') {
+        stallReason = 'sem_retorno_orcamento';
+      } else if (lastMsgLower.includes('medida') || lastMsgLower.includes('medir') || lastMsgLower.includes('metragem')) {
+        stallReason = 'aguardando_medidas';
+      } else if (lastMsgLower.includes('vou pensar') || lastMsgLower.includes('preciso conversar') || lastMsgLower.includes('vou avaliar')) {
+        stallReason = 'aguardando_decisao';
+      } else if (hoursInactive >= 168) {
+        stallReason = 'lead_abandonado';
       } else if (hoursInactive >= 48) {
-        suggested = `Oi ${contactName}! Passando para saber se conseguiu pensar sobre nosso último contato. Posso ajudar em algo mais?`;
-        taskTemp = temp === 'quente' ? 'morno' : 'frio';
-      } else if (hoursInactive >= 24) {
-        suggested = `Oi ${contactName}! Vi que ainda não tivemos retorno. Gostaria de agendar uma conversa ou tirar alguma dúvida?`;
-        taskTemp = temp;
-      } else if (hoursInactive >= 0.17) {
-        // 10 min+ but < 24h — no followup task yet, skip
-        continue;
+        stallReason = 'interesse_sem_avanco';
       }
 
-      if (!suggested) continue;
+      // Build suggested message based on stall reason
+      let suggested = '';
+      const stallMessages: Record<string, string> = {
+        'sem_retorno_orcamento': `Oi ${contactName}! 😊 Passando para saber se conseguiu analisar o orçamento que enviamos. Alguma dúvida ou ajuste que eu possa ajudar?`,
+        'aguardando_medidas': `Oi ${contactName}! Vi que ficamos aguardando as medidas do local. Tudo certo por aí? Se precisar de ajuda para medir, posso agendar uma visita técnica! 📏`,
+        'aguardando_decisao': `Oi ${contactName}! Tudo bem? Passando para saber se teve alguma novidade sobre o projeto. Estou à disposição para qualquer dúvida! 😊`,
+        'interesse_sem_avanco': `Oi ${contactName}! Passando para saber se ainda tem interesse no projeto. Posso ajudar em algo mais?`,
+        'lead_abandonado': `Olá ${contactName}! Faz um tempinho que conversamos. Tudo bem? Se ainda tiver interesse, estou à disposição. 😊`,
+        'sem_retorno': `Oi ${contactName}! Vi que ainda não tivemos retorno. Gostaria de agendar uma conversa ou tirar alguma dúvida?`
+      };
+      suggested = stallMessages[stallReason] || stallMessages['sem_retorno'];
 
-      // Calculate due_at (if outside business hours, schedule for next business day 9am)
+      // Calculate due_at
       let dueAt = now;
       if (!isBusinessHours) {
         const next = new Date(now);
         next.setHours(startHour, 0, 0, 0);
         if (currentHour >= endHour || !businessDays.includes(currentDay)) {
-          // Move to next business day
           do {
             next.setDate(next.getDate() + 1);
           } while (!businessDays.includes(next.getDay()));
@@ -135,15 +149,26 @@ serve(async (req) => {
         dueAt = next;
       }
 
-      // Check if pending followup exists (unique index prevents duplicates)
+      // Check existing pending followup
       const { data: existing } = await supabase
         .from('followup_tasks')
-        .select('id')
+        .select('id, attempt_count')
         .eq('conversation_id', conv.id)
         .eq('status', 'pending')
         .maybeSingle();
 
-      if (existing) continue;
+      if (existing) {
+        // Update existing with new stall reason if changed
+        await supabase.from('followup_tasks')
+          .update({ 
+            stall_reason: stallReason,
+            suggested_message: suggested,
+            temperature: temp,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existing.id);
+        continue;
+      }
 
       // Insert followup task
       const { error: insertError } = await supabase
@@ -154,11 +179,13 @@ serve(async (req) => {
           assigned_user_id: conv.assigned_user_id,
           due_at: dueAt.toISOString(),
           suggested_message: suggested,
-          temperature: taskTemp,
+          temperature: temp,
+          stall_reason: stallReason,
+          attempt_count: 0,
+          history: [],
         });
 
       if (insertError) {
-        // Unique constraint violation = already exists, skip
         if (insertError.code === '23505') continue;
         console.error('[Followup] Insert error:', insertError);
         continue;
@@ -177,10 +204,22 @@ serve(async (req) => {
           priority: 1,
         });
         if (!queueError) {
-          await supabase.from('followup_tasks').update({ status: 'sent', updated_at: new Date().toISOString() }).eq('conversation_id', conv.id).eq('status', 'pending');
+          await supabase.from('followup_tasks')
+            .update({ status: 'sent', updated_at: new Date().toISOString(), attempt_count: 1 })
+            .eq('conversation_id', conv.id).eq('status', 'pending');
           autoSent++;
         }
       }
+
+      // Log conversation event
+      try {
+        await supabase.from('conversation_events').insert({
+          conversation_id: conv.id,
+          contact_id: conv.contact_id,
+          event_type: 'stalled',
+          event_data: { stall_reason: stallReason, hours_inactive: Math.round(hoursInactive), temperature: temp }
+        });
+      } catch (e) { /* non-critical */ }
     }
 
     console.log(`[Followup] Created: ${created}, Auto-sent: ${autoSent}, Resolved: ${resolved}`);

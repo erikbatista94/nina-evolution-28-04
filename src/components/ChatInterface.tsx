@@ -120,7 +120,7 @@ const ChatInterface: React.FC = () => {
     if (activeChat?.contactId) {
       supabase
         .from('contacts')
-        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full')
+        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full, qualification_gaps')
         .eq('id', activeChat.contactId)
         .single()
         .then(({ data }) => { setContactDetails(data); });
@@ -1336,6 +1336,24 @@ const ChatInterface: React.FC = () => {
                         {contactDetails.source && ` • Origem: ${contactDetails.source}`}
                       </div>
                     )}
+                  </div>
+                )}
+
+                {/* Qualification Gaps Alert */}
+                {contactDetails?.qualification_gaps && contactDetails.qualification_gaps.length > 0 && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
+                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                      ⚠️ Informações Pendentes
+                    </h4>
+                    <div className="space-y-1">
+                      {contactDetails.qualification_gaps.map((gap: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className={`w-2 h-2 rounded-full ${gap.status === 'missing' ? 'bg-red-400' : gap.status === 'vague' ? 'bg-amber-400' : 'bg-orange-400'}`} />
+                          <span className="text-slate-300">{gap.label}</span>
+                          <span className="text-slate-500">({gap.status === 'missing' ? 'não informado' : gap.status === 'vague' ? 'resposta vaga' : 'contraditório'})</span>
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
 
