@@ -1165,6 +1165,8 @@ export const api = {
       throw new Error('Stage "Perdido" not found in pipeline');
     }
     
+    const { data: deal } = await supabase.from('deals').select('contact_id').eq('id', dealId).single();
+    
     const { error } = await supabase
       .from('deals')
       .update({ 
@@ -1178,6 +1180,17 @@ export const api = {
     if (error) {
       console.error('[API] Error marking deal as lost:', error);
       throw error;
+    }
+
+    // Log event
+    if (deal?.contact_id) {
+      const { data: conv } = await supabase.from('conversations').select('id').eq('contact_id', deal.contact_id).eq('is_active', true).limit(1).maybeSingle();
+      await supabase.from('conversation_events').insert({
+        conversation_id: conv?.id || null,
+        contact_id: deal.contact_id,
+        event_type: 'lost',
+        event_data: { deal_id: dealId, reason }
+      }).catch(() => {});
     }
   },
 
