@@ -120,7 +120,7 @@ const ChatInterface: React.FC = () => {
     if (activeChat?.contactId) {
       supabase
         .from('contacts')
-        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full')
+        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full, qualification_gaps')
         .eq('id', activeChat.contactId)
         .single()
         .then(({ data }) => { setContactDetails(data); });
