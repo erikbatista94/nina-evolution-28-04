@@ -1339,6 +1339,24 @@ const ChatInterface: React.FC = () => {
                   </div>
                 )}
 
+                {/* Qualification Gaps Alert */}
+                {contactDetails?.qualification_gaps && contactDetails.qualification_gaps.length > 0 && (
+                  <div className="p-3 rounded-lg bg-amber-500/10 border border-amber-500/30 space-y-2">
+                    <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-2">
+                      ⚠️ Informações Pendentes
+                    </h4>
+                    <div className="space-y-1">
+                      {contactDetails.qualification_gaps.map((gap: any, i: number) => (
+                        <div key={i} className="flex items-center gap-2 text-xs">
+                          <span className={`w-2 h-2 rounded-full ${gap.status === 'missing' ? 'bg-red-400' : gap.status === 'vague' ? 'bg-amber-400' : 'bg-orange-400'}`} />
+                          <span className="text-slate-300">{gap.label}</span>
+                          <span className="text-slate-500">({gap.status === 'missing' ? 'não informado' : gap.status === 'vague' ? 'resposta vaga' : 'contraditório'})</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="h-px bg-slate-800/50 w-full"></div>
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
