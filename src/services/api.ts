@@ -1184,15 +1184,17 @@ export const api = {
       throw error;
     }
 
-    // Log event
+    // Log event (non-critical)
     if (deal?.contact_id) {
-      const { data: conv } = await supabase.from('conversations').select('id').eq('contact_id', deal.contact_id).eq('is_active', true).limit(1).maybeSingle();
-      await supabase.from('conversation_events').insert({
-        conversation_id: conv?.id || null,
-        contact_id: deal.contact_id,
-        event_type: 'lost',
-        event_data: { deal_id: dealId, reason }
-      }).catch(() => {});
+      try {
+        const { data: conv } = await supabase.from('conversations').select('id').eq('contact_id', deal.contact_id).eq('is_active', true).limit(1).maybeSingle();
+        await (supabase as any).from('conversation_events').insert({
+          conversation_id: conv?.id || null,
+          contact_id: deal.contact_id,
+          event_type: 'lost',
+          event_data: { deal_id: dealId, reason }
+        });
+      } catch (e) { console.error('[API] Event log error:', e); }
     }
   },
 
