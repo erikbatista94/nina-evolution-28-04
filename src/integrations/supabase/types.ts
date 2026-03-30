@@ -122,6 +122,7 @@ export type Database = {
           notes: string | null
           phone_number: string
           profile_picture_url: string | null
+          qualification_gaps: Json | null
           source: string | null
           start_timeframe: string | null
           tags: string[] | null
@@ -158,6 +159,7 @@ export type Database = {
           notes?: string | null
           phone_number: string
           profile_picture_url?: string | null
+          qualification_gaps?: Json | null
           source?: string | null
           start_timeframe?: string | null
           tags?: string[] | null
@@ -194,6 +196,7 @@ export type Database = {
           notes?: string | null
           phone_number?: string
           profile_picture_url?: string | null
+          qualification_gaps?: Json | null
           source?: string | null
           start_timeframe?: string | null
           tags?: string[] | null
@@ -202,6 +205,71 @@ export type Database = {
           whatsapp_id?: string | null
         }
         Relationships: []
+      }
+      conversation_events: {
+        Row: {
+          contact_id: string | null
+          conversation_id: string
+          created_at: string | null
+          event_data: Json | null
+          event_type: string
+          id: string
+        }
+        Insert: {
+          contact_id?: string | null
+          conversation_id: string
+          created_at?: string | null
+          event_data?: Json | null
+          event_type: string
+          id?: string
+        }
+        Update: {
+          contact_id?: string | null
+          conversation_id?: string
+          created_at?: string | null
+          event_data?: Json | null
+          event_type?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      conversation_ownership_log: {
+        Row: {
+          action: string
+          conversation_id: string
+          created_at: string | null
+          id: string
+          notes: string | null
+          previous_user_id: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          previous_user_id?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          notes?: string | null
+          previous_user_id?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_ownership_log_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       conversation_states: {
         Row: {
@@ -250,8 +318,10 @@ export type Database = {
           assigned_user_id: string | null
           contact_id: string
           created_at: string
+          human_status: string | null
           id: string
           is_active: boolean
+          last_human_interaction_at: string | null
           last_message_at: string
           metadata: Json | null
           nina_context: Json | null
@@ -266,8 +336,10 @@ export type Database = {
           assigned_user_id?: string | null
           contact_id: string
           created_at?: string
+          human_status?: string | null
           id?: string
           is_active?: boolean
+          last_human_interaction_at?: string | null
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
@@ -282,8 +354,10 @@ export type Database = {
           assigned_user_id?: string | null
           contact_id?: string
           created_at?: string
+          human_status?: string | null
           id?: string
           is_active?: boolean
+          last_human_interaction_at?: string | null
           last_message_at?: string
           metadata?: Json | null
           nina_context?: Json | null
@@ -477,11 +551,15 @@ export type Database = {
       followup_tasks: {
         Row: {
           assigned_user_id: string | null
+          attempt_count: number | null
           contact_id: string
           conversation_id: string
           created_at: string | null
           due_at: string
+          history: Json | null
           id: string
+          result: string | null
+          stall_reason: string | null
           status: string
           suggested_message: string | null
           temperature: string | null
@@ -489,11 +567,15 @@ export type Database = {
         }
         Insert: {
           assigned_user_id?: string | null
+          attempt_count?: number | null
           contact_id: string
           conversation_id: string
           created_at?: string | null
           due_at: string
+          history?: Json | null
           id?: string
+          result?: string | null
+          stall_reason?: string | null
           status?: string
           suggested_message?: string | null
           temperature?: string | null
@@ -501,11 +583,15 @@ export type Database = {
         }
         Update: {
           assigned_user_id?: string | null
+          attempt_count?: number | null
           contact_id?: string
           conversation_id?: string
           created_at?: string | null
           due_at?: string
+          history?: Json | null
           id?: string
+          result?: string | null
+          stall_reason?: string | null
           status?: string
           suggested_message?: string | null
           temperature?: string | null
