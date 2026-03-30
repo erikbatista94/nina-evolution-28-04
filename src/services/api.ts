@@ -1664,10 +1664,23 @@ export const api = {
    * Assign conversation to a team member and sync with deal
    */
   assignConversation: async (conversationId: string, userId: string | null, contactId: string): Promise<void> => {
+    // Get current assignment for ownership log
+    const { data: currentConv } = await supabase
+      .from('conversations')
+      .select('assigned_user_id')
+      .eq('id', conversationId)
+      .single();
+
+    const previousUserId = currentConv?.assigned_user_id || null;
+
     // Update conversation
     const { error: convError } = await supabase
       .from('conversations')
-      .update({ assigned_user_id: userId })
+      .update({ 
+        assigned_user_id: userId,
+        last_human_interaction_at: new Date().toISOString(),
+        human_status: userId ? 'active' : 'active'
+      })
       .eq('id', conversationId);
 
     if (convError) {
@@ -1675,7 +1688,16 @@ export const api = {
       throw convError;
     }
 
-    // Update deal(s) with same contact_id — set both owner_id and user_id
+    // Log ownership change
+    const action = previousUserId ? 'transferred' : 'assumed';
+    await supabase.from('conversation_ownership_log').insert({
+      conversation_id: conversationId,
+      user_id: userId,
+      action,
+      previous_user_id: previousUserId,
+    });
+
+    // Update deal(s) with same contact_id
     const { error: dealError } = await supabase
       .from('deals')
       .update({ owner_id: userId, user_id: userId })
@@ -1685,6 +1707,14 @@ export const api = {
       console.error('[API] Error updating deal owner:', dealError);
       throw dealError;
     }
+
+    // Log conversation event
+    await supabase.from('conversation_events').insert({
+      conversation_id: conversationId,
+      contact_id: contactId,
+      event_type: action === 'transferred' ? 'transferred' : 'human_takeover',
+      event_data: { from_user: previousUserId, to_user: userId }
+    }).catch(() => {});
 
     console.log(`[API] Conversation ${conversationId} and deals assigned to user ${userId}`);
   },
