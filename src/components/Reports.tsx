@@ -561,6 +561,11 @@ const Reports: React.FC = () => {
             <Filter className="w-4 h-4 inline mr-1.5" />Avançado
           </button>
         )}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('quality')} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'quality' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-white'}`}>
+            <ShieldAlert className="w-4 h-4 inline mr-1.5" />Qualidade
+          </button>
+        )}
       </div>
 
       {/* ═══════ OVERVIEW ═══════ */}
