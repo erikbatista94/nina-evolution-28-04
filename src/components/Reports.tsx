@@ -43,6 +43,23 @@ interface AdvancedData {
   objectionsSampled: number;
 }
 
+interface QualityData {
+  totalConversations: number;
+  qualifiedLeads: number;
+  sentToHuman: number;
+  resolvedByAI: number;
+  gapsDetected: number;
+  stalledLeads: number;
+  followupSuccessRate: number;
+  avgTimeToHuman: number;
+  unownedHumanConvs: number;
+  stalledHumanConvs: number;
+  conversionsByType: { type: string; count: number }[];
+  conversionsBySeller: { seller: string; won: number; lost: number; rate: number }[];
+  funnelDropoff: { stage: string; count: number; dropPct: number }[];
+  eventsByType: { type: string; count: number }[];
+}
+
 const Reports: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
