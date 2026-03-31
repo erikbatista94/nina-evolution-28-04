@@ -532,6 +532,11 @@ const Kanban: React.FC = () => {
                             ★ {deal.contactLeadScore}
                           </span>
                         )}
+                        {(deal.contactQualificationGaps?.length || 0) > 0 && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded border font-medium bg-amber-500/10 text-amber-400 border-amber-500/20" title={`${deal.contactQualificationGaps!.length} info pendente(s)`}>
+                            ⚠ {deal.contactQualificationGaps!.length}
+                          </span>
+                        )}
                         <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100 ml-auto">
                            <MoreHorizontal className="w-3.5 h-3.5" />
                         </button>
