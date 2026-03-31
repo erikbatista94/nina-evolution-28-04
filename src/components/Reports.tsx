@@ -66,7 +66,7 @@ const Reports: React.FC = () => {
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [filterSeller, setFilterSeller] = useState('all');
   const [filterDays, setFilterDays] = useState(30);
-  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'advanced'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'advanced' | 'quality'>('overview');
   const [perfData, setPerfData] = useState<SellerPerformance[]>([]);
   const [loadingPerf, setLoadingPerf] = useState(false);
   const [advData, setAdvData] = useState<AdvancedData | null>(null);
