@@ -848,6 +848,7 @@ export const api = {
       conditions: d.conditions || '',
       proposalStatus: d.proposal_status || 'none',
       proposalFilePath: d.proposal_file_path || null,
+      contactQualificationGaps: d.contact?.qualification_gaps || [],
     }));
   },
 

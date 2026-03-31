@@ -172,6 +172,7 @@ export interface Deal {
   conditions?: string;
   proposalStatus?: string;
   proposalFilePath?: string;
+  contactQualificationGaps?: any[];
 }
 
 export interface DealActivity {
