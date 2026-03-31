@@ -111,7 +111,7 @@ const DashboardMyDay: React.FC = () => {
       todayEnd.setHours(23, 59, 59, 999);
       const { data } = await supabase
         .from('followup_tasks')
-        .select('id, conversation_id, contact_id, suggested_message, temperature, due_at')
+        .select('id, conversation_id, contact_id, suggested_message, temperature, due_at, stall_reason, attempt_count')
         .eq('assigned_user_id', user.id)
         .eq('status', 'pending')
         .lte('due_at', todayEnd.toISOString())
