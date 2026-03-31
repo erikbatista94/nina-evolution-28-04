@@ -43,17 +43,36 @@ interface AdvancedData {
   objectionsSampled: number;
 }
 
+interface QualityData {
+  totalConversations: number;
+  qualifiedLeads: number;
+  sentToHuman: number;
+  resolvedByAI: number;
+  gapsDetected: number;
+  stalledLeads: number;
+  followupSuccessRate: number;
+  avgTimeToHuman: number;
+  unownedHumanConvs: number;
+  stalledHumanConvs: number;
+  conversionsByType: { type: string; count: number }[];
+  conversionsBySeller: { seller: string; won: number; lost: number; rate: number }[];
+  funnelDropoff: { stage: string; count: number; dropPct: number }[];
+  eventsByType: { type: string; count: number }[];
+}
+
 const Reports: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<ReportData | null>(null);
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [filterSeller, setFilterSeller] = useState('all');
   const [filterDays, setFilterDays] = useState(30);
-  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'advanced'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'performance' | 'advanced' | 'quality'>('overview');
   const [perfData, setPerfData] = useState<SellerPerformance[]>([]);
   const [loadingPerf, setLoadingPerf] = useState(false);
   const [advData, setAdvData] = useState<AdvancedData | null>(null);
   const [loadingAdv, setLoadingAdv] = useState(false);
+  const [qualityData, setQualityData] = useState<QualityData | null>(null);
+  const [loadingQuality, setLoadingQuality] = useState(false);
   const { isAdmin } = useCompanySettings();
 
   useEffect(() => {
@@ -64,6 +83,7 @@ const Reports: React.FC = () => {
     if (activeTab === 'overview') loadReports();
     else if (activeTab === 'performance') loadPerformance();
     else if (activeTab === 'advanced') loadAdvanced();
+    else if (activeTab === 'quality') loadQuality();
   }, [filterSeller, filterDays, activeTab]);
 
   // ── Overview ──
@@ -315,7 +335,118 @@ const Reports: React.FC = () => {
     }
   };
 
-  // ── CSV Exports ──
+  // ── Quality ──
+  const loadQuality = async () => {
+    setLoadingQuality(true);
+    try {
+      const since = new Date();
+      since.setDate(since.getDate() - filterDays);
+      const sinceStr = since.toISOString();
+
+      // Total conversations
+      let convQ = supabase.from('conversations').select('id, status, assigned_user_id, human_status, created_at, last_message_at').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') convQ = convQ.eq('assigned_user_id', filterSeller);
+      const { data: convs } = await convQ.limit(1000);
+      const totalConversations = (convs || []).length;
+      const sentToHuman = (convs || []).filter(c => c.status === 'human').length;
+      const resolvedByAI = (convs || []).filter(c => c.status === 'nina').length;
+      const unownedHumanConvs = (convs || []).filter(c => c.status === 'human' && !c.assigned_user_id).length;
+      const stalledHumanConvs = (convs || []).filter(c => {
+        if (c.status !== 'human') return false;
+        const lastMsg = new Date(c.last_message_at).getTime();
+        return (Date.now() - lastMsg) > 2 * 60 * 60 * 1000; // 2h
+      }).length;
+
+      // Qualified leads: has city + customer_type + at least 1 interest_service + lead_score >= 30
+      let cq = supabase.from('contacts').select('id, city, customer_type, interest_services, lead_score, qualification_gaps, assigned_user_id').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') cq = cq.eq('assigned_user_id', filterSeller);
+      const { data: contacts } = await cq.limit(1000);
+      const qualifiedLeads = (contacts || []).filter(c => 
+        c.city && c.customer_type && (c.interest_services || []).length > 0 && (c.lead_score || 0) >= 30
+      ).length;
+      const gapsDetected = (contacts || []).filter(c => (c.qualification_gaps as any[] || []).length > 0).length;
+
+      // Follow-up tasks
+      let fq = supabase.from('followup_tasks').select('id, status, result, assigned_user_id').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') fq = fq.eq('assigned_user_id', filterSeller);
+      const { data: followups } = await fq.limit(500);
+      const stalledLeads = (followups || []).filter(f => f.status === 'pending').length;
+      const completedFollowups = (followups || []).filter(f => f.status === 'completed');
+      const successFollowups = completedFollowups.filter(f => f.result === 'retomado' || f.result === 'reagendado');
+      const followupSuccessRate = completedFollowups.length > 0 ? Math.round((successFollowups.length / completedFollowups.length) * 100) : 0;
+
+      // Avg time to human (first human msg after conv start)
+      const humanConvIds = (convs || []).filter(c => c.status === 'human').map(c => c.id).slice(0, 50);
+      let avgTimeToHuman = 0;
+      if (humanConvIds.length > 0) {
+        const { data: humanMsgs } = await supabase.from('messages').select('conversation_id, sent_at').eq('from_type', 'human').in('conversation_id', humanConvIds).order('sent_at', { ascending: true }).limit(500);
+        const convCreatedMap = new Map((convs || []).map(c => [c.id, new Date(c.created_at).getTime()]));
+        const firstHumanByConv = new Map<string, number>();
+        (humanMsgs || []).forEach(m => {
+          if (!firstHumanByConv.has(m.conversation_id)) {
+            firstHumanByConv.set(m.conversation_id, new Date(m.sent_at).getTime());
+          }
+        });
+        const diffs: number[] = [];
+        firstHumanByConv.forEach((ts, cid) => {
+          const created = convCreatedMap.get(cid);
+          if (created) diffs.push((ts - created) / 60000);
+        });
+        avgTimeToHuman = diffs.length > 0 ? Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length) : 0;
+      }
+
+      // Conversions by customer type
+      let dq = supabase.from('deals').select('won_at, lost_at, user_id, contact:contacts(customer_type)').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') dq = dq.eq('user_id', filterSeller);
+      const { data: deals } = await dq.limit(1000);
+      const typeWon: Record<string, number> = {};
+      (deals || []).filter((d: any) => d.won_at).forEach((d: any) => {
+        const t = d.contact?.customer_type || 'Não definido';
+        typeWon[t] = (typeWon[t] || 0) + 1;
+      });
+      const conversionsByType = Object.entries(typeWon).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+
+      // Conversions by seller
+      const sellers = teamMembers.filter(m => m.user_id);
+      const conversionsBySeller = sellers.map(s => {
+        const sellerDeals = (deals || []).filter((d: any) => d.user_id === s.user_id);
+        const won = sellerDeals.filter((d: any) => d.won_at).length;
+        const lost = sellerDeals.filter((d: any) => d.lost_at).length;
+        const rate = (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : 0;
+        return { seller: s.name, won, lost, rate };
+      }).filter(s => s.won + s.lost > 0).sort((a, b) => b.rate - a.rate);
+
+      // Events by type
+      const { data: events } = await supabase.from('conversation_events').select('event_type').gte('created_at', sinceStr).limit(1000);
+      const eventCounts: Record<string, number> = {};
+      (events || []).forEach(e => { eventCounts[e.event_type] = (eventCounts[e.event_type] || 0) + 1; });
+      const eventsByType = Object.entries(eventCounts).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+
+      // Funnel drop-off
+      const { data: stagesData } = await supabase.from('pipeline_stages').select('id, title, position').eq('is_active', true).order('position', { ascending: true });
+      const stageCountMap: Record<string, number> = {};
+      (deals || []).forEach((d: any) => { stageCountMap[d.stage_id || ''] = (stageCountMap[d.stage_id || ''] || 0) + 1; });
+      const funnelDropoff = (stagesData || []).map((s, i, arr) => {
+        const count = stageCountMap[s.id] || 0;
+        const prev = i > 0 ? (stageCountMap[arr[i - 1].id] || 0) : count;
+        const dropPct = prev > 0 && i > 0 ? Math.round(((prev - count) / prev) * 100) : 0;
+        return { stage: s.title, count, dropPct };
+      });
+
+      setQualityData({
+        totalConversations, qualifiedLeads, sentToHuman, resolvedByAI,
+        gapsDetected, stalledLeads, followupSuccessRate, avgTimeToHuman,
+        unownedHumanConvs, stalledHumanConvs, conversionsByType, conversionsBySeller,
+        funnelDropoff, eventsByType,
+      });
+    } catch (err) {
+      console.error('Error loading quality:', err);
+    } finally {
+      setLoadingQuality(false);
+    }
+  };
+
+
   const downloadCSV = (filename: string, rows: string[][]) => {
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
@@ -428,6 +559,11 @@ const Reports: React.FC = () => {
         {isAdmin && (
           <button onClick={() => setActiveTab('advanced')} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'advanced' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-white'}`}>
             <Filter className="w-4 h-4 inline mr-1.5" />Avançado
+          </button>
+        )}
+        {isAdmin && (
+          <button onClick={() => setActiveTab('quality')} className={`pb-3 text-sm font-medium border-b-2 transition-colors ${activeTab === 'quality' ? 'border-cyan-500 text-cyan-400' : 'border-transparent text-slate-400 hover:text-white'}`}>
+            <ShieldAlert className="w-4 h-4 inline mr-1.5" />Qualidade
           </button>
         )}
       </div>
@@ -765,6 +901,141 @@ const Reports: React.FC = () => {
                   </table>
                 </div>
               </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* ═══════ QUALITY (admin-only) ═══════ */}
+      {activeTab === 'quality' && isAdmin && (
+        <>
+          {loadingQuality ? (
+            <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : qualityData && (
+            <div className="space-y-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-5 gap-3">
+                {[
+                  { label: 'Conversas', value: qualityData.totalConversations, color: 'text-white' },
+                  { label: 'Leads Qualificados', value: qualityData.qualifiedLeads, color: 'text-emerald-400' },
+                  { label: 'Enviadas p/ Humano', value: qualityData.sentToHuman, color: 'text-amber-400' },
+                  { label: 'Resolvidas pela IA', value: qualityData.resolvedByAI, color: 'text-cyan-400' },
+                  { label: 'Gaps Detectados', value: qualityData.gapsDetected, color: 'text-orange-400' },
+                ].map(kpi => (
+                  <div key={kpi.label} className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <p className="text-[10px] text-slate-500 uppercase">{kpi.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Operational Health */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Leads Parados</p>
+                  <p className={`text-xl font-bold mt-1 ${qualityData.stalledLeads > 5 ? 'text-red-400' : 'text-slate-300'}`}>{qualityData.stalledLeads}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Taxa Retomada</p>
+                  <p className={`text-xl font-bold mt-1 ${qualityData.followupSuccessRate >= 50 ? 'text-emerald-400' : qualityData.followupSuccessRate >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{qualityData.followupSuccessRate}%</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Tempo até Humano</p>
+                  <p className="text-xl font-bold text-slate-300 mt-1">{qualityData.avgTimeToHuman > 0 ? formatMinutes(qualityData.avgTimeToHuman) : '—'}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Sem Dono (humano)</p>
+                  <p className={`text-xl font-bold mt-1 ${qualityData.unownedHumanConvs > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{qualityData.unownedHumanConvs}</p>
+                </div>
+              </div>
+
+              {/* Stalled human convs alert */}
+              {qualityData.stalledHumanConvs > 0 && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3">
+                  <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  <p className="text-sm text-red-300"><strong>{qualityData.stalledHumanConvs}</strong> conversa(s) humana(s) parada(s) há mais de 2h</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Conversions by Type */}
+                <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-emerald-400" /> Conversões por Tipo</h3>
+                  <div className="space-y-2">
+                    {qualityData.conversionsByType.length > 0 ? qualityData.conversionsByType.map(c => (
+                      <div key={c.type} className="flex justify-between py-1 border-b border-slate-800/50">
+                        <span className="text-sm text-slate-300">{c.type}</span>
+                        <span className="text-sm text-emerald-400 font-bold">{c.count}</span>
+                      </div>
+                    )) : <p className="text-xs text-slate-600">Sem conversões no período</p>}
+                  </div>
+                </div>
+
+                {/* Funnel Drop-off */}
+                <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-violet-400" /> Drop-off por Etapa</h3>
+                  <div className="space-y-2">
+                    {qualityData.funnelDropoff.map(f => (
+                      <div key={f.stage} className="flex items-center justify-between py-1 border-b border-slate-800/50">
+                        <span className="text-sm text-slate-300">{f.stage}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-slate-500">{f.count} deals</span>
+                          {f.dropPct > 0 && (
+                            <span className={`text-xs font-medium ${f.dropPct > 50 ? 'text-red-400' : f.dropPct > 25 ? 'text-amber-400' : 'text-slate-400'}`}>
+                              ↓{f.dropPct}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Conversions by Seller */}
+              {qualityData.conversionsBySeller.length > 0 && (
+                <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+                  <div className="p-4 border-b border-slate-800">
+                    <h3 className="text-sm font-semibold text-slate-300">Taxa de Conversão por Vendedor</h3>
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[10px] text-slate-500 uppercase border-b border-slate-800">
+                        <th className="text-left p-3">Vendedor</th>
+                        <th className="text-center p-3">Ganhos</th>
+                        <th className="text-center p-3">Perdidos</th>
+                        <th className="text-center p-3">Taxa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qualityData.conversionsBySeller.map(s => (
+                        <tr key={s.seller} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                          <td className="p-3 text-sm text-slate-200 font-medium">{s.seller}</td>
+                          <td className="p-3 text-center text-sm text-emerald-400">{s.won}</td>
+                          <td className="p-3 text-center text-sm text-red-400">{s.lost}</td>
+                          <td className="p-3 text-center">
+                            <span className={`text-xs font-bold ${s.rate >= 50 ? 'text-emerald-400' : s.rate >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{s.rate}%</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Events */}
+              {qualityData.eventsByType.length > 0 && (
+                <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4">Eventos Registrados</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {qualityData.eventsByType.map(e => (
+                      <span key={e.type} className="px-3 py-1.5 bg-slate-800 text-slate-300 text-xs rounded-lg border border-slate-700">
+                        {e.type} <strong className="text-cyan-400 ml-1">{e.count}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

@@ -788,7 +788,7 @@ export const api = {
       .from('deals')
       .select(`
         *,
-        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature, lead_score),
+        contact:contacts(name, call_name, phone_number, email, client_memory, city, neighborhood, customer_type, interest_services, job_size, lead_temperature, lead_score, qualification_gaps),
         owner:team_members(name, avatar)
       `)
       .order('created_at', { ascending: false });
@@ -848,6 +848,7 @@ export const api = {
       conditions: d.conditions || '',
       proposalStatus: d.proposal_status || 'none',
       proposalFilePath: d.proposal_file_path || null,
+      contactQualificationGaps: d.contact?.qualification_gaps || [],
     }));
   },
 

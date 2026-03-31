@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -1398,7 +1398,7 @@ const ChatInterface: React.FC = () => {
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
 
-                {/* Assigned User */}
+                {/* Assigned User + Ownership Control */}
                 <div className="space-y-3">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
                     <User className="w-4 h-4" />
@@ -1409,7 +1409,7 @@ const ChatInterface: React.FC = () => {
                     onChange={(e) => {
                       const userId = e.target.value || null;
                       assignConversation(activeChat.id, userId);
-                      toast.success('Conversa atribuída. Deal atualizado automaticamente.');
+                      toast.success(userId ? 'Conversa transferida.' : 'Conversa desatribuída.');
                     }}
                     className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-3 text-sm text-slate-300 focus:ring-1 focus:ring-cyan-500/50 focus:border-cyan-500/50 outline-none transition-all"
                   >
@@ -1422,6 +1422,43 @@ const ChatInterface: React.FC = () => {
                         </option>
                       ))}
                   </select>
+
+                  {/* Inactivity badge */}
+                  {activeChat.status === 'human' && activeChat.assignedUserId && (() => {
+                    const lastActivity = (activeChat as any).lastHumanInteractionAt || activeChat.lastMessageTime;
+                    if (!lastActivity) return null;
+                    const diffMin = Math.floor((Date.now() - new Date(lastActivity).getTime()) / 60000);
+                    if (diffMin < 30) return null;
+                    const label = diffMin >= 1440 ? `${Math.floor(diffMin / 1440)}d parada` : diffMin >= 60 ? `${Math.floor(diffMin / 60)}h parada` : `${diffMin}min parada`;
+                    return (
+                      <div className={`text-xs px-2 py-1 rounded-lg border flex items-center gap-1.5 ${diffMin >= 120 ? 'bg-red-500/10 border-red-500/30 text-red-400' : 'bg-amber-500/10 border-amber-500/30 text-amber-400'}`}>
+                        <Clock className="w-3 h-3" /> {label}
+                      </div>
+                    );
+                  })()}
+
+                  {/* Human Status dropdown */}
+                  {activeChat.status === 'human' && (
+                    <div className="space-y-1.5">
+                      <span className="text-[10px] text-slate-500 uppercase">Status operacional</span>
+                      <select
+                        value={(activeChat as any).humanStatus || 'active'}
+                        onChange={async (e) => {
+                          const newStatus = e.target.value;
+                          await supabase.from('conversations').update({ human_status: newStatus }).eq('id', activeChat.id);
+                          toast.success('Status atualizado');
+                        }}
+                        className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 outline-none"
+                      >
+                        <option value="active">🟢 Em atendimento</option>
+                        <option value="waiting_seller">🟡 Aguardando vendedor</option>
+                        <option value="waiting_client">🔵 Aguardando cliente</option>
+                        <option value="transferred">🔄 Transferida</option>
+                        <option value="stalled">🔴 Parada</option>
+                        <option value="finished">✅ Finalizada</option>
+                      </select>
+                    </div>
+                  )}
                 </div>
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
