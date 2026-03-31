@@ -30,6 +30,8 @@ interface FollowupTask {
   suggested_message: string | null;
   temperature: string | null;
   due_at: string;
+  stall_reason: string | null;
+  attempt_count: number | null;
   contact_name?: string;
 }
 
