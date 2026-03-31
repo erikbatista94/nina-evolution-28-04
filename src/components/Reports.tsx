@@ -335,7 +335,118 @@ const Reports: React.FC = () => {
     }
   };
 
-  // ── CSV Exports ──
+  // ── Quality ──
+  const loadQuality = async () => {
+    setLoadingQuality(true);
+    try {
+      const since = new Date();
+      since.setDate(since.getDate() - filterDays);
+      const sinceStr = since.toISOString();
+
+      // Total conversations
+      let convQ = supabase.from('conversations').select('id, status, assigned_user_id, human_status, created_at, last_message_at').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') convQ = convQ.eq('assigned_user_id', filterSeller);
+      const { data: convs } = await convQ.limit(1000);
+      const totalConversations = (convs || []).length;
+      const sentToHuman = (convs || []).filter(c => c.status === 'human').length;
+      const resolvedByAI = (convs || []).filter(c => c.status === 'nina').length;
+      const unownedHumanConvs = (convs || []).filter(c => c.status === 'human' && !c.assigned_user_id).length;
+      const stalledHumanConvs = (convs || []).filter(c => {
+        if (c.status !== 'human') return false;
+        const lastMsg = new Date(c.last_message_at).getTime();
+        return (Date.now() - lastMsg) > 2 * 60 * 60 * 1000; // 2h
+      }).length;
+
+      // Qualified leads: has city + customer_type + at least 1 interest_service + lead_score >= 30
+      let cq = supabase.from('contacts').select('id, city, customer_type, interest_services, lead_score, qualification_gaps, assigned_user_id').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') cq = cq.eq('assigned_user_id', filterSeller);
+      const { data: contacts } = await cq.limit(1000);
+      const qualifiedLeads = (contacts || []).filter(c => 
+        c.city && c.customer_type && (c.interest_services || []).length > 0 && (c.lead_score || 0) >= 30
+      ).length;
+      const gapsDetected = (contacts || []).filter(c => (c.qualification_gaps as any[] || []).length > 0).length;
+
+      // Follow-up tasks
+      let fq = supabase.from('followup_tasks').select('id, status, result, assigned_user_id').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') fq = fq.eq('assigned_user_id', filterSeller);
+      const { data: followups } = await fq.limit(500);
+      const stalledLeads = (followups || []).filter(f => f.status === 'pending').length;
+      const completedFollowups = (followups || []).filter(f => f.status === 'completed');
+      const successFollowups = completedFollowups.filter(f => f.result === 'retomado' || f.result === 'reagendado');
+      const followupSuccessRate = completedFollowups.length > 0 ? Math.round((successFollowups.length / completedFollowups.length) * 100) : 0;
+
+      // Avg time to human (first human msg after conv start)
+      const humanConvIds = (convs || []).filter(c => c.status === 'human').map(c => c.id).slice(0, 50);
+      let avgTimeToHuman = 0;
+      if (humanConvIds.length > 0) {
+        const { data: humanMsgs } = await supabase.from('messages').select('conversation_id, sent_at').eq('from_type', 'human').in('conversation_id', humanConvIds).order('sent_at', { ascending: true }).limit(500);
+        const convCreatedMap = new Map((convs || []).map(c => [c.id, new Date(c.created_at).getTime()]));
+        const firstHumanByConv = new Map<string, number>();
+        (humanMsgs || []).forEach(m => {
+          if (!firstHumanByConv.has(m.conversation_id)) {
+            firstHumanByConv.set(m.conversation_id, new Date(m.sent_at).getTime());
+          }
+        });
+        const diffs: number[] = [];
+        firstHumanByConv.forEach((ts, cid) => {
+          const created = convCreatedMap.get(cid);
+          if (created) diffs.push((ts - created) / 60000);
+        });
+        avgTimeToHuman = diffs.length > 0 ? Math.round(diffs.reduce((a, b) => a + b, 0) / diffs.length) : 0;
+      }
+
+      // Conversions by customer type
+      let dq = supabase.from('deals').select('won_at, lost_at, user_id, contact:contacts(customer_type)').gte('created_at', sinceStr);
+      if (filterSeller !== 'all') dq = dq.eq('user_id', filterSeller);
+      const { data: deals } = await dq.limit(1000);
+      const typeWon: Record<string, number> = {};
+      (deals || []).filter((d: any) => d.won_at).forEach((d: any) => {
+        const t = d.contact?.customer_type || 'Não definido';
+        typeWon[t] = (typeWon[t] || 0) + 1;
+      });
+      const conversionsByType = Object.entries(typeWon).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+
+      // Conversions by seller
+      const sellers = teamMembers.filter(m => m.user_id);
+      const conversionsBySeller = sellers.map(s => {
+        const sellerDeals = (deals || []).filter((d: any) => d.user_id === s.user_id);
+        const won = sellerDeals.filter((d: any) => d.won_at).length;
+        const lost = sellerDeals.filter((d: any) => d.lost_at).length;
+        const rate = (won + lost) > 0 ? Math.round((won / (won + lost)) * 100) : 0;
+        return { seller: s.name, won, lost, rate };
+      }).filter(s => s.won + s.lost > 0).sort((a, b) => b.rate - a.rate);
+
+      // Events by type
+      const { data: events } = await supabase.from('conversation_events').select('event_type').gte('created_at', sinceStr).limit(1000);
+      const eventCounts: Record<string, number> = {};
+      (events || []).forEach(e => { eventCounts[e.event_type] = (eventCounts[e.event_type] || 0) + 1; });
+      const eventsByType = Object.entries(eventCounts).map(([type, count]) => ({ type, count })).sort((a, b) => b.count - a.count);
+
+      // Funnel drop-off
+      const { data: stagesData } = await supabase.from('pipeline_stages').select('id, title, position').eq('is_active', true).order('position', { ascending: true });
+      const stageCountMap: Record<string, number> = {};
+      (deals || []).forEach((d: any) => { stageCountMap[d.stage_id || ''] = (stageCountMap[d.stage_id || ''] || 0) + 1; });
+      const funnelDropoff = (stagesData || []).map((s, i, arr) => {
+        const count = stageCountMap[s.id] || 0;
+        const prev = i > 0 ? (stageCountMap[arr[i - 1].id] || 0) : count;
+        const dropPct = prev > 0 && i > 0 ? Math.round(((prev - count) / prev) * 100) : 0;
+        return { stage: s.title, count, dropPct };
+      });
+
+      setQualityData({
+        totalConversations, qualifiedLeads, sentToHuman, resolvedByAI,
+        gapsDetected, stalledLeads, followupSuccessRate, avgTimeToHuman,
+        unownedHumanConvs, stalledHumanConvs, conversionsByType, conversionsBySeller,
+        funnelDropoff, eventsByType,
+      });
+    } catch (err) {
+      console.error('Error loading quality:', err);
+    } finally {
+      setLoadingQuality(false);
+    }
+  };
+
+
   const downloadCSV = (filename: string, rows: string[][]) => {
     const csv = rows.map(r => r.join(',')).join('\n');
     const blob = new Blob([csv], { type: 'text/csv' });
