@@ -83,6 +83,7 @@ const Reports: React.FC = () => {
     if (activeTab === 'overview') loadReports();
     else if (activeTab === 'performance') loadPerformance();
     else if (activeTab === 'advanced') loadAdvanced();
+    else if (activeTab === 'quality') loadQuality();
   }, [filterSeller, filterDays, activeTab]);
 
   // ── Overview ──
