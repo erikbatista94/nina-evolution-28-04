@@ -237,14 +237,47 @@ const DashboardMyDay: React.FC = () => {
           <div className="space-y-2">
             {followups.map(f => (
               <div key={f.id} className="flex items-center justify-between p-3 rounded-xl bg-blue-500/5 border border-blue-500/10">
-                <div className="min-w-0">
+                <div className="min-w-0 flex-1">
                   <p className="text-sm font-medium truncate">{f.contact_name}</p>
-                  <p className="text-xs text-muted-foreground truncate">{f.suggested_message?.substring(0, 60)}...</p>
+                  {f.stall_reason && (
+                    <p className="text-[10px] text-blue-300 mt-0.5">
+                      {f.stall_reason === 'sem_retorno' ? '📭 Sem retorno' :
+                       f.stall_reason === 'sem_retorno_orcamento' ? '💰 Sem retorno após orçamento' :
+                       f.stall_reason === 'aguardando_medidas' ? '📏 Aguardando medidas' :
+                       f.stall_reason === 'aguardando_decisao' ? '🤔 Aguardando decisão' :
+                       f.stall_reason === 'interesse_sem_avanco' ? '🐌 Interesse sem avanço' :
+                       f.stall_reason === 'lead_abandonado' ? '🚫 Lead abandonado' :
+                       f.stall_reason}
+                    </p>
+                  )}
+                  <p className="text-xs text-muted-foreground truncate mt-0.5">{f.suggested_message?.substring(0, 60)}...</p>
                 </div>
                 <div className="flex items-center gap-2 flex-shrink-0">
                   {f.temperature && (
                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-800 text-slate-400">{f.temperature}</span>
                   )}
+                  <select
+                    defaultValue=""
+                    onChange={async (e) => {
+                      const result = e.target.value;
+                      if (!result) return;
+                      await supabase.from('followup_tasks').update({
+                        status: 'completed',
+                        result,
+                        updated_at: new Date().toISOString(),
+                        attempt_count: (f as any).attempt_count ? (f as any).attempt_count + 1 : 1,
+                      }).eq('id', f.id);
+                      setFollowups(prev => prev.filter(x => x.id !== f.id));
+                    }}
+                    className="text-[10px] bg-slate-800 border border-slate-700 rounded px-1.5 py-0.5 text-slate-300 outline-none"
+                  >
+                    <option value="" disabled>Resultado</option>
+                    <option value="retomado">✅ Retomado</option>
+                    <option value="sem_resposta">📭 Sem resposta</option>
+                    <option value="perdeu_timing">⏰ Perdeu timing</option>
+                    <option value="perdido">❌ Perdido</option>
+                    <option value="reagendado">📅 Reagendado</option>
+                  </select>
                   <button
                     onClick={() => navigate(`/chat?conversation=${f.conversation_id}&suggested=${encodeURIComponent(f.suggested_message || '')}`)}
                     className="text-xs text-blue-400 hover:underline flex items-center gap-1"
