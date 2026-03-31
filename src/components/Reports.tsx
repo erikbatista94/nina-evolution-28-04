@@ -71,6 +71,8 @@ const Reports: React.FC = () => {
   const [loadingPerf, setLoadingPerf] = useState(false);
   const [advData, setAdvData] = useState<AdvancedData | null>(null);
   const [loadingAdv, setLoadingAdv] = useState(false);
+  const [qualityData, setQualityData] = useState<QualityData | null>(null);
+  const [loadingQuality, setLoadingQuality] = useState(false);
   const { isAdmin } = useCompanySettings();
 
   useEffect(() => {
