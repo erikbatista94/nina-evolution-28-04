@@ -905,6 +905,141 @@ const Reports: React.FC = () => {
           )}
         </>
       )}
+
+      {/* ═══════ QUALITY (admin-only) ═══════ */}
+      {activeTab === 'quality' && isAdmin && (
+        <>
+          {loadingQuality ? (
+            <div className="flex items-center justify-center py-20"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div>
+          ) : qualityData && (
+            <div className="space-y-6">
+              {/* KPI Cards */}
+              <div className="grid grid-cols-5 gap-3">
+                {[
+                  { label: 'Conversas', value: qualityData.totalConversations, color: 'text-white' },
+                  { label: 'Leads Qualificados', value: qualityData.qualifiedLeads, color: 'text-emerald-400' },
+                  { label: 'Enviadas p/ Humano', value: qualityData.sentToHuman, color: 'text-amber-400' },
+                  { label: 'Resolvidas pela IA', value: qualityData.resolvedByAI, color: 'text-cyan-400' },
+                  { label: 'Gaps Detectados', value: qualityData.gapsDetected, color: 'text-orange-400' },
+                ].map(kpi => (
+                  <div key={kpi.label} className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                    <p className="text-[10px] text-slate-500 uppercase">{kpi.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${kpi.color}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Operational Health */}
+              <div className="grid grid-cols-4 gap-3">
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Leads Parados</p>
+                  <p className={`text-xl font-bold mt-1 ${qualityData.stalledLeads > 5 ? 'text-red-400' : 'text-slate-300'}`}>{qualityData.stalledLeads}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Taxa Retomada</p>
+                  <p className={`text-xl font-bold mt-1 ${qualityData.followupSuccessRate >= 50 ? 'text-emerald-400' : qualityData.followupSuccessRate >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{qualityData.followupSuccessRate}%</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Tempo até Humano</p>
+                  <p className="text-xl font-bold text-slate-300 mt-1">{qualityData.avgTimeToHuman > 0 ? formatMinutes(qualityData.avgTimeToHuman) : '—'}</p>
+                </div>
+                <div className="p-4 rounded-xl bg-slate-900 border border-slate-800">
+                  <p className="text-[10px] text-slate-500 uppercase">Sem Dono (humano)</p>
+                  <p className={`text-xl font-bold mt-1 ${qualityData.unownedHumanConvs > 0 ? 'text-red-400' : 'text-emerald-400'}`}>{qualityData.unownedHumanConvs}</p>
+                </div>
+              </div>
+
+              {/* Stalled human convs alert */}
+              {qualityData.stalledHumanConvs > 0 && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center gap-3">
+                  <ShieldAlert className="w-5 h-5 text-red-400 flex-shrink-0" />
+                  <p className="text-sm text-red-300"><strong>{qualityData.stalledHumanConvs}</strong> conversa(s) humana(s) parada(s) há mais de 2h</p>
+                </div>
+              )}
+
+              <div className="grid grid-cols-2 gap-6">
+                {/* Conversions by Type */}
+                <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-emerald-400" /> Conversões por Tipo</h3>
+                  <div className="space-y-2">
+                    {qualityData.conversionsByType.length > 0 ? qualityData.conversionsByType.map(c => (
+                      <div key={c.type} className="flex justify-between py-1 border-b border-slate-800/50">
+                        <span className="text-sm text-slate-300">{c.type}</span>
+                        <span className="text-sm text-emerald-400 font-bold">{c.count}</span>
+                      </div>
+                    )) : <p className="text-xs text-slate-600">Sem conversões no período</p>}
+                  </div>
+                </div>
+
+                {/* Funnel Drop-off */}
+                <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><BarChart3 className="w-4 h-4 text-violet-400" /> Drop-off por Etapa</h3>
+                  <div className="space-y-2">
+                    {qualityData.funnelDropoff.map(f => (
+                      <div key={f.stage} className="flex items-center justify-between py-1 border-b border-slate-800/50">
+                        <span className="text-sm text-slate-300">{f.stage}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-xs text-slate-500">{f.count} deals</span>
+                          {f.dropPct > 0 && (
+                            <span className={`text-xs font-medium ${f.dropPct > 50 ? 'text-red-400' : f.dropPct > 25 ? 'text-amber-400' : 'text-slate-400'}`}>
+                              ↓{f.dropPct}%
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Conversions by Seller */}
+              {qualityData.conversionsBySeller.length > 0 && (
+                <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+                  <div className="p-4 border-b border-slate-800">
+                    <h3 className="text-sm font-semibold text-slate-300">Taxa de Conversão por Vendedor</h3>
+                  </div>
+                  <table className="w-full">
+                    <thead>
+                      <tr className="text-[10px] text-slate-500 uppercase border-b border-slate-800">
+                        <th className="text-left p-3">Vendedor</th>
+                        <th className="text-center p-3">Ganhos</th>
+                        <th className="text-center p-3">Perdidos</th>
+                        <th className="text-center p-3">Taxa</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {qualityData.conversionsBySeller.map(s => (
+                        <tr key={s.seller} className="border-b border-slate-800/50 hover:bg-slate-800/30">
+                          <td className="p-3 text-sm text-slate-200 font-medium">{s.seller}</td>
+                          <td className="p-3 text-center text-sm text-emerald-400">{s.won}</td>
+                          <td className="p-3 text-center text-sm text-red-400">{s.lost}</td>
+                          <td className="p-3 text-center">
+                            <span className={`text-xs font-bold ${s.rate >= 50 ? 'text-emerald-400' : s.rate >= 25 ? 'text-amber-400' : 'text-red-400'}`}>{s.rate}%</span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Events */}
+              {qualityData.eventsByType.length > 0 && (
+                <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
+                  <h3 className="text-sm font-semibold text-slate-300 mb-4">Eventos Registrados</h3>
+                  <div className="flex flex-wrap gap-2">
+                    {qualityData.eventsByType.map(e => (
+                      <span key={e.type} className="px-3 py-1.5 bg-slate-800 text-slate-300 text-xs rounded-lg border border-slate-700">
+                        {e.type} <strong className="text-cyan-400 ml-1">{e.count}</strong>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
