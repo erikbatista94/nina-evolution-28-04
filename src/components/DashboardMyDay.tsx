@@ -13,6 +13,7 @@ interface PendingConversation {
   last_message_at: string;
   contact_name: string;
   contact_phone: string;
+  is_urgent?: boolean;
 }
 
 interface TodayAppointment {
