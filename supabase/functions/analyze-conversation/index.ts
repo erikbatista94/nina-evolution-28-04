@@ -153,6 +153,14 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
                 enum: ["unknown", "immediate", "1month", "3months", "6months+"],
                 description: "Timeline de decisão baseado em urgência"
               },
+              is_urgent: {
+                type: "boolean",
+                description: "Se o lead demonstra urgência comercial real (obra já começou, precisa urgente, prazo curto, quer fechar logo). NÃO marcar urgência por frases soltas sem contexto real de pressa."
+              },
+              urgency_reason: {
+                type: "string",
+                description: "Motivo da urgência em até 50 caracteres. Null se não urgente."
+              },
               // NEW CRM structured fields
               customer_type: {
                 type: "string",
@@ -192,7 +200,7 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
                 description: "Serviços específicos de interesse: drywall, forro, gesso, vinilico, ripado_pvc, molduras, iluminacao, etc."
               }
             },
-            required: ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline"],
+            required: ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline", "is_urgent"],
             additionalProperties: false
           }
         }
