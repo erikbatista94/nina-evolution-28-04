@@ -110,6 +110,7 @@ export type Database = {
           interest_services: string[] | null
           is_blocked: boolean | null
           is_business: boolean | null
+          is_urgent: boolean | null
           job_size: string | null
           last_activity: string
           last_interaction_at: string | null
@@ -147,6 +148,7 @@ export type Database = {
           interest_services?: string[] | null
           is_blocked?: boolean | null
           is_business?: boolean | null
+          is_urgent?: boolean | null
           job_size?: string | null
           last_activity?: string
           last_interaction_at?: string | null
@@ -184,6 +186,7 @@ export type Database = {
           interest_services?: string[] | null
           is_blocked?: boolean | null
           is_business?: boolean | null
+          is_urgent?: boolean | null
           job_size?: string | null
           last_activity?: string
           last_interaction_at?: string | null
