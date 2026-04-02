@@ -14,6 +14,22 @@ const GROUPING_DELAY_MS = 3500;
 const STATUS_RETRY_DELAY_MS = 2500;
 const STATUS_MAX_RETRIES = 3;
 
+// Fast urgency detection keywords (lightweight, runs on every inbound)
+const URGENCY_KEYWORDS = [
+  'urgente', 'urgência', 'pressa', 'obra começou', 'obra já começou', 'obra comecou',
+  'visita logo', 'orçamento rápido', 'orcamento rapido', 'fechar logo', 'fechar rápido',
+  'prazo curto', 'prazo apertado', 'preciso logo', 'preciso urgente', 'o mais rápido',
+  'o mais rapido', 'imediato', 'imediata', 'começar amanhã', 'comecar amanha',
+  'semana que vem', 'essa semana', 'hoje mesmo', 'agora mesmo', 'não posso esperar',
+  'nao posso esperar', 'precisando muito', 'correndo contra o tempo'
+];
+
+function detectUrgencyFast(text: string): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return URGENCY_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
