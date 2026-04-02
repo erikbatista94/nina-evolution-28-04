@@ -57,6 +57,9 @@ const ChatInterface: React.FC = () => {
   const [contactDetails, setContactDetails] = useState<any>(null);
   const [objectionSuggestions, setObjectionSuggestions] = useState<{title: string; response_text: string}[]>([]);
   const [pendingFollowup, setPendingFollowup] = useState<any>(null);
+  const [windowStatus, setWindowStatus] = useState<{ status: 'open' | 'expiring' | 'closed'; hoursLeft: number }>({ status: 'open', hoursLeft: 24 });
+  const [timelineEvents, setTimelineEvents] = useState<{ date: string; type: string; label: string; icon: string }[]>([]);
+  const [showTimeline, setShowTimeline] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
