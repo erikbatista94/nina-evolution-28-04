@@ -14,6 +14,22 @@ const GROUPING_DELAY_MS = 3500;
 const STATUS_RETRY_DELAY_MS = 2500;
 const STATUS_MAX_RETRIES = 3;
 
+// Fast urgency detection keywords (lightweight, runs on every inbound)
+const URGENCY_KEYWORDS = [
+  'urgente', 'urgência', 'pressa', 'obra começou', 'obra já começou', 'obra comecou',
+  'visita logo', 'orçamento rápido', 'orcamento rapido', 'fechar logo', 'fechar rápido',
+  'prazo curto', 'prazo apertado', 'preciso logo', 'preciso urgente', 'o mais rápido',
+  'o mais rapido', 'imediato', 'imediata', 'começar amanhã', 'comecar amanha',
+  'semana que vem', 'essa semana', 'hoje mesmo', 'agora mesmo', 'não posso esperar',
+  'nao posso esperar', 'precisando muito', 'correndo contra o tempo'
+];
+
+function detectUrgencyFast(text: string): boolean {
+  if (!text) return false;
+  const lower = text.toLowerCase();
+  return URGENCY_KEYWORDS.some(kw => lower.includes(kw));
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -293,6 +309,24 @@ serve(async (req) => {
           }
 
           console.log('[Webhook] Created message:', dbMessage.id, 'for conversation:', conversation.id);
+
+          // 4b. Fast urgency detection on inbound text
+          if (messageType === 'text' && messageContent && detectUrgencyFast(messageContent)) {
+            console.log('[Webhook] 🔥 Urgency detected for contact:', contact.id);
+            await supabase
+              .from('contacts')
+              .update({ is_urgent: true })
+              .eq('id', contact.id)
+              .eq('is_urgent', false); // only flip once
+            
+            // Log urgency event
+            await supabase.from('conversation_events').insert({
+              conversation_id: conversation.id,
+              contact_id: contact.id,
+              event_type: 'urgency_detected',
+              event_data: { trigger: 'keyword', source: 'webhook', snippet: messageContent.substring(0, 100) }
+            }).then(() => {}).catch(() => {});
+          }
 
           // 5. Update conversation
           await supabase

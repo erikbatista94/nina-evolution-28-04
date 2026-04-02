@@ -3,7 +3,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { 
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
-  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock
+  Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock,
+  AlertTriangle, Shield, History
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
 import { Button } from './Button';
@@ -56,6 +57,9 @@ const ChatInterface: React.FC = () => {
   const [contactDetails, setContactDetails] = useState<any>(null);
   const [objectionSuggestions, setObjectionSuggestions] = useState<{title: string; response_text: string}[]>([]);
   const [pendingFollowup, setPendingFollowup] = useState<any>(null);
+  const [windowStatus, setWindowStatus] = useState<{ status: 'open' | 'expiring' | 'closed'; hoursLeft: number }>({ status: 'open', hoursLeft: 24 });
+  const [timelineEvents, setTimelineEvents] = useState<{ date: string; type: string; label: string; icon: string }[]>([]);
+  const [showTimeline, setShowTimeline] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -120,13 +124,145 @@ const ChatInterface: React.FC = () => {
     if (activeChat?.contactId) {
       supabase
         .from('contacts')
-        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full, qualification_gaps')
+        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full, qualification_gaps, is_urgent')
         .eq('id', activeChat.contactId)
         .single()
         .then(({ data }) => { setContactDetails(data); });
     } else {
       setContactDetails(null);
     }
+  }, [activeChat?.contactId]);
+
+  // Calculate 24h WhatsApp window status
+  useEffect(() => {
+    if (!activeChat) { setWindowStatus({ status: 'open', hoursLeft: 24 }); return; }
+    
+    const calcWindow = async () => {
+      // Find last inbound message timestamp (from_type='user')
+      const { data: lastInbound } = await supabase
+        .from('messages')
+        .select('sent_at')
+        .eq('conversation_id', activeChat.id)
+        .eq('from_type', 'user')
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!lastInbound) {
+        setWindowStatus({ status: 'closed', hoursLeft: 0 });
+        return;
+      }
+
+      const hoursLeft = 24 - (Date.now() - new Date(lastInbound.sent_at).getTime()) / 3600000;
+      
+      if (hoursLeft <= 0) setWindowStatus({ status: 'closed', hoursLeft: 0 });
+      else if (hoursLeft <= 4) setWindowStatus({ status: 'expiring', hoursLeft: Math.round(hoursLeft * 10) / 10 });
+      else setWindowStatus({ status: 'open', hoursLeft: Math.round(hoursLeft * 10) / 10 });
+    };
+
+    calcWindow();
+    const interval = setInterval(calcWindow, 60000); // refresh every minute
+    return () => clearInterval(interval);
+  }, [activeChat?.id, activeChat?.messages?.length]);
+
+  // Load commercial timeline
+  useEffect(() => {
+    if (!activeChat?.contactId) { setTimelineEvents([]); return; }
+    
+    const loadTimeline = async () => {
+      const events: { date: string; type: string; label: string; icon: string }[] = [];
+      
+      // Conversation events (won, lost, qualified, urgency, stage_moved, etc.)
+      const { data: convEvents } = await supabase
+        .from('conversation_events')
+        .select('event_type, event_data, created_at')
+        .eq('contact_id', activeChat.contactId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      (convEvents || []).forEach(e => {
+        const typeLabels: Record<string, { label: string; icon: string }> = {
+          'won': { label: 'Ganho ✅', icon: '🏆' },
+          'lost': { label: 'Perdido ❌', icon: '💔' },
+          'qualified': { label: 'Lead qualificado', icon: '⭐' },
+          'high_score': { label: `Score alto (${(e.event_data as any)?.score || ''})`, icon: '📈' },
+          'urgency_detected': { label: 'Urgência detectada', icon: '🔥' },
+          'stage_moved': { label: `Etapa: ${(e.event_data as any)?.new_stage || 'movido'}`, icon: '📍' },
+          'stalled': { label: 'Lead parado', icon: '⏸️' },
+          'transferred': { label: 'Transferido', icon: '🔄' },
+          'analyzed': { label: 'Análise IA', icon: '🤖' },
+        };
+        const info = typeLabels[e.event_type] || { label: e.event_type, icon: '📋' };
+        events.push({ date: e.created_at || '', type: e.event_type, ...info });
+      });
+
+      // Appointments
+      const { data: appts } = await supabase
+        .from('appointments')
+        .select('title, date, time, status, created_at')
+        .eq('contact_id', activeChat.contactId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      (appts || []).forEach(a => {
+        events.push({ 
+          date: a.created_at, 
+          type: 'appointment', 
+          label: `Agendamento: ${a.title} (${a.date} ${a.time})`, 
+          icon: '📅' 
+        });
+      });
+
+      // Follow-up tasks
+      const { data: followups } = await supabase
+        .from('followup_tasks')
+        .select('status, due_at, stall_reason, created_at')
+        .eq('contact_id', activeChat.contactId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      (followups || []).forEach(f => {
+        events.push({ 
+          date: f.created_at || '', 
+          type: 'followup', 
+          label: `Follow-up ${f.status === 'completed' ? '✅' : f.status === 'pending' ? '⏳' : '—'}${f.stall_reason ? ` (${f.stall_reason})` : ''}`, 
+          icon: '🔄' 
+        });
+      });
+
+      // Deal activities (budget, proposals, etc.)
+      const { data: deals } = await supabase
+        .from('deals')
+        .select('id')
+        .eq('contact_id', activeChat.contactId)
+        .limit(1)
+        .maybeSingle();
+      
+      if (deals?.id) {
+        const { data: activities } = await supabase
+          .from('deal_activities')
+          .select('type, title, created_at, is_completed')
+          .eq('deal_id', deals.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        (activities || []).forEach(a => {
+          const actIcons: Record<string, string> = { 'note': '📝', 'call': '📞', 'email': '📧', 'meeting': '🤝', 'task': '✅' };
+          events.push({ 
+            date: a.created_at || '', 
+            type: `activity_${a.type}`, 
+            label: a.title, 
+            icon: actIcons[a.type] || '📋' 
+          });
+        });
+      }
+
+      // Sort chronologically descending
+      events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setTimelineEvents(events.slice(0, 20));
+    };
+
+    loadTimeline();
   }, [activeChat?.contactId]);
 
   // Sync notes value with active chat
@@ -883,6 +1019,22 @@ const ChatInterface: React.FC = () => {
                   <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                     {activeChat.contactName}
                     {renderStatusBadge(activeChat.status)}
+                    {/* Urgency badge */}
+                    {contactDetails?.is_urgent && (
+                      <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded border border-red-500/30 font-medium animate-pulse">
+                        🔥 Urgente
+                      </span>
+                    )}
+                    {/* 24h Window badge */}
+                    <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium ${
+                      windowStatus.status === 'open' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                      windowStatus.status === 'expiring' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' :
+                      'bg-red-500/10 text-red-400 border-red-500/20'
+                    }`}>
+                      {windowStatus.status === 'open' ? `🟢 ${Math.round(windowStatus.hoursLeft)}h` :
+                       windowStatus.status === 'expiring' ? `🟡 ${windowStatus.hoursLeft}h` :
+                       '🔴 Janela fechada'}
+                    </span>
                   </h2>
                   <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
                 </div>
@@ -1067,6 +1219,19 @@ const ChatInterface: React.FC = () => {
 
              {/* Input Area */}
             <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
+              {/* 24h Window Warning Banner */}
+              {windowStatus.status === 'closed' && (
+                <div className="mb-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-sm text-red-300">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400" />
+                  <span><strong>Janela de 24h expirada.</strong> Use template para reabrir contato. Mensagem comum não será entregue.</span>
+                </div>
+              )}
+              {windowStatus.status === 'expiring' && (
+                <div className="mb-3 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                  <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>Janela expira em <strong>{windowStatus.hoursLeft}h</strong>. Responda antes que feche.</span>
+                </div>
+              )}
               {isRecording && activeChat ? (
                 <div className="max-w-4xl mx-auto">
                   <AudioRecorder
@@ -1189,7 +1354,7 @@ const ChatInterface: React.FC = () => {
                         if (!showQuickReplies) handleSendMessage();
                       }
                     }}
-                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite / para atalhos...'}
+                    placeholder={windowStatus.status === 'closed' ? '⚠️ Janela fechada — use template' : activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite / para atalhos...'}
                     className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
                     rows={1}
                   />
@@ -1355,6 +1520,34 @@ const ChatInterface: React.FC = () => {
                       ))}
                     </div>
                   </div>
+                )}
+
+                {/* Commercial Timeline */}
+                {timelineEvents.length > 0 && (
+                  <>
+                    <div className="h-px bg-slate-800/50 w-full"></div>
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-2"><History className="w-4 h-4" /> Timeline Comercial</span>
+                        <button onClick={() => setShowTimeline(!showTimeline)} className="text-cyan-500 hover:text-cyan-400 text-[10px]">
+                          {showTimeline ? 'Ocultar' : `Ver (${timelineEvents.length})`}
+                        </button>
+                      </h4>
+                      {showTimeline && (
+                        <div className="relative pl-4 border-l-2 border-slate-800 space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                          {timelineEvents.map((evt, i) => (
+                            <div key={i} className="relative">
+                              <div className="absolute -left-[21px] top-0.5 w-3 h-3 rounded-full bg-slate-700 border-2 border-slate-600" />
+                              <p className="text-xs text-slate-300">{evt.icon} {evt.label}</p>
+                              <p className="text-[10px] text-slate-500">
+                                {evt.date ? new Date(evt.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
                 )}
 
                 <div className="h-px bg-slate-800/50 w-full"></div>
