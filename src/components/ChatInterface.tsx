@@ -1354,7 +1354,7 @@ const ChatInterface: React.FC = () => {
                         if (!showQuickReplies) handleSendMessage();
                       }
                     }}
-                    placeholder={activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite / para atalhos...'}
+                    placeholder={windowStatus.status === 'closed' ? '⚠️ Janela fechada — use template' : activeChat.status === 'nina' ? `${sdrName} está respondendo automaticamente...` : 'Digite / para atalhos...'}
                     className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
                     rows={1}
                   />
