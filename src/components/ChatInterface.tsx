@@ -1019,6 +1019,22 @@ const ChatInterface: React.FC = () => {
                   <h2 className="text-sm font-bold text-slate-100 flex items-center gap-2">
                     {activeChat.contactName}
                     {renderStatusBadge(activeChat.status)}
+                    {/* Urgency badge */}
+                    {contactDetails?.is_urgent && (
+                      <span className="px-1.5 py-0.5 bg-red-500/20 text-red-400 text-[10px] rounded border border-red-500/30 font-medium animate-pulse">
+                        🔥 Urgente
+                      </span>
+                    )}
+                    {/* 24h Window badge */}
+                    <span className={`px-1.5 py-0.5 text-[10px] rounded border font-medium ${
+                      windowStatus.status === 'open' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                      windowStatus.status === 'expiring' ? 'bg-amber-500/10 text-amber-400 border-amber-500/20 animate-pulse' :
+                      'bg-red-500/10 text-red-400 border-red-500/20'
+                    }`}>
+                      {windowStatus.status === 'open' ? `🟢 ${Math.round(windowStatus.hoursLeft)}h` :
+                       windowStatus.status === 'expiring' ? `🟡 ${windowStatus.hoursLeft}h` :
+                       '🔴 Janela fechada'}
+                    </span>
                   </h2>
                   <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
                 </div>
