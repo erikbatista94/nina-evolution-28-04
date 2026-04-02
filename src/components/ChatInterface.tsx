@@ -1219,6 +1219,19 @@ const ChatInterface: React.FC = () => {
 
              {/* Input Area */}
             <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
+              {/* 24h Window Warning Banner */}
+              {windowStatus.status === 'closed' && (
+                <div className="mb-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-sm text-red-300">
+                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400" />
+                  <span><strong>Janela de 24h expirada.</strong> Use template para reabrir contato. Mensagem comum não será entregue.</span>
+                </div>
+              )}
+              {windowStatus.status === 'expiring' && (
+                <div className="mb-3 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2 text-xs text-amber-300">
+                  <Clock className="w-3.5 h-3.5 flex-shrink-0" />
+                  <span>Janela expira em <strong>{windowStatus.hoursLeft}h</strong>. Responda antes que feche.</span>
+                </div>
+              )}
               {isRecording && activeChat ? (
                 <div className="max-w-4xl mx-auto">
                   <AudioRecorder
