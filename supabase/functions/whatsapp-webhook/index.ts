@@ -310,6 +310,24 @@ serve(async (req) => {
 
           console.log('[Webhook] Created message:', dbMessage.id, 'for conversation:', conversation.id);
 
+          // 4b. Fast urgency detection on inbound text
+          if (messageType === 'text' && messageContent && detectUrgencyFast(messageContent)) {
+            console.log('[Webhook] 🔥 Urgency detected for contact:', contact.id);
+            await supabase
+              .from('contacts')
+              .update({ is_urgent: true })
+              .eq('id', contact.id)
+              .eq('is_urgent', false); // only flip once
+            
+            // Log urgency event
+            await supabase.from('conversation_events').insert({
+              conversation_id: conversation.id,
+              contact_id: contact.id,
+              event_type: 'urgency_detected',
+              event_data: { trigger: 'keyword', source: 'webhook', snippet: messageContent.substring(0, 100) }
+            }).then(() => {}).catch(() => {});
+          }
+
           // 5. Update conversation
           await supabase
             .from('conversations')
