@@ -124,13 +124,145 @@ const ChatInterface: React.FC = () => {
     if (activeChat?.contactId) {
       supabase
         .from('contacts')
-        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full, qualification_gaps')
+        .select('customer_type, interest_services, city, neighborhood, job_size, start_timeframe, has_project, lead_temperature, lead_status, source, address_full, qualification_gaps, is_urgent')
         .eq('id', activeChat.contactId)
         .single()
         .then(({ data }) => { setContactDetails(data); });
     } else {
       setContactDetails(null);
     }
+  }, [activeChat?.contactId]);
+
+  // Calculate 24h WhatsApp window status
+  useEffect(() => {
+    if (!activeChat) { setWindowStatus({ status: 'open', hoursLeft: 24 }); return; }
+    
+    const calcWindow = async () => {
+      // Find last inbound message timestamp (from_type='user')
+      const { data: lastInbound } = await supabase
+        .from('messages')
+        .select('sent_at')
+        .eq('conversation_id', activeChat.id)
+        .eq('from_type', 'user')
+        .order('sent_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (!lastInbound) {
+        setWindowStatus({ status: 'closed', hoursLeft: 0 });
+        return;
+      }
+
+      const hoursLeft = 24 - (Date.now() - new Date(lastInbound.sent_at).getTime()) / 3600000;
+      
+      if (hoursLeft <= 0) setWindowStatus({ status: 'closed', hoursLeft: 0 });
+      else if (hoursLeft <= 4) setWindowStatus({ status: 'expiring', hoursLeft: Math.round(hoursLeft * 10) / 10 });
+      else setWindowStatus({ status: 'open', hoursLeft: Math.round(hoursLeft * 10) / 10 });
+    };
+
+    calcWindow();
+    const interval = setInterval(calcWindow, 60000); // refresh every minute
+    return () => clearInterval(interval);
+  }, [activeChat?.id, activeChat?.messages?.length]);
+
+  // Load commercial timeline
+  useEffect(() => {
+    if (!activeChat?.contactId) { setTimelineEvents([]); return; }
+    
+    const loadTimeline = async () => {
+      const events: { date: string; type: string; label: string; icon: string }[] = [];
+      
+      // Conversation events (won, lost, qualified, urgency, stage_moved, etc.)
+      const { data: convEvents } = await supabase
+        .from('conversation_events')
+        .select('event_type, event_data, created_at')
+        .eq('contact_id', activeChat.contactId)
+        .order('created_at', { ascending: false })
+        .limit(20);
+      
+      (convEvents || []).forEach(e => {
+        const typeLabels: Record<string, { label: string; icon: string }> = {
+          'won': { label: 'Ganho ✅', icon: '🏆' },
+          'lost': { label: 'Perdido ❌', icon: '💔' },
+          'qualified': { label: 'Lead qualificado', icon: '⭐' },
+          'high_score': { label: `Score alto (${(e.event_data as any)?.score || ''})`, icon: '📈' },
+          'urgency_detected': { label: 'Urgência detectada', icon: '🔥' },
+          'stage_moved': { label: `Etapa: ${(e.event_data as any)?.new_stage || 'movido'}`, icon: '📍' },
+          'stalled': { label: 'Lead parado', icon: '⏸️' },
+          'transferred': { label: 'Transferido', icon: '🔄' },
+          'analyzed': { label: 'Análise IA', icon: '🤖' },
+        };
+        const info = typeLabels[e.event_type] || { label: e.event_type, icon: '📋' };
+        events.push({ date: e.created_at || '', type: e.event_type, ...info });
+      });
+
+      // Appointments
+      const { data: appts } = await supabase
+        .from('appointments')
+        .select('title, date, time, status, created_at')
+        .eq('contact_id', activeChat.contactId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      (appts || []).forEach(a => {
+        events.push({ 
+          date: a.created_at, 
+          type: 'appointment', 
+          label: `Agendamento: ${a.title} (${a.date} ${a.time})`, 
+          icon: '📅' 
+        });
+      });
+
+      // Follow-up tasks
+      const { data: followups } = await supabase
+        .from('followup_tasks')
+        .select('status, due_at, stall_reason, created_at')
+        .eq('contact_id', activeChat.contactId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+      
+      (followups || []).forEach(f => {
+        events.push({ 
+          date: f.created_at || '', 
+          type: 'followup', 
+          label: `Follow-up ${f.status === 'completed' ? '✅' : f.status === 'pending' ? '⏳' : '—'}${f.stall_reason ? ` (${f.stall_reason})` : ''}`, 
+          icon: '🔄' 
+        });
+      });
+
+      // Deal activities (budget, proposals, etc.)
+      const { data: deals } = await supabase
+        .from('deals')
+        .select('id')
+        .eq('contact_id', activeChat.contactId)
+        .limit(1)
+        .maybeSingle();
+      
+      if (deals?.id) {
+        const { data: activities } = await supabase
+          .from('deal_activities')
+          .select('type, title, created_at, is_completed')
+          .eq('deal_id', deals.id)
+          .order('created_at', { ascending: false })
+          .limit(10);
+        
+        (activities || []).forEach(a => {
+          const actIcons: Record<string, string> = { 'note': '📝', 'call': '📞', 'email': '📧', 'meeting': '🤝', 'task': '✅' };
+          events.push({ 
+            date: a.created_at || '', 
+            type: `activity_${a.type}`, 
+            label: a.title, 
+            icon: actIcons[a.type] || '📋' 
+          });
+        });
+      }
+
+      // Sort chronologically descending
+      events.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      setTimelineEvents(events.slice(0, 20));
+    };
+
+    loadTimeline();
   }, [activeChat?.contactId]);
 
   // Sync notes value with active chat
