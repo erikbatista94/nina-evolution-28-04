@@ -399,6 +399,21 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
       if (insights.source) structuredUpdate.source = insights.source;
       if (startTimeframe) structuredUpdate.start_timeframe = startTimeframe;
 
+      // === AI URGENCY CONFIRMATION ===
+      if (insights.is_urgent === true) {
+        structuredUpdate.is_urgent = true;
+        console.log('[Analyze] 🔥 AI confirmed urgency:', insights.urgency_reason || 'no reason');
+        // Log event
+        try {
+          await supabase.from('conversation_events').insert({
+            conversation_id,
+            contact_id,
+            event_type: 'urgency_detected',
+            event_data: { trigger: 'ai_analysis', reason: insights.urgency_reason || null }
+          });
+        } catch (_) {}
+      }
+
       // === QUALIFICATION GAPS DETECTION ===
       // Only generate gaps after 3+ interactions (configurable threshold)
       const GAP_MIN_INTERACTIONS = 3;
