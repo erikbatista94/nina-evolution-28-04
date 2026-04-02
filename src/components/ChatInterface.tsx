@@ -1522,6 +1522,34 @@ const ChatInterface: React.FC = () => {
                   </div>
                 )}
 
+                {/* Commercial Timeline */}
+                {timelineEvents.length > 0 && (
+                  <>
+                    <div className="h-px bg-slate-800/50 w-full"></div>
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
+                        <span className="flex items-center gap-2"><History className="w-4 h-4" /> Timeline Comercial</span>
+                        <button onClick={() => setShowTimeline(!showTimeline)} className="text-cyan-500 hover:text-cyan-400 text-[10px]">
+                          {showTimeline ? 'Ocultar' : `Ver (${timelineEvents.length})`}
+                        </button>
+                      </h4>
+                      {showTimeline && (
+                        <div className="relative pl-4 border-l-2 border-slate-800 space-y-3 max-h-64 overflow-y-auto custom-scrollbar">
+                          {timelineEvents.map((evt, i) => (
+                            <div key={i} className="relative">
+                              <div className="absolute -left-[21px] top-0.5 w-3 h-3 rounded-full bg-slate-700 border-2 border-slate-600" />
+                              <p className="text-xs text-slate-300">{evt.icon} {evt.label}</p>
+                              <p className="text-[10px] text-slate-500">
+                                {evt.date ? new Date(evt.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) : ''}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </>
+                )}
+
                 <div className="h-px bg-slate-800/50 w-full"></div>
                 <div className="space-y-4">
                   <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
