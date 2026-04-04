@@ -26,6 +26,14 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
   useEffect(() => {
     if (loading) return;
     if (!user) {
+      lastValidUserId.current = null;
+      setAuthorized(false);
+      setChecking(false);
+      return;
+    }
+
+    // If user id hasn't changed and we already authorized, skip re-check
+    if (user.id === lastValidUserId.current && authorized) {
       setChecking(false);
       return;
     }
@@ -50,6 +58,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
             .maybeSingle();
 
           if (!member || member.status === 'disabled') {
+            // Definitive denial — clear cache and redirect
+            lastValidUserId.current = null;
             toast.error('Acesso não autorizado. Contate o administrador.');
             await signOut();
             setChecking(false);
@@ -68,17 +78,23 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           setForcePasswordChange(true);
         }
 
+        lastValidUserId.current = user.id;
         setAuthorized(true);
       } catch (error) {
         console.error('Error checking access:', error);
-        setAuthorized(true); // Allow on error to not lock out users
+        // Transient error: reuse last valid auth if same user
+        if (lastValidUserId.current === user.id) {
+          setAuthorized(true); // Keep access on transient failure
+        } else {
+          setAuthorized(true); // First load with error — allow rather than lock out
+        }
       } finally {
         setChecking(false);
       }
     };
 
     checkAccess();
-  }, [user, loading, signOut]);
+  }, [user?.id, loading, signOut]);
 
   const handlePasswordChange = async (e: React.FormEvent) => {
     e.preventDefault();
