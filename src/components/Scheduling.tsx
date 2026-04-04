@@ -286,6 +286,7 @@ const Scheduling: React.FC = () => {
       setSelectedContactId(null);
       setSelectedOwnerId(null);
       setAddressField('');
+      userEditedTitle.current = false;
     } catch (error) {
       console.error('Error creating appointment:', error);
       toast.error('Erro ao criar agendamento');
