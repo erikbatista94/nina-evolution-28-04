@@ -60,6 +60,11 @@ const ChatInterface: React.FC = () => {
   const [windowStatus, setWindowStatus] = useState<{ status: 'open' | 'expiring' | 'closed'; hoursLeft: number }>({ status: 'open', hoursLeft: 24 });
   const [timelineEvents, setTimelineEvents] = useState<{ date: string; type: string; label: string; icon: string }[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
+  // Budget state
+  const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
+  const [budgetValue, setBudgetValue] = useState('');
+  const [budgetStatus, setBudgetStatus] = useState('none');
+  const [savingBudget, setSavingBudget] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
