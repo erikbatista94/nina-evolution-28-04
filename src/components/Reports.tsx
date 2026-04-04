@@ -820,7 +820,12 @@ const Reports: React.FC = () => {
                       ))}
                     </tbody>
                   </table>
-                  {advData.objections.length === 0 && <div className="text-center py-6 text-slate-500 text-sm">Nenhuma objeção cadastrada no playbook</div>}
+                  {advData.objections.length === 0 && (
+                    <div className="text-center py-6 px-4 space-y-2">
+                      <p className="text-slate-400 text-sm font-medium">Nenhuma objeção detectada ainda</p>
+                      <p className="text-slate-500 text-xs max-w-md mx-auto">O sistema analisa conversas automaticamente (IA + humano) e detecta objeções como preço, prazo, concorrente, falta de projeto, etc. As objeções aparecerão aqui conforme mais conversas forem analisadas. Você também pode cadastrar gatilhos no Playbook de Objeções.</p>
+                    </div>
+                  )}
                 </div>
               </div>
 
