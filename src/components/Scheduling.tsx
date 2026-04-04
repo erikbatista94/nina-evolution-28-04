@@ -807,7 +807,7 @@ const Scheduling: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-cyan-500 outline-none placeholder:text-slate-600"
                   placeholder="Ex: Gabriel: Visita - Ramos Carlos - Rua das Palmeiras"
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  onChange={(e) => { userEditedTitle.current = true; setFormData({...formData, title: e.target.value}); }}
                 />
                 <p className="text-xs text-slate-500">Formato: Vendedor: Visita - Cliente - Endereço</p>
               </div>
