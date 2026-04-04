@@ -940,13 +940,32 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             <h3 className="font-semibold text-white">Google Calendar</h3>
           </div>
           <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${
-            gcalConfigured 
-              ? 'bg-emerald-500/10 text-emerald-400' 
-              : 'bg-amber-500/10 text-amber-400'
+            gcalStatus.status === 'connected' ? 'bg-emerald-500/10 text-emerald-400' :
+            gcalStatus.status === 'error' ? 'bg-red-500/10 text-red-400' :
+            gcalConfigured ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'
           }`}>
-            <span className={`h-2 w-2 rounded-full ${gcalConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-            {gcalConfigured ? 'Configurado' : 'Aguardando'}
+            <span className={`h-2 w-2 rounded-full ${
+              gcalStatus.status === 'connected' ? 'bg-emerald-500' :
+              gcalStatus.status === 'error' ? 'bg-red-500' :
+              gcalConfigured ? 'bg-emerald-500' : 'bg-amber-500'
+            }`}></span>
+            {gcalStatus.status === 'connected' ? '🟢 Conectado' :
+             gcalStatus.status === 'error' ? '🔴 Erro' :
+             gcalConfigured ? 'Configurado' : 'Aguardando'}
           </div>
+        </div>
+
+        {/* GCal Status Detail */}
+        {gcalStatus.status === 'error' && gcalStatus.message && (
+          <div className="mb-4 px-4 py-3 bg-red-500/10 border border-red-500/30 rounded-xl text-sm text-red-300">
+            <strong>Erro na integração:</strong> {gcalStatus.message}
+          </div>
+        )}
+        {gcalStatus.status === 'connected' && gcalStatus.message && (
+          <div className="mb-4 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300">
+            ✅ {gcalStatus.message}
+          </div>
+        )}
         </div>
 
         <details className="mb-4">
