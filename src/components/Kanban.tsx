@@ -534,12 +534,12 @@ const Kanban: React.FC = () => {
                               (deal.contactLeadScore || 0) > 70 ? 'bg-amber-500/10 text-amber-400 border-amber-500/20' :
                               (deal.contactLeadScore || 0) > 40 ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
                               'bg-slate-500/10 text-slate-400 border-slate-500/20'
-                            }`}>
+                            }`} title={`Lead Score: ${deal.contactLeadScore}/100 — >70=quente, >40=morno, <40=frio`}>
                               ★ {deal.contactLeadScore}
                             </span>
                           )}
                           {(deal.contactQualificationGaps?.length || 0) > 0 && (
-                            <span className="text-[9px] px-1.5 py-0.5 rounded border font-medium bg-amber-500/10 text-amber-400 border-amber-500/20" title={`${deal.contactQualificationGaps!.length} info pendente(s)`}>
+                            <span className="text-[9px] px-1.5 py-0.5 rounded border font-medium bg-amber-500/10 text-amber-400 border-amber-500/20" title={`${deal.contactQualificationGaps!.length} campo(s) pendente(s) de qualificação (cidade, tipo, serviços, etc.)`}>
                               ⚠ {deal.contactQualificationGaps!.length}
                             </span>
                           )}
