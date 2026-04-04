@@ -121,8 +121,9 @@ const Scheduling: React.FC = () => {
     fetchAddress();
   }, [selectedContactId]);
 
-  // Auto-generate title when owner/contact changes
+  // Auto-generate title when owner/contact changes (only if user hasn't manually edited)
   useEffect(() => {
+    if (userEditedTitle.current) return;
     if (!selectedOwnerId && !selectedContactId) return;
     const owner = teamMembers.find(m => m.id === selectedOwnerId);
     const contact = contacts.find(c => c.id === selectedContactId);
