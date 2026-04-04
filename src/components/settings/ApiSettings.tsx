@@ -965,7 +965,7 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           <div className="mb-4 px-4 py-2 bg-emerald-500/10 border border-emerald-500/30 rounded-xl text-xs text-emerald-300">
             ✅ {gcalStatus.message}
           </div>
-        )
+        )}
 
         <details className="mb-4">
           <summary className="text-xs text-blue-400 cursor-pointer hover:text-blue-300 flex items-center gap-2 py-2">
