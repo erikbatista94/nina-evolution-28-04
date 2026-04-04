@@ -479,12 +479,16 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const elevenlabsConfigured = settings.elevenlabs_api_key;
   const gcalConfigured = settings.google_client_id && settings.google_client_secret && settings.google_refresh_token && settings.google_calendar_id;
 
+  const [gcalStatus, setGcalStatus] = useState<{ status: 'idle' | 'connected' | 'error' | 'not_configured'; message: string }>({ status: 'idle', message: '' });
+
   const handleTestGoogleCalendar = async () => {
     if (!settings.google_client_id || !settings.google_client_secret || !settings.google_refresh_token || !settings.google_calendar_id) {
+      setGcalStatus({ status: 'not_configured', message: 'Preencha todos os campos do Google Calendar antes de testar.' });
       toast.error('Preencha todos os campos do Google Calendar antes de testar.');
       return;
     }
     setTestingGcal(true);
+    setGcalStatus({ status: 'idle', message: 'Testando...' });
     try {
       // Save credentials first so the edge function can read them
       const { error: saveError } = await supabase
@@ -506,10 +510,24 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
         body: { action: 'test-connection' }
       });
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      if (data?.error) {
+        const step = data.step || 'unknown';
+        const stepMessages: Record<string, string> = {
+          'credentials': 'Credenciais não encontradas no banco. Verifique se foram salvas.',
+          'refresh_token': 'Refresh Token inválido ou expirado. Gere um novo no Google Cloud Console.',
+          'calendar_access': 'Não foi possível acessar a agenda. Verifique o Calendar ID e permissões.',
+        };
+        const msg = stepMessages[step] || data.error;
+        setGcalStatus({ status: 'error', message: msg });
+        toast.error(msg);
+        return;
+      }
+      setGcalStatus({ status: 'connected', message: `Conectado! Agenda: ${data.calendarName} (${data.timeZone})` });
       toast.success(`Conectado! Agenda: ${data.calendarName} (${data.timeZone})`);
     } catch (err: any) {
-      toast.error(err.message || 'Erro ao testar conexão');
+      const msg = err.message || 'Erro desconhecido ao testar conexão';
+      setGcalStatus({ status: 'error', message: msg });
+      toast.error(msg);
     } finally {
       setTestingGcal(false);
     }
