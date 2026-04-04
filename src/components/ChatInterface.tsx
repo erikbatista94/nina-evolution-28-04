@@ -277,6 +277,76 @@ const ChatInterface: React.FC = () => {
     }
   }, [activeChat?.id]);
 
+  // Load active deal for budget editing
+  useEffect(() => {
+    if (!activeChat?.contactId) { setActiveDeal(null); setBudgetValue(''); setBudgetStatus('none'); return; }
+    const loadDeal = async () => {
+      // Rule: active/open deal most recently created, or deal linked to this conversation
+      const convId = activeChat.id;
+      // First try: deal linked to conversation via metadata or stage not won/lost
+      const { data } = await supabase
+        .from('deals')
+        .select('id, value, proposal_status, stage')
+        .eq('contact_id', activeChat.contactId)
+        .not('stage', 'in', '("won","lost")')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (data) {
+        setActiveDeal(data as any);
+        setBudgetValue(data.value ? String(data.value) : '');
+        setBudgetStatus(data.proposal_status || 'none');
+      } else {
+        // Fallback: most recent deal regardless of stage
+        const { data: fallback } = await supabase
+          .from('deals')
+          .select('id, value, proposal_status, stage')
+          .eq('contact_id', activeChat.contactId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fallback) {
+          setActiveDeal(fallback as any);
+          setBudgetValue(fallback.value ? String(fallback.value) : '');
+          setBudgetStatus(fallback.proposal_status || 'none');
+        } else {
+          setActiveDeal(null);
+          setBudgetValue('');
+          setBudgetStatus('none');
+        }
+      }
+    };
+    loadDeal();
+  }, [activeChat?.contactId, activeChat?.id]);
+
+  // Save budget value handler
+  const handleSaveBudget = async () => {
+    if (!activeDeal) return;
+    setSavingBudget(true);
+    try {
+      const numericValue = parseFloat(budgetValue.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      await supabase.from('deals').update({ 
+        value: numericValue, 
+        proposal_status: budgetStatus 
+      }).eq('id', activeDeal.id);
+      
+      // Log activity
+      await supabase.from('deal_activities').insert({
+        deal_id: activeDeal.id,
+        type: 'note',
+        title: `Orçamento atualizado: R$ ${numericValue.toLocaleString('pt-BR')} (${budgetStatus})`,
+      });
+      
+      setActiveDeal({ ...activeDeal, value: numericValue, proposal_status: budgetStatus });
+      toast.success('Orçamento salvo e sincronizado com pipeline');
+    } catch (err) {
+      toast.error('Erro ao salvar orçamento');
+    } finally {
+      setSavingBudget(false);
+    }
+  };
+
   // Load objection suggestions when last client message changes
   useEffect(() => {
     if (!activeChat) { setObjectionSuggestions([]); return; }
