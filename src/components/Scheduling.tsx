@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, AlignLeft, X, Loader2, LayoutGrid, List, Columns, Video, User, UserCircle, Bot, Pencil, MapPin, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -53,6 +53,8 @@ const Scheduling: React.FC = () => {
   const [editContactId, setEditContactId] = useState<string | null>(null);
   const [editOwnerId, setEditOwnerId] = useState<string | null>(null);
   const [editAddressField, setEditAddressField] = useState('');
+  const userEditedTitle = useRef(false);
+  const userEditedEditTitle = useRef(false);
 
   // ESC key handler for modals
   useEffect(() => {
@@ -119,8 +121,9 @@ const Scheduling: React.FC = () => {
     fetchAddress();
   }, [selectedContactId]);
 
-  // Auto-generate title when owner/contact changes
+  // Auto-generate title when owner/contact changes (only if user hasn't manually edited)
   useEffect(() => {
+    if (userEditedTitle.current) return;
     if (!selectedOwnerId && !selectedContactId) return;
     const owner = teamMembers.find(m => m.id === selectedOwnerId);
     const contact = contacts.find(c => c.id === selectedContactId);
@@ -283,6 +286,7 @@ const Scheduling: React.FC = () => {
       setSelectedContactId(null);
       setSelectedOwnerId(null);
       setAddressField('');
+      userEditedTitle.current = false;
     } catch (error) {
       console.error('Error creating appointment:', error);
       toast.error('Erro ao criar agendamento');
@@ -803,7 +807,7 @@ const Scheduling: React.FC = () => {
                   className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-white focus:ring-1 focus:ring-cyan-500 outline-none placeholder:text-slate-600"
                   placeholder="Ex: Gabriel: Visita - Ramos Carlos - Rua das Palmeiras"
                   value={formData.title}
-                  onChange={(e) => setFormData({...formData, title: e.target.value})}
+                  onChange={(e) => { userEditedTitle.current = true; setFormData({...formData, title: e.target.value}); }}
                 />
                 <p className="text-xs text-slate-500">Formato: Vendedor: Visita - Cliente - Endereço</p>
               </div>

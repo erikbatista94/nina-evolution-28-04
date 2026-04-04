@@ -60,6 +60,11 @@ const ChatInterface: React.FC = () => {
   const [windowStatus, setWindowStatus] = useState<{ status: 'open' | 'expiring' | 'closed'; hoursLeft: number }>({ status: 'open', hoursLeft: 24 });
   const [timelineEvents, setTimelineEvents] = useState<{ date: string; type: string; label: string; icon: string }[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
+  // Budget state
+  const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
+  const [budgetValue, setBudgetValue] = useState('');
+  const [budgetStatus, setBudgetStatus] = useState('none');
+  const [savingBudget, setSavingBudget] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   
@@ -271,6 +276,76 @@ const ChatInterface: React.FC = () => {
       setNotesValue(activeChat.notes || '');
     }
   }, [activeChat?.id]);
+
+  // Load active deal for budget editing
+  useEffect(() => {
+    if (!activeChat?.contactId) { setActiveDeal(null); setBudgetValue(''); setBudgetStatus('none'); return; }
+    const loadDeal = async () => {
+      // Rule: active/open deal most recently created, or deal linked to this conversation
+      const convId = activeChat.id;
+      // First try: deal linked to conversation via metadata or stage not won/lost
+      const { data } = await supabase
+        .from('deals')
+        .select('id, value, proposal_status, stage')
+        .eq('contact_id', activeChat.contactId)
+        .not('stage', 'in', '("won","lost")')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      
+      if (data) {
+        setActiveDeal(data as any);
+        setBudgetValue(data.value ? String(data.value) : '');
+        setBudgetStatus(data.proposal_status || 'none');
+      } else {
+        // Fallback: most recent deal regardless of stage
+        const { data: fallback } = await supabase
+          .from('deals')
+          .select('id, value, proposal_status, stage')
+          .eq('contact_id', activeChat.contactId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        if (fallback) {
+          setActiveDeal(fallback as any);
+          setBudgetValue(fallback.value ? String(fallback.value) : '');
+          setBudgetStatus(fallback.proposal_status || 'none');
+        } else {
+          setActiveDeal(null);
+          setBudgetValue('');
+          setBudgetStatus('none');
+        }
+      }
+    };
+    loadDeal();
+  }, [activeChat?.contactId, activeChat?.id]);
+
+  // Save budget value handler
+  const handleSaveBudget = async () => {
+    if (!activeDeal) return;
+    setSavingBudget(true);
+    try {
+      const numericValue = parseFloat(budgetValue.replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+      await supabase.from('deals').update({ 
+        value: numericValue, 
+        proposal_status: budgetStatus 
+      }).eq('id', activeDeal.id);
+      
+      // Log activity
+      await supabase.from('deal_activities').insert({
+        deal_id: activeDeal.id,
+        type: 'note',
+        title: `Orçamento atualizado: R$ ${numericValue.toLocaleString('pt-BR')} (${budgetStatus})`,
+      });
+      
+      setActiveDeal({ ...activeDeal, value: numericValue, proposal_status: budgetStatus });
+      toast.success('Orçamento salvo e sincronizado com pipeline');
+    } catch (err) {
+      toast.error('Erro ao salvar orçamento');
+    } finally {
+      setSavingBudget(false);
+    }
+  };
 
   // Load objection suggestions when last client message changes
   useEffect(() => {
@@ -1522,7 +1597,84 @@ const ChatInterface: React.FC = () => {
                   </div>
                 )}
 
-                {/* Commercial Timeline */}
+                {/* Temperature Explainability */}
+                {contactDetails && (
+                  <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 space-y-2">
+                    <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                      🌡️ Classificação do Lead
+                    </h4>
+                    <div className="flex items-center gap-2">
+                      <span className={`px-2 py-1 rounded-lg text-xs font-bold ${
+                        contactDetails.lead_temperature === 'quente' ? 'bg-red-500/20 text-red-400 border border-red-500/30' :
+                        contactDetails.lead_temperature === 'morno' ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' :
+                        'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      }`}>
+                        {contactDetails.lead_temperature === 'quente' ? '🔥 Quente' : contactDetails.lead_temperature === 'morno' ? '🌤 Morno' : '❄️ Frio'}
+                      </span>
+                      <span className="text-[10px] text-slate-500">Score: <strong className="text-slate-300">{activeChat?.clientMemory?.lead_profile?.qualification_score || 0}/100</strong></span>
+                    </div>
+                    <div className="text-[10px] text-slate-400 space-y-0.5">
+                      <p className="font-medium text-slate-500">Como foi calculado:</p>
+                      <p>• Score base da IA (interesses, orçamento, urgência, fit)</p>
+                      {contactDetails.customer_type && <p>• ✅ Tipo: {contactDetails.customer_type}</p>}
+                      {contactDetails.has_project && <p>• ✅ Tem projeto arquitetônico</p>}
+                      {contactDetails.start_timeframe && <p>• ✅ Prazo: {contactDetails.start_timeframe}</p>}
+                      {contactDetails.is_urgent && <p>• 🔥 Lead urgente</p>}
+                      {contactDetails.city && <p>• 📍 Cidade: {contactDetails.city}</p>}
+                      {(contactDetails.qualification_gaps?.length || 0) > 0 && <p>• ⚠️ {contactDetails.qualification_gaps.length} informação(ões) pendente(s)</p>}
+                      <p className="text-slate-600 mt-1">{'>'} 70 = quente • {'>'} 40 = morno • resto = frio</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Budget / Orçamento Section */}
+                {activeDeal && (
+                  <>
+                    <div className="h-px bg-slate-800/50 w-full"></div>
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        💰 Orçamento
+                        {savingBudget && <Loader2 className="w-3 h-3 animate-spin text-cyan-500" />}
+                      </h4>
+                      <div className="space-y-2">
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase mb-1 block">Valor (R$)</label>
+                          <input
+                            type="text"
+                            className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-sm text-slate-200 outline-none focus:ring-1 focus:ring-cyan-500/50"
+                            placeholder="Ex: 15000"
+                            value={budgetValue}
+                            onChange={(e) => setBudgetValue(e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] text-slate-500 uppercase mb-1 block">Status proposta</label>
+                          <select
+                            className="w-full bg-slate-950/50 border border-slate-800 rounded-lg p-2 text-xs text-slate-300 outline-none"
+                            value={budgetStatus}
+                            onChange={(e) => setBudgetStatus(e.target.value)}
+                          >
+                            <option value="none">Nenhum</option>
+                            <option value="draft">Rascunho</option>
+                            <option value="sent">Enviado</option>
+                            <option value="accepted">Aceito</option>
+                            <option value="rejected">Recusado</option>
+                          </select>
+                        </div>
+                        <button
+                          onClick={handleSaveBudget}
+                          disabled={savingBudget}
+                          className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/30 rounded-lg text-xs text-emerald-400 font-medium transition-colors disabled:opacity-50"
+                        >
+                          {savingBudget ? <Loader2 className="w-3 h-3 animate-spin" /> : null}
+                          Salvar orçamento
+                        </button>
+                        <p className="text-[10px] text-slate-600">Vinculado ao deal: {activeDeal.stage || 'em aberto'}</p>
+                      </div>
+                    </div>
+                  </>
+                )}
+
                 {timelineEvents.length > 0 && (
                   <>
                     <div className="h-px bg-slate-800/50 w-full"></div>
