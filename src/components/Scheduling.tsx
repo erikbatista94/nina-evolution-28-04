@@ -53,6 +53,8 @@ const Scheduling: React.FC = () => {
   const [editContactId, setEditContactId] = useState<string | null>(null);
   const [editOwnerId, setEditOwnerId] = useState<string | null>(null);
   const [editAddressField, setEditAddressField] = useState('');
+  const userEditedTitle = useRef(false);
+  const userEditedEditTitle = useRef(false);
 
   // ESC key handler for modals
   useEffect(() => {
