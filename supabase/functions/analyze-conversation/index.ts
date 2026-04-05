@@ -198,6 +198,25 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
                 type: "array",
                 items: { type: "string" },
                 description: "Serviços específicos de interesse: drywall, forro, gesso, vinilico, ripado_pvc, molduras, iluminacao, etc."
+              },
+              objections: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    category: {
+                      type: "string",
+                      enum: ["preco", "prazo", "concorrente", "sem_prioridade", "sem_projeto", "avaliando", "sem_retorno"],
+                      description: "Categoria da objeção detectada"
+                    },
+                    evidence: {
+                      type: "string",
+                      description: "Trecho ou resumo da objeção detectada na mensagem, max 100 chars"
+                    }
+                  },
+                  required: ["category", "evidence"]
+                },
+                description: "Objeções comerciais detectadas na conversa (preço alto, prazo longo, comparando concorrente, sem prioridade, sem projeto, ainda avaliando, sem retorno). Detectar tanto em mensagens do cliente quanto em contexto de atendimento humano. Deixar array vazio se nenhuma objeção detectada."
               }
             },
             required: ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline", "is_urgent"],
