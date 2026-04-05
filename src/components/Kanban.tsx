@@ -710,16 +710,7 @@ const Kanban: React.FC = () => {
                                             const isPerdidoColumn = col.title === 'Perdido';
                                             
                                             if (isGanhoColumn) {
-                                                try {
-                                                    await api.markDealWon(selectedDeal.id);
-                                                    toast.success("Deal marcado como ganho!");
-                                                    // Update local state
-                                                    setDeals(deals.map(d => d.id === selectedDeal.id ? {...d, stageId: col.id, wonAt: new Date().toISOString()} : d));
-                                                    setSelectedDeal({...selectedDeal, stageId: col.id});
-                                                } catch (error) {
-                                                    console.error('Error marking deal as won:', error);
-                                                    toast.error("Erro ao marcar como ganho");
-                                                }
+                                                handleMarkWon();
                                             } else if (isPerdidoColumn) {
                                                 setIsLostModalOpen(true);
                                             } else {
