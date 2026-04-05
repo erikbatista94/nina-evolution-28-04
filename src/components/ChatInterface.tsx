@@ -1666,7 +1666,7 @@ const ChatInterface: React.FC = () => {
 
                 {/* Follow-up Suggestion */}
                 {contactDetails && activeChat && (() => {
-                  const { getFollowUpSuggestion } = require('@/utils/salesIntelligence');
+                  const suggestion = getFollowUpSuggestion({
                   const suggestion = getFollowUpSuggestion({
                     proposalStatus: activeDeal?.proposal_status,
                     proposalSentDaysAgo: undefined,
