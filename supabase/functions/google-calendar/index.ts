@@ -77,8 +77,8 @@ async function checkAvailability(accessToken: string, calendarId: string, date: 
 
   if (!resp.ok) {
     const err = await resp.text();
-    console.error('[GCal] FreeBusy error:', err);
-    throw new Error('Erro ao consultar disponibilidade');
+    console.error('[GCal] FreeBusy error:', resp.status, err);
+    throw new Error(`Erro ao consultar disponibilidade (HTTP ${resp.status}). Verifique as credenciais e permissões da agenda.`);
   }
 
   const data = await resp.json();
@@ -145,8 +145,8 @@ async function createEvent(
 
   if (!resp.ok) {
     const err = await resp.text();
-    console.error('[GCal] Create event error:', err);
-    throw new Error('Erro ao criar evento no Google Calendar');
+    console.error('[GCal] Create event error:', resp.status, err);
+    throw new Error(`Erro ao criar evento no Google Calendar (HTTP ${resp.status}). Verifique as permissões da agenda.`);
   }
 
   const created = await resp.json();
@@ -254,19 +254,54 @@ async function syncEvents(supabase: any, accessToken: string, calendarId: string
   return { synced };
 }
 
-// Test connection
-async function testConnection(accessToken: string, calendarId: string) {
-  const resp = await fetch(
-    `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(calendarId)}`,
-    { headers: { 'Authorization': `Bearer ${accessToken}` } }
-  );
+// Test connection with step-by-step diagnostics
+async function testConnection(supabase: any, settings: any) {
+  const steps: { step: string; status: 'ok' | 'error'; message: string }[] = [];
 
-  if (!resp.ok) {
-    throw new Error('Falha ao conectar com Google Calendar. Verifique o Calendar ID e as credenciais.');
+  // Step 1: Validate credentials present
+  const missing: string[] = [];
+  if (!settings.google_client_id) missing.push('Client ID');
+  if (!settings.google_client_secret) missing.push('Client Secret');
+  if (!settings.google_refresh_token) missing.push('Refresh Token');
+  if (!settings.google_calendar_id) missing.push('Calendar ID');
+  
+  if (missing.length > 0) {
+    steps.push({ step: 'credentials', status: 'error', message: `Campos faltando: ${missing.join(', ')}` });
+    return { success: false, steps };
+  }
+  steps.push({ step: 'credentials', status: 'ok', message: 'Todas as credenciais configuradas' });
+
+  // Step 2: Test refresh token → access token
+  let accessToken: string;
+  try {
+    accessToken = await getAccessToken(settings.google_client_id, settings.google_client_secret, settings.google_refresh_token);
+    steps.push({ step: 'token', status: 'ok', message: 'Refresh token válido, access token obtido' });
+  } catch (err: any) {
+    steps.push({ step: 'token', status: 'error', message: `Refresh token inválido: ${err.message}` });
+    return { success: false, steps };
   }
 
-  const cal = await resp.json();
-  return { success: true, calendarName: cal.summary, timeZone: cal.timeZone };
+  // Step 3: Test calendar access
+  try {
+    const resp = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/${encodeURIComponent(settings.google_calendar_id)}`,
+      { headers: { 'Authorization': `Bearer ${accessToken}` } }
+    );
+
+    if (!resp.ok) {
+      const errText = await resp.text();
+      console.error('[GCal] Calendar access error:', resp.status, errText);
+      steps.push({ step: 'calendar', status: 'error', message: `Sem acesso à agenda (HTTP ${resp.status}). Verifique o Calendar ID e as permissões.` });
+      return { success: false, steps };
+    }
+
+    const cal = await resp.json();
+    steps.push({ step: 'calendar', status: 'ok', message: `Agenda: ${cal.summary} (${cal.timeZone})` });
+    return { success: true, steps, calendarName: cal.summary, timeZone: cal.timeZone };
+  } catch (err: any) {
+    steps.push({ step: 'calendar', status: 'error', message: `Erro ao acessar agenda: ${err.message}` });
+    return { success: false, steps };
+  }
 }
 
 serve(async (req) => {
@@ -357,7 +392,7 @@ serve(async (req) => {
       }
 
       case 'test-connection': {
-        result = await testConnection(accessToken, settings.google_calendar_id);
+        result = await testConnection(supabase, settings);
         break;
       }
 

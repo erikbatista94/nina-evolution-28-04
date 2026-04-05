@@ -118,7 +118,7 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
         type: "function",
         function: {
           name: "update_memory_insights",
-          description: "Extrair insights estruturados da conversa para atualizar memória do cliente",
+          description: "Extrair insights estruturados da conversa para atualizar memória do cliente. Também detecte objeções comerciais se existirem.",
           parameters: {
             type: "object",
             properties: {
@@ -198,6 +198,25 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
                 type: "array",
                 items: { type: "string" },
                 description: "Serviços específicos de interesse: drywall, forro, gesso, vinilico, ripado_pvc, molduras, iluminacao, etc."
+              },
+              objections: {
+                type: "array",
+                items: {
+                  type: "object",
+                  properties: {
+                    category: {
+                      type: "string",
+                      enum: ["preco", "prazo", "concorrente", "sem_prioridade", "sem_projeto", "avaliando", "sem_retorno"],
+                      description: "Categoria da objeção detectada"
+                    },
+                    evidence: {
+                      type: "string",
+                      description: "Trecho ou resumo da objeção detectada na mensagem, max 100 chars"
+                    }
+                  },
+                  required: ["category", "evidence"]
+                },
+                description: "Objeções comerciais detectadas na conversa (preço alto, prazo longo, comparando concorrente, sem prioridade, sem projeto, ainda avaliando, sem retorno). Detectar tanto em mensagens do cliente quanto em contexto de atendimento humano. Deixar array vazio se nenhuma objeção detectada."
               }
             },
             required: ["interests", "pain_points", "qualification_score", "next_best_action", "budget_indication", "decision_timeline", "is_urgent"],
@@ -500,6 +519,48 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
         });
       } catch (evErr) {
         console.error('[Analyze] Event logging error:', evErr);
+      }
+
+      // === SAVE DETECTED OBJECTIONS (deduplicated by contact_id + category + 7d window) ===
+      if (insights.objections && insights.objections.length > 0) {
+        console.log(`[Analyze] 🛡️ ${insights.objections.length} objection(s) detected`);
+        
+        // Load existing objections for this contact in the last 7 days
+        const sevenDaysAgo = new Date(Date.now() - 7 * 86400000).toISOString();
+        const { data: existingObjections } = await supabase
+          .from('conversation_events')
+          .select('event_data')
+          .eq('contact_id', contact_id)
+          .eq('event_type', 'objection')
+          .gte('created_at', sevenDaysAgo);
+
+        const existingCategories = new Set(
+          (existingObjections || []).map((e: any) => e.event_data?.category).filter(Boolean)
+        );
+
+        for (const obj of insights.objections) {
+          // Deduplicate: same contact + same category within 7 days → skip
+          if (existingCategories.has(obj.category)) {
+            console.log(`[Analyze] ⏭️ Objection '${obj.category}' already exists for contact in last 7d, skipping`);
+            continue;
+          }
+          
+          try {
+            await supabase.from('conversation_events').insert({
+              conversation_id,
+              contact_id,
+              event_type: 'objection',
+              event_data: {
+                category: obj.category,
+                evidence: (obj.evidence || '').substring(0, 100)
+              }
+            });
+            existingCategories.add(obj.category); // prevent duplicates within same batch
+            console.log(`[Analyze] ✅ Objection saved: ${obj.category}`);
+          } catch (objErr) {
+            console.error('[Analyze] Error saving objection:', objErr);
+          }
+        }
       }
 
       console.log('[Analyze] Memory updated successfully');

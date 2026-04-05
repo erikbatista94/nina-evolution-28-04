@@ -260,7 +260,7 @@ const Reports: React.FC = () => {
       });
       const byScoreRange = Object.entries(scoreRanges).map(([value, count]) => ({ dimension: 'score_faixa', value, count }));
 
-      // 2) Objections — get conversation IDs for seller filter, then messages with sent_at
+      // 2) Objections — combine playbook trigger matching + real conversation_events
       const { data: playbook } = await supabase.from('objections_playbook').select('title, category, triggers').eq('is_active', true);
 
       let sellerConvIds: Set<string> | null = null;
@@ -273,6 +273,7 @@ const Reports: React.FC = () => {
 
       const filteredMsgs = sellerConvIds ? (msgs || []).filter(m => sellerConvIds!.has(m.conversation_id)) : (msgs || []);
 
+      // Playbook-based matching
       const objectionCounts: Record<string, { title: string; category: string; count: number; triggers: string }> = {};
       (playbook || []).forEach(p => {
         let count = 0;
@@ -286,6 +287,34 @@ const Reports: React.FC = () => {
           objectionCounts[p.title] = { title: p.title, category: p.category, count, triggers: triggerArr.join(', ') };
         }
       });
+
+      // AI-detected objections from conversation_events
+      let evQuery = supabase.from('conversation_events').select('event_data, conversation_id').eq('event_type', 'objection').gte('created_at', sinceStr);
+      const { data: objEvents } = await evQuery.limit(500);
+      
+      const aiObjCounts: Record<string, number> = {};
+      (objEvents || []).forEach((ev: any) => {
+        if (sellerConvIds && !sellerConvIds.has(ev.conversation_id)) return;
+        const cat = ev.event_data?.category;
+        if (cat) aiObjCounts[cat] = (aiObjCounts[cat] || 0) + 1;
+      });
+
+      // Merge AI-detected into objections list
+      const categoryLabels: Record<string, string> = {
+        'preco': 'Preço alto', 'prazo': 'Prazo longo', 'concorrente': 'Concorrente',
+        'sem_prioridade': 'Sem prioridade', 'sem_projeto': 'Sem projeto',
+        'avaliando': 'Ainda avaliando', 'sem_retorno': 'Sem retorno'
+      };
+      Object.entries(aiObjCounts).forEach(([cat, count]) => {
+        const label = categoryLabels[cat] || cat;
+        const key = `ai_${cat}`;
+        if (objectionCounts[key]) {
+          objectionCounts[key].count += count;
+        } else {
+          objectionCounts[key] = { title: `${label} (IA)`, category: cat, count, triggers: 'detecção automática' };
+        }
+      });
+
       const objections = Object.values(objectionCounts).sort((a, b) => b.count - a.count);
 
       // 3) Funnel
