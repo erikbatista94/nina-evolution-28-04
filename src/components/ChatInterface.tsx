@@ -7,6 +7,7 @@ import {
   AlertTriangle, Shield, History
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
+import { calculateCloseProbability, getFollowUpSuggestion } from '@/utils/salesIntelligence';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
 import { toast } from 'sonner';
