@@ -3,7 +3,7 @@ import {
   Plus, Search, MoreHorizontal, DollarSign, Loader2, CalendarClock, Tag, X, 
   Building, User, Calendar, ArrowRight, CheckCircle2, Circle, 
   FileText, Phone, Mail, Paperclip, Send, CheckSquare, Clock, Trash2, Settings, Brain, MessageSquare, Bot,
-  Filter, RotateCcw, MapPin, Briefcase, Thermometer, Star
+  Filter, RotateCcw, MapPin, Briefcase, Thermometer, Star, Target, AlertCircle
 } from 'lucide-react';
 import { Button } from './Button';
 import { api } from '../services/api';
@@ -16,6 +16,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
+import { calculateCloseProbability, validateWinChecklist } from '@/utils/salesIntelligence';
 
 const Kanban: React.FC = () => {
   const { sdrName, isAdmin } = useCompanySettings();
