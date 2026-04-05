@@ -1630,7 +1630,7 @@ const ChatInterface: React.FC = () => {
 
                 {/* Close Probability */}
                 {contactDetails && activeChat && (() => {
-                  const { calculateCloseProbability } = require('@/utils/salesIntelligence');
+                  const prob = calculateCloseProbability({
                   const lastInteraction = activeChat.clientMemory?.interaction_summary?.last_contact_reason ? 0 : undefined;
                   const prob = calculateCloseProbability({
                     leadScore: activeChat.clientMemory?.lead_profile?.qualification_score,
