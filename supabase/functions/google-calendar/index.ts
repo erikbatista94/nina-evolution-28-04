@@ -77,8 +77,8 @@ async function checkAvailability(accessToken: string, calendarId: string, date: 
 
   if (!resp.ok) {
     const err = await resp.text();
-    console.error('[GCal] FreeBusy error:', err);
-    throw new Error('Erro ao consultar disponibilidade');
+    console.error('[GCal] FreeBusy error:', resp.status, err);
+    throw new Error(`Erro ao consultar disponibilidade (HTTP ${resp.status}). Verifique as credenciais e permissões da agenda.`);
   }
 
   const data = await resp.json();
