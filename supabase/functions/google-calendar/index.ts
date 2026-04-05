@@ -392,7 +392,7 @@ serve(async (req) => {
       }
 
       case 'test-connection': {
-        result = await testConnection(accessToken, settings.google_calendar_id);
+        result = await testConnection(supabase, settings);
         break;
       }
 
