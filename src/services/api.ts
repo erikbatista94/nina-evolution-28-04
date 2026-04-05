@@ -1117,7 +1117,7 @@ export const api = {
   },
 
   /**
-   * Mark deal as won
+   * Mark deal as won — validates required fields before allowing
    */
   markDealWon: async (dealId: string): Promise<void> => {
     const { ganhoId } = await getSystemStageIds();
@@ -1127,7 +1127,36 @@ export const api = {
       throw new Error('Stage "Ganho" not found in pipeline');
     }
     
-    const { data: deal } = await supabase.from('deals').select('contact_id').eq('id', dealId).single();
+    // Backend validation: fetch deal + contact and check required fields
+    const { data: deal, error: dealErr } = await supabase
+      .from('deals')
+      .select('id, contact_id, value, user_id')
+      .eq('id', dealId)
+      .single();
+    
+    if (dealErr || !deal) throw new Error('Deal não encontrado');
+
+    const validationErrors: string[] = [];
+    if (!deal.value || Number(deal.value) <= 0) validationErrors.push('Valor do orçamento');
+    if (!deal.user_id) validationErrors.push('Responsável');
+
+    if (deal.contact_id) {
+      const { data: contact } = await supabase
+        .from('contacts')
+        .select('name, city, address_full, interest_services')
+        .eq('id', deal.contact_id)
+        .single();
+
+      if (!contact?.name) validationErrors.push('Nome do contato');
+      if (!contact?.address_full && !contact?.city) validationErrors.push('Endereço/Cidade');
+      if (!contact?.interest_services || contact.interest_services.length === 0) validationErrors.push('Serviço fechado');
+    } else {
+      validationErrors.push('Contato vinculado');
+    }
+
+    if (validationErrors.length > 0) {
+      throw new Error(`Campos obrigatórios faltando: ${validationErrors.join(', ')}`);
+    }
     
     const { error } = await supabase
       .from('deals')
