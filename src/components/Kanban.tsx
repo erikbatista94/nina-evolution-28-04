@@ -1115,6 +1115,60 @@ const Kanban: React.FC = () => {
           setStages(data);
         }}
       />
+
+      {/* Win Checklist Modal */}
+      {showWinChecklist && selectedDeal && (() => {
+        const check = validateWinChecklist({
+          value: selectedDeal.value,
+          userId: selectedDeal.userId,
+          contactName: selectedDeal.contactName,
+          contactCity: selectedDeal.contactCity,
+          contactAddress: undefined,
+          contactInterestServices: selectedDeal.contactInterestServices,
+        });
+        return (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center" onClick={() => setShowWinChecklist(false)}>
+            <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-md p-6 shadow-2xl" onClick={e => e.stopPropagation()}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-amber-500/20 flex items-center justify-center">
+                  <AlertCircle className="w-5 h-5 text-amber-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white">Checklist de Fechamento</h3>
+                  <p className="text-xs text-slate-400">Preencha os campos obrigatórios para marcar como ganho</p>
+                </div>
+              </div>
+              <div className="space-y-2 mb-6">
+                {check.items.map(item => (
+                  <div key={item.field} className={`flex items-center gap-3 p-3 rounded-lg border ${item.passed ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'}`}>
+                    {item.passed ? <CheckCircle2 className="w-5 h-5 text-emerald-400 flex-shrink-0" /> : <Circle className="w-5 h-5 text-red-400 flex-shrink-0" />}
+                    <div className="flex-1 min-w-0">
+                      <p className={`text-sm font-medium ${item.passed ? 'text-emerald-300' : 'text-red-300'}`}>{item.label}</p>
+                      {item.value && <p className="text-[10px] text-slate-500 truncate">{item.value}</p>}
+                      {!item.passed && <p className="text-[10px] text-red-400/70">Obrigatório</p>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <div className="flex gap-3">
+                <Button variant="outline" className="flex-1 border-slate-700" onClick={() => setShowWinChecklist(false)}>Voltar</Button>
+                <Button className="flex-1" disabled={!check.canWin} onClick={async () => {
+                  try {
+                    await api.markDealWon(selectedDeal.id);
+                    toast.success("Deal marcado como ganho!");
+                    setSelectedDeal(null);
+                    setShowWinChecklist(false);
+                  } catch (err: any) {
+                    toast.error(err?.message || 'Erro ao marcar como ganho');
+                  }
+                }}>
+                  {check.canWin ? 'Confirmar Ganho' : `${check.missingCount} campo(s) faltando`}
+                </Button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </div>
   );
 };
