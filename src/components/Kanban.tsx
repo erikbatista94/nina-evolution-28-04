@@ -172,13 +172,36 @@ const Kanban: React.FC = () => {
 
   const handleMarkWon = async () => {
     if (!selectedDeal) return;
+    
+    // Validate checklist first
+    const check = validateWinChecklist({
+      value: selectedDeal.value,
+      userId: selectedDeal.userId,
+      contactName: selectedDeal.contactName,
+      contactCity: selectedDeal.contactCity,
+      contactAddress: undefined, // will be checked server-side too
+      contactInterestServices: selectedDeal.contactInterestServices,
+    });
+
+    if (!check.canWin) {
+      setShowWinChecklist(true);
+      return;
+    }
+
     try {
       await api.markDealWon(selectedDeal.id);
       toast.success("Deal marcado como ganho! Parabéns pelo fechamento!");
       setSelectedDeal(null);
-    } catch (error) {
-      console.error("Erro ao marcar deal como ganho", error);
-      toast.error("Não foi possível marcar como ganho");
+      setShowWinChecklist(false);
+    } catch (error: any) {
+      const msg = error?.message || '';
+      if (msg.includes('Campos obrigatórios')) {
+        toast.error(msg);
+        setShowWinChecklist(true);
+      } else {
+        console.error("Erro ao marcar deal como ganho", error);
+        toast.error("Não foi possível marcar como ganho");
+      }
     }
   };
 
