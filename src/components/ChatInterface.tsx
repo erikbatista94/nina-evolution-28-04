@@ -1631,8 +1631,6 @@ const ChatInterface: React.FC = () => {
                 {/* Close Probability */}
                 {contactDetails && activeChat && (() => {
                   const prob = calculateCloseProbability({
-                  const lastInteraction = activeChat.clientMemory?.interaction_summary?.last_contact_reason ? 0 : undefined;
-                  const prob = calculateCloseProbability({
                     leadScore: activeChat.clientMemory?.lead_profile?.qualification_score,
                     proposalStatus: activeDeal?.proposal_status,
                     isUrgent: contactDetails.is_urgent,
@@ -1666,7 +1664,6 @@ const ChatInterface: React.FC = () => {
 
                 {/* Follow-up Suggestion */}
                 {contactDetails && activeChat && (() => {
-                  const suggestion = getFollowUpSuggestion({
                   const suggestion = getFollowUpSuggestion({
                     proposalStatus: activeDeal?.proposal_status,
                     proposalSentDaysAgo: undefined,
