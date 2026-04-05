@@ -145,8 +145,8 @@ async function createEvent(
 
   if (!resp.ok) {
     const err = await resp.text();
-    console.error('[GCal] Create event error:', err);
-    throw new Error('Erro ao criar evento no Google Calendar');
+    console.error('[GCal] Create event error:', resp.status, err);
+    throw new Error(`Erro ao criar evento no Google Calendar (HTTP ${resp.status}). Verifique as permissões da agenda.`);
   }
 
   const created = await resp.json();
