@@ -118,7 +118,7 @@ ESTÁGIO ATUAL DO DEAL: ${currentDeal?.stage || 'Sem estágio'}` : ''}
         type: "function",
         function: {
           name: "update_memory_insights",
-          description: "Extrair insights estruturados da conversa para atualizar memória do cliente",
+          description: "Extrair insights estruturados da conversa para atualizar memória do cliente. Também detecte objeções comerciais se existirem.",
           parameters: {
             type: "object",
             properties: {
