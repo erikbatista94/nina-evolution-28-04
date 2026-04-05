@@ -568,6 +568,25 @@ const Kanban: React.FC = () => {
                               ⚠ {deal.contactQualificationGaps!.length}
                             </span>
                           )}
+                          {(() => {
+                            const prob = calculateCloseProbability({
+                              leadScore: deal.contactLeadScore,
+                              proposalStatus: deal.proposalStatus,
+                              isUrgent: (deal as any).contactIsUrgent,
+                              gapsCount: deal.contactQualificationGaps?.length,
+                              value: deal.value,
+                              leadTemperature: deal.contactLeadTemperature,
+                            });
+                            return prob.percentage > 0 ? (
+                              <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${
+                                prob.band === 'alta' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' :
+                                prob.band === 'média' ? 'bg-cyan-500/10 text-cyan-400 border-cyan-500/20' :
+                                'bg-slate-500/10 text-slate-400 border-slate-500/20'
+                              }`} title={`Prob. fechamento: ${prob.percentage}% (${prob.band})\n${prob.signals.map(s => `${s.emoji} ${s.label}`).join('\n')}`}>
+                                🎯 {prob.percentage}%
+                              </span>
+                            ) : null;
+                          })()}
                         </div>
                         <button className="text-slate-600 hover:text-white transition-colors opacity-0 group-hover:opacity-100 ml-auto">
                            <MoreHorizontal className="w-3.5 h-3.5" />
