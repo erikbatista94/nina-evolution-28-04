@@ -46,6 +46,7 @@ const Kanban: React.FC = () => {
   const [filterValueMin, setFilterValueMin] = useState<string>('');
   const [filterValueMax, setFilterValueMax] = useState<string>('');
   const [filterHighPriority, setFilterHighPriority] = useState(false);
+  const [showWinChecklist, setShowWinChecklist] = useState(false);
   const dragItem = useRef<string | null>(null);
   
   const handleDealCreated = async () => {
