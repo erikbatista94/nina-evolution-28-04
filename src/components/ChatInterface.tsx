@@ -1627,6 +1627,65 @@ const ChatInterface: React.FC = () => {
                   </div>
                 )}
 
+                {/* Close Probability */}
+                {contactDetails && activeChat && (() => {
+                  const { calculateCloseProbability } = require('@/utils/salesIntelligence');
+                  const lastInteraction = activeChat.clientMemory?.interaction_summary?.last_contact_reason ? 0 : undefined;
+                  const prob = calculateCloseProbability({
+                    leadScore: activeChat.clientMemory?.lead_profile?.qualification_score,
+                    proposalStatus: activeDeal?.proposal_status,
+                    isUrgent: contactDetails.is_urgent,
+                    gapsCount: contactDetails.qualification_gaps?.length,
+                    value: activeDeal?.value,
+                    leadTemperature: contactDetails.lead_temperature,
+                    hasProject: contactDetails.has_project,
+                    interestServicesCount: contactDetails.interest_services?.length,
+                  });
+                  return (
+                    <div className="p-3 rounded-lg bg-slate-800/50 border border-slate-700/50 space-y-2">
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-2">
+                        🎯 Probabilidade de Fechamento
+                      </h4>
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 h-2 bg-slate-700 rounded-full overflow-hidden">
+                          <div className={`h-full rounded-full transition-all ${prob.band === 'alta' ? 'bg-emerald-500' : prob.band === 'média' ? 'bg-cyan-500' : 'bg-slate-500'}`} style={{ width: `${prob.percentage}%` }} />
+                        </div>
+                        <span className={`text-sm font-bold ${prob.band === 'alta' ? 'text-emerald-400' : prob.band === 'média' ? 'text-cyan-400' : 'text-slate-400'}`}>{prob.percentage}%</span>
+                      </div>
+                      <div className="space-y-0.5">
+                        {prob.signals.slice(0, 5).map((s: any, i: number) => (
+                          <p key={i} className={`text-[10px] ${s.impact > 0 ? 'text-emerald-400/80' : 'text-red-400/80'}`}>
+                            {s.emoji} {s.label} ({s.impact > 0 ? '+' : ''}{s.impact}%)
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Follow-up Suggestion */}
+                {contactDetails && activeChat && (() => {
+                  const { getFollowUpSuggestion } = require('@/utils/salesIntelligence');
+                  const suggestion = getFollowUpSuggestion({
+                    proposalStatus: activeDeal?.proposal_status,
+                    proposalSentDaysAgo: undefined,
+                    gapsCount: contactDetails.qualification_gaps?.length,
+                    gapFields: (contactDetails.qualification_gaps || []).map((g: any) => g.label),
+                    isUrgent: contactDetails.is_urgent,
+                    lastInteractionDaysAgo: undefined,
+                    leadTemperature: contactDetails.lead_temperature,
+                    windowOpen: windowStatus.status !== 'closed',
+                  });
+                  return (
+                    <div className={`p-3 rounded-lg border space-y-1 ${suggestion.priority === 'high' ? 'bg-red-500/5 border-red-500/20' : suggestion.priority === 'medium' ? 'bg-amber-500/5 border-amber-500/20' : 'bg-slate-800/50 border-slate-700/50'}`}>
+                      <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">📋 Próxima Ação</h4>
+                      <p className={`text-xs font-semibold ${suggestion.priority === 'high' ? 'text-red-400' : suggestion.priority === 'medium' ? 'text-amber-400' : 'text-slate-300'}`}>{suggestion.action}</p>
+                      <p className="text-[10px] text-slate-400">{suggestion.message}</p>
+                      {suggestion.useTemplate && <p className="text-[10px] text-amber-400/80">⚠️ Janela 24h fechada — usar template</p>}
+                    </div>
+                  );
+                })()}
+
                 {/* Budget / Orçamento Section */}
                 {activeDeal && (
                   <>
