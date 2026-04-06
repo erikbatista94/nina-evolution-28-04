@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { QuickReplyDropdown } from './QuickReplyDropdown';
 import { QuickRepliesManager } from './QuickRepliesManager';
 import AudioRecorder from './AudioRecorder';
+import TemplateModal from './TemplateModal';
 
 const EMOJI_CATEGORIES = [
   { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
