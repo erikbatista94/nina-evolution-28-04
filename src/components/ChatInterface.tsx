@@ -456,6 +456,13 @@ const ChatInterface: React.FC = () => {
     e?.preventDefault();
     if (!inputText.trim() || !activeChat) return;
 
+    // Block send when 24h window is closed
+    if (windowStatus.status === 'closed') {
+      toast.error('Janela de 24h expirada. Use um template para reengajar o cliente.');
+      setShowTemplateModal(true);
+      return;
+    }
+
     const content = inputText.trim();
     setInputText('');
     
