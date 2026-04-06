@@ -80,7 +80,6 @@ const TemplateModal: React.FC<TemplateModalProps> = ({
     if (!selectedTemplate || !allFilled) return;
     setSending(true);
     try {
-      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID;
       const res = await supabase.functions.invoke('send-template', {
         body: {
           template_name: selectedTemplate.name,
