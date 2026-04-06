@@ -1,9 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock, Swords } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock, Swords, FileText } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
 import ObjectionsPlaybook from './settings/ObjectionsPlaybook';
+import TemplatesManager from './settings/TemplatesManager';
 import SystemRoadmap from './SystemRoadmap';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { Button } from './Button';
