@@ -79,6 +79,12 @@ const Settings: React.FC = () => {
                 Objeções
               </TabsTrigger>
             )}
+            {isAdmin && (
+              <TabsTrigger value="templates" className="gap-2">
+                <FileText className="w-4 h-4" />
+                Templates
+              </TabsTrigger>
+            )}
             <TabsTrigger value="docs" className="gap-2">
               <BookOpen className="w-4 h-4" />
               Documentação
