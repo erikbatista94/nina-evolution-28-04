@@ -56,6 +56,7 @@ const ChatInterface: React.FC = () => {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [pendingAppointment, setPendingAppointment] = useState<any>(null);
   const [confirmingAppointment, setConfirmingAppointment] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [contactDetails, setContactDetails] = useState<any>(null);
   const [objectionSuggestions, setObjectionSuggestions] = useState<{title: string; response_text: string}[]>([]);
   const [pendingFollowup, setPendingFollowup] = useState<any>(null);
