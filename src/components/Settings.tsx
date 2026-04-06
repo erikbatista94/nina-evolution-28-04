@@ -145,6 +145,14 @@ const Settings: React.FC = () => {
           </TabsContent>
         )}
 
+        {isAdmin && (
+          <TabsContent value="templates">
+            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
+              <TemplatesManager />
+            </div>
+          </TabsContent>
+        )}
+
         <TabsContent value="docs">
           <SystemRoadmap />
         </TabsContent>
