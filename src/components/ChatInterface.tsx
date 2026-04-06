@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { QuickReplyDropdown } from './QuickReplyDropdown';
 import { QuickRepliesManager } from './QuickRepliesManager';
 import AudioRecorder from './AudioRecorder';
+import TemplateModal from './TemplateModal';
 
 const EMOJI_CATEGORIES = [
   { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
@@ -55,6 +56,7 @@ const ChatInterface: React.FC = () => {
   const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
   const [pendingAppointment, setPendingAppointment] = useState<any>(null);
   const [confirmingAppointment, setConfirmingAppointment] = useState(false);
+  const [showTemplateModal, setShowTemplateModal] = useState(false);
   const [contactDetails, setContactDetails] = useState<any>(null);
   const [objectionSuggestions, setObjectionSuggestions] = useState<{title: string; response_text: string}[]>([]);
   const [pendingFollowup, setPendingFollowup] = useState<any>(null);
@@ -453,6 +455,13 @@ const ChatInterface: React.FC = () => {
   const handleSendMessage = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!inputText.trim() || !activeChat) return;
+
+    // Block send when 24h window is closed
+    if (windowStatus.status === 'closed') {
+      toast.error('Janela de 24h expirada. Use um template para reengajar o cliente.');
+      setShowTemplateModal(true);
+      return;
+    }
 
     const content = inputText.trim();
     setInputText('');
@@ -1299,7 +1308,13 @@ const ChatInterface: React.FC = () => {
               {windowStatus.status === 'closed' && (
                 <div className="mb-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-sm text-red-300">
                   <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400" />
-                  <span><strong>Janela de 24h expirada.</strong> Use template para reabrir contato. Mensagem comum não será entregue.</span>
+                  <span className="flex-1"><strong>Janela de 24h expirada.</strong> Mensagem comum não será entregue.</span>
+                  <button
+                    onClick={() => setShowTemplateModal(true)}
+                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
+                  >
+                    📩 Reengajar
+                  </button>
                 </div>
               )}
               {windowStatus.status === 'expiring' && (
@@ -2076,6 +2091,19 @@ const ChatInterface: React.FC = () => {
       )}
 
       <QuickRepliesManager open={showQuickRepliesManager} onClose={() => setShowQuickRepliesManager(false)} />
+      
+      {activeChat && (
+        <TemplateModal
+          open={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          contactId={activeChat.contactId}
+          conversationId={activeChat.id}
+          contactName={activeChat.contactName}
+          contactInterests={contactDetails?.interest_services}
+          userId={user?.id}
+          onSent={() => refetch()}
+        />
+      )}
     </div>
   );
 };

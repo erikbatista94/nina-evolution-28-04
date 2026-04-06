@@ -1543,6 +1543,42 @@ export type Database = {
         }
         Relationships: []
       }
+      whatsapp_templates: {
+        Row: {
+          content: string
+          created_at: string
+          display_name: string
+          id: string
+          is_active: boolean
+          language: string
+          name: string
+          updated_at: string
+          variables: Json
+        }
+        Insert: {
+          content: string
+          created_at?: string
+          display_name: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          name: string
+          updated_at?: string
+          variables?: Json
+        }
+        Update: {
+          content?: string
+          created_at?: string
+          display_name?: string
+          id?: string
+          is_active?: boolean
+          language?: string
+          name?: string
+          updated_at?: string
+          variables?: Json
+        }
+        Relationships: []
+      }
     }
     Views: {
       contacts_with_stats: {
