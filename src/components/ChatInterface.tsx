@@ -2091,6 +2091,19 @@ const ChatInterface: React.FC = () => {
       )}
 
       <QuickRepliesManager open={showQuickRepliesManager} onClose={() => setShowQuickRepliesManager(false)} />
+      
+      {activeChat && (
+        <TemplateModal
+          open={showTemplateModal}
+          onClose={() => setShowTemplateModal(false)}
+          contactId={activeChat.contactId}
+          conversationId={activeChat.id}
+          contactName={activeChat.contactName}
+          contactInterests={contactDetails?.interest_services}
+          userId={user?.id}
+          onSent={() => refetch()}
+        />
+      )}
     </div>
   );
 };
