@@ -547,7 +547,13 @@ const Reports: React.FC = () => {
             <span className="text-xs text-slate-400 font-medium ml-2">{item.count}</span>
           </div>
         ))}
-        {items.length === 0 && <p className="text-xs text-slate-600">Sem dados</p>}
+        {items.length === 0 && (
+          <div className="flex flex-col items-center py-6 text-center">
+            <BarChart3 className="w-8 h-8 text-slate-700 mb-2" />
+            <p className="text-xs text-slate-500 font-medium">Ainda não há dados suficientes</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">Tente mudar o período ou aguarde mais atendimentos</p>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -737,7 +743,13 @@ const Reports: React.FC = () => {
                     ))}
                   </tbody>
                 </table>
-                {perfData.length === 0 && <div className="text-center py-8 text-slate-500 text-sm">Nenhum dado de performance encontrado</div>}
+                {perfData.length === 0 && (
+                  <div className="flex flex-col items-center py-12 text-center">
+                    <Award className="w-10 h-10 text-slate-700 mb-3" />
+                    <p className="text-sm text-slate-500 font-medium">Ainda não há dados de performance</p>
+                    <p className="text-xs text-slate-600 mt-1">Os dados aparecerão conforme os vendedores realizarem atendimentos</p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-3 gap-4">
@@ -851,7 +863,11 @@ const Reports: React.FC = () => {
                   </table>
                   {advData.objections.length === 0 && (
                     <div className="text-center py-6 px-4 space-y-2">
-                      <p className="text-slate-400 text-sm font-medium">Nenhuma objeção detectada ainda</p>
+                      <div className="flex flex-col items-center">
+                        <ShieldAlert className="w-8 h-8 text-slate-700 mb-2" />
+                        <p className="text-slate-500 text-sm font-medium">Nenhuma objeção detectada ainda</p>
+                        <p className="text-xs text-slate-600 mt-1">As objeções serão detectadas automaticamente nas conversas</p>
+                      </div>
                       <p className="text-slate-500 text-xs max-w-md mx-auto">O sistema analisa conversas automaticamente (IA + humano) e detecta objeções como preço, prazo, concorrente, falta de projeto, etc. As objeções aparecerão aqui conforme mais conversas forem analisadas. Você também pode cadastrar gatilhos no Playbook de Objeções.</p>
                     </div>
                   )}
