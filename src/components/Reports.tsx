@@ -547,7 +547,13 @@ const Reports: React.FC = () => {
             <span className="text-xs text-slate-400 font-medium ml-2">{item.count}</span>
           </div>
         ))}
-        {items.length === 0 && <p className="text-xs text-slate-600">Sem dados</p>}
+        {items.length === 0 && (
+          <div className="flex flex-col items-center py-6 text-center">
+            <BarChart3 className="w-8 h-8 text-slate-700 mb-2" />
+            <p className="text-xs text-slate-500 font-medium">Ainda não há dados suficientes</p>
+            <p className="text-[10px] text-slate-600 mt-0.5">Tente mudar o período ou aguarde mais atendimentos</p>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -949,6 +949,15 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
 
+        {/* Counters */}
+        <div className="px-4 py-1.5 border-b border-slate-800/50 flex items-center gap-3 text-[10px] text-slate-500 font-medium">
+          <span>{conversations.length} total</span>
+          <span className="w-px h-3 bg-slate-800"></span>
+          <span className="text-cyan-400">{myConversationsCount} minhas</span>
+          <span className="w-px h-3 bg-slate-800"></span>
+          <span className="text-amber-400">{conversations.filter(c => !c.assignedUserId).length} livres</span>
+        </div>
+
         {/* View Filter Tabs */}
         <div className="px-4 py-2 border-b border-slate-800/50 flex flex-col gap-2">
           <div className="flex gap-1 bg-slate-950/50 rounded-lg p-0.5">
@@ -1050,6 +1059,11 @@ const ChatInterface: React.FC = () => {
                   
                   <div className="flex items-center mt-2 gap-1.5 flex-wrap">
                     {renderStatusBadge(chat.status)}
+                    {(chat as any).contactIsUrgent && (
+                      <span className="px-1.5 py-0.5 bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] rounded-md font-medium animate-pulse">
+                        🔥
+                      </span>
+                    )}
                     {!chat.assignedUserId && (
                       <span className="px-2 py-0.5 bg-amber-500/15 border border-amber-500/30 text-amber-400 text-[10px] rounded-md font-medium">
                         Não atribuída
@@ -1121,7 +1135,20 @@ const ChatInterface: React.FC = () => {
                        '🔴 Janela fechada'}
                     </span>
                   </h2>
-                  <p className="text-xs text-cyan-500 font-medium">{activeChat.contactPhone}</p>
+                  <p className="text-xs text-cyan-500 font-medium flex items-center gap-1.5">
+                    {activeChat.contactPhone}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        navigator.clipboard.writeText(activeChat.contactPhone);
+                        toast.success('Telefone copiado');
+                      }}
+                      className="text-slate-500 hover:text-cyan-400 transition-colors"
+                      title="Copiar telefone"
+                    >
+                      <Phone className="w-3 h-3" />
+                    </button>
+                  </p>
                 </div>
               </div>
               <div className="flex items-center gap-1">
