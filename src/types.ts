@@ -267,6 +267,7 @@ export interface DBContact {
   last_activity: string;
   created_at: string;
   updated_at: string;
+  is_urgent?: boolean;
 }
 
 export interface DBConversation {
