@@ -328,6 +328,7 @@ export interface UIConversation {
   messages: UIMessage[];
   clientMemory: ClientMemory;
   notes: string | null;
+  contactIsUrgent?: boolean;
 }
 
 export interface UIMessage {
@@ -376,7 +377,8 @@ export function transformDBToUIConversation(
     tags: [...(conv.tags || []), ...(conv.contact?.tags || [])],
     messages: sortedMessages.map(transformDBToUIMessage),
     clientMemory: conv.contact?.client_memory || getDefaultClientMemory(),
-    notes: conv.contact?.notes || null
+    notes: conv.contact?.notes || null,
+    contactIsUrgent: conv.contact?.is_urgent || false,
   };
 }
 
