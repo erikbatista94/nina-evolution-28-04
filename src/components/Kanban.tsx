@@ -542,7 +542,7 @@ const Kanban: React.FC = () => {
                       onDragStart={(e) => onDragStart(e, deal.id)}
                       onDragEnd={onDragEnd}
                       onClick={() => setSelectedDeal(deal)}
-                      className="bg-slate-900 border border-slate-800 rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-cyan-500/50 hover:shadow-cyan-500/10 transition-all group relative"
+                      className={`bg-slate-900 border rounded-lg p-3 shadow-sm cursor-grab active:cursor-grabbing hover:border-cyan-500/50 hover:shadow-cyan-500/10 transition-all group relative ${(deal as any).contactIsUrgent ? 'border-red-500/40 ring-1 ring-red-500/20' : 'border-slate-800'}`}
                     >
                       <div className="flex justify-between items-start mb-1.5">
                         <span className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${getPriorityColor(deal.priority)}`} title={`Prioridade: ${deal.priority === 'high' ? 'Alta' : deal.priority === 'medium' ? 'Média' : 'Baixa'}\n\n• Alta = lead urgente ou score > 70\n• Média = score entre 40-70\n• Baixa = score < 40 ou sem dados`}>
