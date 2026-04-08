@@ -6,7 +6,7 @@ import {
   Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock,
   AlertTriangle, Shield, History
 } from 'lucide-react';
-import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
+import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, getMessageDateLabel } from '../types';
 import { calculateCloseProbability, getFollowUpSuggestion } from '@/utils/salesIntelligence';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
