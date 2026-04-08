@@ -328,7 +328,9 @@ export function useConversations() {
                   ...conv,
                   status: updated.status,
                   isActive: updated.is_active,
-                  assignedTeam: updated.assigned_team
+                  assignedTeam: updated.assigned_team,
+                  assignedUserId: updated.assigned_user_id ?? conv.assignedUserId,
+                  tags: updated.tags ?? conv.tags
                 };
               }
               return conv;
