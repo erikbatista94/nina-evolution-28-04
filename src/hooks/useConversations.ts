@@ -371,7 +371,8 @@ export function useConversations() {
     const tempMessage: UIMessage = {
       id: tempId,
       content,
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }),
+      createdAt: new Date().toISOString(),
       direction: MessageDirection.OUTGOING,
       type: MessageType.TEXT,
       status: 'sent',
@@ -430,7 +431,8 @@ export function useConversations() {
     const tempMessage: UIMessage = {
       id: tempId,
       content: file.name,
-      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+      timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' }),
+      createdAt: new Date().toISOString(),
       direction: MessageDirection.OUTGOING,
       type: messageType === 'image' ? MessageType.IMAGE : MessageType.DOCUMENT,
       status: 'sent',
@@ -563,6 +565,7 @@ export function useConversations() {
       type: MessageType.AUDIO,
       direction: MessageDirection.OUTGOING,
       timestamp: 'Agora',
+      createdAt: new Date().toISOString(),
       status: 'sent' as const,
       fromType: 'human',
       senderUserId: currentUser?.id || null,
