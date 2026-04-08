@@ -389,6 +389,7 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     id: msg.id,
     content: msg.content || '',
     timestamp: formatMessageTime(msg.sent_at),
+    createdAt: msg.created_at || msg.sent_at,
     direction: msg.from_type === 'user' ? MessageDirection.INCOMING : MessageDirection.OUTGOING,
     type: mapDBMessageType(msg.type),
     status: mapDBMessageStatus(msg.status),
@@ -437,7 +438,24 @@ function formatRelativeTime(dateStr: string): string {
 
 function formatMessageTime(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' });
+}
+
+export function getMessageDateLabel(dateStr: string): string {
+  const msgDate = new Date(dateStr);
+  const now = new Date();
+  
+  const fmt = (d: Date) => d.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' });
+  const msgDay = fmt(msgDate);
+  const todayStr = fmt(now);
+  
+  const yesterday = new Date(now);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayStr = fmt(yesterday);
+  
+  if (msgDay === todayStr) return 'Hoje';
+  if (msgDay === yesterdayStr) return 'Ontem';
+  return msgDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric', timeZone: 'America/Sao_Paulo' });
 }
 
 function getDefaultClientMemory(): ClientMemory {
