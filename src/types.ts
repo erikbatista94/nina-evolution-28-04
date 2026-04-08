@@ -336,6 +336,7 @@ export interface UIMessage {
   id: string;
   content: string;
   timestamp: string;
+  createdAt: string;
   direction: MessageDirection;
   type: MessageType;
   status: 'sent' | 'delivered' | 'read';
