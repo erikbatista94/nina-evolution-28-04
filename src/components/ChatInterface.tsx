@@ -6,7 +6,7 @@ import {
   Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock,
   AlertTriangle, Shield, History
 } from 'lucide-react';
-import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition } from '../types';
+import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, getMessageDateLabel } from '../types';
 import { calculateCloseProbability, getFollowUpSuggestion } from '@/utils/salesIntelligence';
 import { Button } from './Button';
 import { useConversations } from '../hooks/useConversations';
@@ -1212,50 +1212,59 @@ const ChatInterface: React.FC = () => {
                 </div>
               ) : (
                 <>
-                  <div className="flex justify-center my-6">
-                    <span className="px-4 py-1.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-xs font-medium rounded-full shadow-sm backdrop-blur-sm">Hoje</span>
-                  </div>
-
-                  {activeChat.messages.map((msg) => {
+                  {activeChat.messages.map((msg, idx) => {
                     const isOutgoing = msg.direction === MessageDirection.OUTGOING;
+                    
+                    // Date separator logic
+                    const currentDateLabel = getMessageDateLabel(msg.createdAt);
+                    const prevDateLabel = idx > 0 ? getMessageDateLabel(activeChat.messages[idx - 1].createdAt) : null;
+                    const showDateSeparator = idx === 0 || currentDateLabel !== prevDateLabel;
+
                     return (
-                      <div key={msg.id} className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-300`}>
-                        <div className={`flex flex-col max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
-                          <div 
-                            className={`px-5 py-3 rounded-2xl shadow-md relative text-sm leading-relaxed ${
-                              isOutgoing 
-                                ? msg.fromType === 'nina'
-                                  ? 'bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm shadow-violet-900/20'
-                                  : 'bg-gradient-to-br from-cyan-600 to-teal-700 text-white rounded-tr-sm shadow-cyan-900/20'
-                                : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700/50'
-                            }`}
-                          >
-                            {renderMessageContent(msg)}
+                      <React.Fragment key={msg.id}>
+                        {showDateSeparator && (
+                          <div className="flex justify-center my-6">
+                            <span className="px-4 py-1.5 bg-slate-800/80 border border-slate-700 text-slate-400 text-xs font-medium rounded-full shadow-sm backdrop-blur-sm">{currentDateLabel}</span>
                           </div>
-                          
-                          <div className="flex items-center mt-1.5 gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity px-1">
-                            {isOutgoing && msg.fromType === 'nina' && (
-                              <Bot className="w-3 h-3 text-violet-400" />
-                            )}
-                            {isOutgoing && msg.fromType === 'human' && (
-                              <User className="w-3 h-3 text-cyan-400" />
-                            )}
-                            {isOutgoing && msg.fromType === 'human' && (
-                              <span className="text-[10px] text-cyan-400 font-medium">
-                                {msg.senderUserId 
-                                  ? (teamMembers.find(m => m.id === msg.senderUserId || (m as any).user_id === msg.senderUserId)?.name || 'Agente')
-                                  : 'Agente'}
-                              </span>
-                            )}
-                            <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
-                            {isOutgoing && (
-                              msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> : 
-                              msg.status === 'delivered' ? <CheckCheck className="w-3.5 h-3.5 text-slate-500" /> :
-                              <Check className="w-3.5 h-3.5 text-slate-500" />
-                            )}
+                        )}
+                        <div className={`flex ${isOutgoing ? 'justify-end' : 'justify-start'} group animate-in fade-in slide-in-from-bottom-2 duration-300`}>
+                          <div className={`flex flex-col max-w-[75%] ${isOutgoing ? 'items-end' : 'items-start'}`}>
+                            <div 
+                              className={`px-5 py-3 rounded-2xl shadow-md relative text-sm leading-relaxed ${
+                                isOutgoing 
+                                  ? msg.fromType === 'nina'
+                                    ? 'bg-gradient-to-br from-violet-600 to-purple-700 text-white rounded-tr-sm shadow-violet-900/20'
+                                    : 'bg-gradient-to-br from-cyan-600 to-teal-700 text-white rounded-tr-sm shadow-cyan-900/20'
+                                  : 'bg-slate-800 text-slate-200 rounded-tl-sm border border-slate-700/50'
+                              }`}
+                            >
+                              {renderMessageContent(msg)}
+                            </div>
+                            
+                            <div className="flex items-center mt-1.5 gap-1.5 opacity-60 group-hover:opacity-100 transition-opacity px-1">
+                              {isOutgoing && msg.fromType === 'nina' && (
+                                <Bot className="w-3 h-3 text-violet-400" />
+                              )}
+                              {isOutgoing && msg.fromType === 'human' && (
+                                <User className="w-3 h-3 text-cyan-400" />
+                              )}
+                              {isOutgoing && msg.fromType === 'human' && (
+                                <span className="text-[10px] text-cyan-400 font-medium">
+                                  {msg.senderUserId 
+                                    ? (teamMembers.find(m => m.id === msg.senderUserId || (m as any).user_id === msg.senderUserId)?.name || 'Agente')
+                                    : 'Agente'}
+                                </span>
+                              )}
+                              <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
+                              {isOutgoing && (
+                                msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> : 
+                                msg.status === 'delivered' ? <CheckCheck className="w-3.5 h-3.5 text-slate-500" /> :
+                                <Check className="w-3.5 h-3.5 text-slate-500" />
+                              )}
+                            </div>
                           </div>
                         </div>
-                      </div>
+                      </React.Fragment>
                     );
                   })}
                 </>
