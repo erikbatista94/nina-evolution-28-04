@@ -1544,6 +1544,11 @@ const ChatInterface: React.FC = () => {
                     className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
                     rows={1}
                   />
+                  {inputText.length > 0 && (
+                    <span className={`absolute bottom-1 right-2 text-[9px] ${inputText.length > 4000 ? 'text-red-400' : 'text-slate-600'}`}>
+                      {inputText.length}/4096
+                    </span>
+                  )}
                 </div>
 
                 {inputText.trim() ? (
