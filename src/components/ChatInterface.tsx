@@ -505,6 +505,13 @@ const ChatInterface: React.FC = () => {
 
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
+    
+    // If changing away from current status, ask confirmation
+    if (activeChat.status !== status) {
+      const labels: Record<string, string> = { nina: sdrName + ' (IA)', human: 'Humano', paused: 'Pausado' };
+      const confirmed = window.confirm(`Alterar status de "${labels[activeChat.status]}" para "${labels[status]}"?`);
+      if (!confirmed) return;
+    }
 
     // Auto-assignment logic for human mode
     if (status === 'human') {
