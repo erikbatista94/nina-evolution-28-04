@@ -1028,6 +1028,28 @@ const ChatInterface: React.FC = () => {
               </SelectContent>
             </Select>
           )}
+
+          {/* Temperature filter chips */}
+          <div className="flex gap-1 px-3 pb-2">
+            {([
+              { key: 'all' as const, label: 'Todos', emoji: '' },
+              { key: 'quente' as const, label: 'Quente', emoji: '🔥' },
+              { key: 'morno' as const, label: 'Morno', emoji: '🟡' },
+              { key: 'frio' as const, label: 'Frio', emoji: '🔵' },
+            ]).map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTemperatureFilter(t.key)}
+                className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
+                  temperatureFilter === t.key
+                    ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                    : 'bg-slate-800/50 border-slate-700/50 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Conversation List */}
@@ -1071,7 +1093,20 @@ const ChatInterface: React.FC = () => {
                     <h3 className={`text-sm font-semibold truncate ${selectedChatId === chat.id ? 'text-white' : 'text-slate-300'}`}>
                       {chat.contactName}
                     </h3>
-                    <span className="text-[10px] text-slate-500 font-medium">{chat.lastMessageTime}</span>
+                    <span className="text-[10px] text-slate-500 font-medium flex flex-col items-end">
+                      <span>{chat.lastMessageTime}</span>
+                      {(() => {
+                        const raw = chat.lastMessageRawTime;
+                        if (!raw) return null;
+                        const d = new Date(raw);
+                        const now = new Date();
+                        const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+                        if (diffDays >= 1) {
+                          return <span className="text-[9px] text-slate-600">{d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })}</span>;
+                        }
+                        return null;
+                      })()}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
                     {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
