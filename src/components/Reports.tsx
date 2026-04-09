@@ -633,7 +633,9 @@ const Reports: React.FC = () => {
                 <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
                   <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><TrendingUp className="w-4 h-4 text-cyan-400" /> Por Etapa</h3>
                   <div className="space-y-2">
-                    {data.dealsByStage.map(s => (
+                    {data.dealsByStage.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-4">Ainda não há dados suficientes neste período</p>
+                    ) : data.dealsByStage.map(s => (
                       <div key={s.stage} className="flex justify-between items-center py-1.5 border-b border-slate-800/50">
                         <span className="text-sm text-slate-300">{s.stage}</span>
                         <div className="flex gap-3">
@@ -647,7 +649,9 @@ const Reports: React.FC = () => {
                 <div className="rounded-xl bg-slate-900 border border-slate-800 p-5">
                   <h3 className="text-sm font-semibold text-slate-300 mb-4 flex items-center gap-2"><Users className="w-4 h-4 text-violet-400" /> Por Vendedor</h3>
                   <div className="space-y-2">
-                    {data.bySeller.map(s => (
+                    {data.bySeller.length === 0 ? (
+                      <p className="text-xs text-slate-500 text-center py-4">Ainda não há dados suficientes neste período</p>
+                    ) : data.bySeller.map(s => (
                       <div key={s.name} className="flex justify-between items-center py-1.5 border-b border-slate-800/50">
                         <span className="text-sm text-slate-300">{s.name}</span>
                         <div className="flex gap-3">

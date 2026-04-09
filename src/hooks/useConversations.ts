@@ -191,7 +191,8 @@ export function useConversations() {
                     ...conv,
                     messages: updatedMessages,
                     lastMessage: newMessage.content || '',
-                    lastMessageTime: 'Agora'
+                    lastMessageTime: 'Agora',
+                    lastMessageRawTime: new Date().toISOString()
                   };
                 }
 
@@ -206,6 +207,7 @@ export function useConversations() {
                   messages: [...conv.messages, uiMessage],
                   lastMessage: newMessage.content || '',
                   lastMessageTime: 'Agora',
+                  lastMessageRawTime: new Date().toISOString(),
                   // Increment unread if it's from user
                   unreadCount: newMessage.from_type === 'user' 
                     ? conv.unreadCount + 1 
@@ -392,7 +394,8 @@ export function useConversations() {
             ...conv,
             messages: [...conv.messages, tempMessage],
             lastMessage: content,
-            lastMessageTime: 'Agora'
+            lastMessageTime: 'Agora',
+            lastMessageRawTime: new Date().toISOString()
           };
         }
         return conv;
@@ -451,7 +454,8 @@ export function useConversations() {
           ...conv,
           messages: [...conv.messages, tempMessage],
           lastMessage: `📎 ${file.name}`,
-          lastMessageTime: 'Agora'
+          lastMessageTime: 'Agora',
+          lastMessageRawTime: new Date().toISOString()
         };
       }
       return conv;
@@ -582,7 +586,8 @@ export function useConversations() {
           ...conv,
           messages: [...conv.messages, tempMessage],
           lastMessage: '🎤 Áudio',
-          lastMessageTime: 'Agora'
+          lastMessageTime: 'Agora',
+          lastMessageRawTime: new Date().toISOString()
         };
       }
       return conv;

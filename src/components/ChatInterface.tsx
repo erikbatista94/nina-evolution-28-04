@@ -46,6 +46,8 @@ const ChatInterface: React.FC = () => {
     return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
   });
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
+  const [temperatureFilter, setTemperatureFilter] = useState<'all' | 'quente' | 'morno' | 'frio'>('all');
+  const [pendingStatusChange, setPendingStatusChange] = useState<ConversationStatus | null>(null);
   const [checkingAvailability, setCheckingAvailability] = useState(false);
   const [availableSlots, setAvailableSlots] = useState<{date: string; freeSlots: string[]}[] | null>(null);
   const [uploadingFile, setUploadingFile] = useState(false);
@@ -503,6 +505,13 @@ const ChatInterface: React.FC = () => {
 
   const handleStatusChange = async (status: ConversationStatus) => {
     if (!activeChat) return;
+    
+    // If changing away from current status, ask confirmation
+    if (activeChat.status !== status) {
+      const labels: Record<string, string> = { nina: sdrName + ' (IA)', human: 'Humano', paused: 'Pausado' };
+      const confirmed = window.confirm(`Alterar status de "${labels[activeChat.status]}" para "${labels[status]}"?`);
+      if (!confirmed) return;
+    }
 
     // Auto-assignment logic for human mode
     if (status === 'human') {
@@ -676,6 +685,21 @@ const ChatInterface: React.FC = () => {
             chat.contactPhone.includes(query) ||
             chat.lastMessage.toLowerCase().includes(query))) {
         return false;
+      }
+    }
+    // Temperature filter
+    if (temperatureFilter !== 'all') {
+      const temp = chat.clientMemory?.lead_profile?.lead_stage;
+      const contactTemp = (chat as any).contactTemperature;
+      // Check clientMemory or tags for temperature
+      const chatTags = chat.tags || [];
+      const hasTemp = chatTags.some(t => t.toLowerCase().includes(temperatureFilter)) || contactTemp === temperatureFilter;
+      if (!hasTemp) {
+        // Fallback: check score ranges
+        const score = chat.clientMemory?.lead_profile?.qualification_score || 0;
+        if (temperatureFilter === 'quente' && score < 60) return false;
+        if (temperatureFilter === 'morno' && (score < 30 || score >= 60)) return false;
+        if (temperatureFilter === 'frio' && score >= 30) return false;
       }
     }
     if (viewFilter === 'mine') {
@@ -1004,6 +1028,28 @@ const ChatInterface: React.FC = () => {
               </SelectContent>
             </Select>
           )}
+
+          {/* Temperature filter chips */}
+          <div className="flex gap-1 px-3 pb-2">
+            {([
+              { key: 'all' as const, label: 'Todos', emoji: '' },
+              { key: 'quente' as const, label: 'Quente', emoji: '🔥' },
+              { key: 'morno' as const, label: 'Morno', emoji: '🟡' },
+              { key: 'frio' as const, label: 'Frio', emoji: '🔵' },
+            ]).map(t => (
+              <button
+                key={t.key}
+                onClick={() => setTemperatureFilter(t.key)}
+                className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
+                  temperatureFilter === t.key
+                    ? 'bg-cyan-500/20 border-cyan-500/40 text-cyan-300'
+                    : 'bg-slate-800/50 border-slate-700/50 text-slate-500 hover:text-slate-300'
+                }`}
+              >
+                {t.emoji} {t.label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Conversation List */}
@@ -1047,7 +1093,20 @@ const ChatInterface: React.FC = () => {
                     <h3 className={`text-sm font-semibold truncate ${selectedChatId === chat.id ? 'text-white' : 'text-slate-300'}`}>
                       {chat.contactName}
                     </h3>
-                    <span className="text-[10px] text-slate-500 font-medium">{chat.lastMessageTime}</span>
+                    <span className="text-[10px] text-slate-500 font-medium flex flex-col items-end">
+                      <span>{chat.lastMessageTime}</span>
+                      {(() => {
+                        const raw = chat.lastMessageRawTime;
+                        if (!raw) return null;
+                        const d = new Date(raw);
+                        const now = new Date();
+                        const diffDays = Math.floor((now.getTime() - d.getTime()) / 86400000);
+                        if (diffDays >= 1) {
+                          return <span className="text-[9px] text-slate-600">{d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', timeZone: 'America/Sao_Paulo' })}</span>;
+                        }
+                        return null;
+                      })()}
+                    </span>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
                     {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
@@ -1485,6 +1544,11 @@ const ChatInterface: React.FC = () => {
                     className="w-full bg-transparent border-none p-3.5 max-h-32 min-h-[48px] text-sm text-slate-200 focus:ring-0 resize-none outline-none placeholder:text-slate-600"
                     rows={1}
                   />
+                  {inputText.length > 0 && (
+                    <span className={`absolute bottom-1 right-2 text-[9px] ${inputText.length > 4000 ? 'text-red-400' : 'text-slate-600'}`}>
+                      {inputText.length}/4096
+                    </span>
+                  )}
                 </div>
 
                 {inputText.trim() ? (
