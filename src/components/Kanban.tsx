@@ -14,6 +14,7 @@ import { LostReasonModal } from './LostReasonModal';
 import { PipelineSettingsModal } from './PipelineSettingsModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
+import { KanbanColumnSkeleton } from './SkeletonCard';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateCloseProbability, validateWinChecklist } from '@/utils/salesIntelligence';

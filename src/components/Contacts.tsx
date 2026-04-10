@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from 'react';
 import { Search, UserPlus, MessageSquare, Loader2, Phone, Users, Thermometer, MapPin, Briefcase, Filter, X, Copy, Mail } from 'lucide-react';
 import HighlightText from './HighlightText';
 import { ContactsTableSkeleton } from './SkeletonCard';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { api } from '../services/api';
