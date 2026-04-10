@@ -21,6 +21,8 @@ import { QuickReplyDropdown } from './QuickReplyDropdown';
 import { QuickRepliesManager } from './QuickRepliesManager';
 import AudioRecorder from './AudioRecorder';
 import TemplateModal from './TemplateModal';
+import HighlightText from './HighlightText';
+import { ChatListSkeleton } from './SkeletonCard';
 
 const EMOJI_CATEGORIES = [
   { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
@@ -919,10 +921,19 @@ const ChatInterface: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex h-full bg-slate-950 items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
-          <p className="text-sm text-slate-500">Sincronizando conversas...</p>
+      <div className="flex h-full bg-slate-950 overflow-hidden">
+        <div className="w-80 lg:w-96 border-r border-slate-800 bg-slate-900/50">
+          <div className="p-4 border-b border-slate-800/50">
+            <div className="h-5 w-28 bg-slate-800 rounded animate-pulse mb-3" />
+            <div className="h-10 w-full bg-slate-800/60 rounded-xl animate-pulse" />
+          </div>
+          <ChatListSkeleton />
+        </div>
+        <div className="flex-1 flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+            <p className="text-sm text-slate-500">Sincronizando conversas...</p>
+          </div>
         </div>
       </div>
     );
@@ -1091,7 +1102,7 @@ const ChatInterface: React.FC = () => {
                 <div className="ml-3 flex-1 min-w-0">
                   <div className="flex justify-between items-baseline mb-1">
                     <h3 className={`text-sm font-semibold truncate ${selectedChatId === chat.id ? 'text-white' : 'text-slate-300'}`}>
-                      {chat.contactName}
+                      <HighlightText text={chat.contactName} query={searchQuery} />
                     </h3>
                     <span className="text-[10px] text-slate-500 font-medium flex flex-col items-end">
                       <span>{chat.lastMessageTime}</span>
