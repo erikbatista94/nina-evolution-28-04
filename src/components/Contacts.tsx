@@ -1,5 +1,8 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Search, UserPlus, MessageSquare, Loader2, Phone, Users, Thermometer, MapPin, Briefcase, Filter, X } from 'lucide-react';
+import { Search, UserPlus, MessageSquare, Loader2, Phone, Users, Thermometer, MapPin, Briefcase, Filter, X, Copy, Mail } from 'lucide-react';
+import HighlightText from './HighlightText';
+import { ContactsTableSkeleton } from './SkeletonCard';
+import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { Button } from './Button';
 import { api } from '../services/api';
@@ -275,10 +278,7 @@ const Contacts: React.FC = () => {
       {/* Table */}
       <div className="rounded-2xl border border-slate-800 bg-slate-900/40 backdrop-blur-sm shadow-xl overflow-hidden min-h-[400px]">
         {loading ? (
-          <div className="flex flex-col items-center justify-center h-80">
-            <Loader2 className="h-10 w-10 animate-spin text-primary mb-3" />
-            <span className="text-sm text-slate-400 animate-pulse">Carregando base de dados...</span>
-          </div>
+          <ContactsTableSkeleton />
         ) : filteredContacts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-80 text-slate-400">
             <Users className="w-12 h-12 mb-4 opacity-50" />
@@ -314,8 +314,32 @@ const Contacts: React.FC = () => {
                             {(contact.name || contact.phone || '?').substring(0, 2).toUpperCase()}
                           </div>
                           <div className="min-w-0">
-                            <div className="font-semibold text-slate-200 group-hover:text-primary transition-colors truncate">{contact.name || 'Sem nome'}</div>
-                            <div className="text-xs text-slate-500">{contact.phone}</div>
+                            <div className="font-semibold text-slate-200 group-hover:text-primary transition-colors truncate">
+                              <HighlightText text={contact.name || 'Sem nome'} query={searchTerm} />
+                            </div>
+                            <div className="text-xs text-slate-500 flex items-center gap-1">
+                              <HighlightText text={contact.phone} query={searchTerm} />
+                              <button
+                                onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(contact.phone); toast.success('Telefone copiado'); }}
+                                className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-cyan-400 transition-all"
+                                title="Copiar telefone"
+                              >
+                                <Copy className="w-3 h-3" />
+                              </button>
+                            </div>
+                            {contact.email && (
+                              <div className="text-[10px] text-slate-500 flex items-center gap-1">
+                                <Mail className="w-2.5 h-2.5" />
+                                <HighlightText text={contact.email} query={searchTerm} />
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); navigator.clipboard.writeText(contact.email!); toast.success('Email copiado'); }}
+                                  className="opacity-0 group-hover:opacity-100 text-slate-600 hover:text-cyan-400 transition-all"
+                                  title="Copiar email"
+                                >
+                                  <Copy className="w-2.5 h-2.5" />
+                                </button>
+                              </div>
+                            )}
                             {ownerName && <div className="text-[10px] text-slate-600">👤 {ownerName}</div>}
                           </div>
                         </div>

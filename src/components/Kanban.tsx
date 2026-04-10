@@ -14,6 +14,7 @@ import { LostReasonModal } from './LostReasonModal';
 import { PipelineSettingsModal } from './PipelineSettingsModal';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { toast } from 'sonner';
+import { KanbanColumnSkeleton } from './SkeletonCard';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
 import { calculateCloseProbability, validateWinChecklist } from '@/utils/salesIntelligence';
@@ -365,8 +366,20 @@ const Kanban: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full bg-slate-950">
-        <Loader2 className="h-8 w-8 animate-spin text-cyan-500" />
+      <div className="h-full flex flex-col bg-slate-950 text-slate-50 p-6 overflow-hidden">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <div className="h-8 w-52 bg-slate-800 rounded animate-pulse mb-2" />
+            <div className="h-4 w-72 bg-slate-800/60 rounded animate-pulse" />
+          </div>
+          <div className="flex gap-3">
+            <div className="h-10 w-24 bg-slate-800 rounded-lg animate-pulse" />
+            <div className="h-10 w-28 bg-slate-800 rounded-lg animate-pulse" />
+          </div>
+        </div>
+        <div className="flex-1 overflow-hidden">
+          <KanbanColumnSkeleton />
+        </div>
       </div>
     );
   }
