@@ -1058,13 +1058,31 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
 
-        {/* Counters */}
-        <div className="px-4 py-1.5 border-b border-slate-800/50 flex items-center gap-3 text-[10px] text-slate-500 font-medium">
-          <span>{conversations.length} total</span>
-          <span className="w-px h-3 bg-slate-800"></span>
+        {/* Counters + Status Filter + Sound */}
+        <div className="px-4 py-1.5 border-b border-slate-800/50 flex items-center gap-2 text-[10px] text-slate-500 font-medium flex-wrap">
+          {([
+            { key: 'all' as const, label: 'Todos', count: conversations.length, color: 'text-slate-400' },
+            { key: 'nina' as const, label: '🤖', count: conversations.filter(c => c.status === 'nina').length, color: 'text-violet-400' },
+            { key: 'human' as const, label: '👤', count: conversations.filter(c => c.status === 'human').length, color: 'text-emerald-400' },
+            { key: 'paused' as const, label: '⏸', count: conversations.filter(c => c.status === 'paused').length, color: 'text-amber-400' },
+          ]).map(s => (
+            <button
+              key={s.key}
+              onClick={() => setStatusFilter(s.key)}
+              className={`px-1.5 py-0.5 rounded transition-colors ${
+                statusFilter === s.key
+                  ? 'bg-slate-700 text-white'
+                  : `${s.color} hover:bg-slate-800`
+              }`}
+            >
+              {s.label} {s.count}
+            </button>
+          ))}
+          <span className="w-px h-3 bg-slate-800 mx-1"></span>
           <span className="text-cyan-400">{myConversationsCount} minhas</span>
-          <span className="w-px h-3 bg-slate-800"></span>
-          <span className="text-amber-400">{conversations.filter(c => !c.assignedUserId).length} livres</span>
+          <button onClick={toggleSound} className="ml-auto p-1 rounded hover:bg-slate-800 transition-colors" title={soundEnabled ? 'Som ativado' : 'Som desativado'}>
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-600" />}
+          </button>
         </div>
 
         {/* View Filter Tabs */}
