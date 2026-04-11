@@ -331,6 +331,8 @@ export interface UIConversation {
   clientMemory: ClientMemory;
   notes: string | null;
   contactIsUrgent?: boolean;
+  contactCustomerType?: string | null;
+  contactTemperature?: string | null;
 }
 
 export interface UIMessage {
@@ -383,6 +385,8 @@ export function transformDBToUIConversation(
     clientMemory: conv.contact?.client_memory || getDefaultClientMemory(),
     notes: conv.contact?.notes || null,
     contactIsUrgent: conv.contact?.is_urgent || false,
+    contactCustomerType: (conv.contact as any)?.customer_type || null,
+    contactTemperature: (conv.contact as any)?.lead_temperature || null,
   };
 }
 

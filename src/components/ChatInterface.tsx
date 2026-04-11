@@ -4,7 +4,7 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
   Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock,
-  AlertTriangle, Shield, History
+  AlertTriangle, Shield, History, Volume2, VolumeX, Thermometer, Building2, Copy
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, getMessageDateLabel } from '../types';
 import { calculateCloseProbability, getFollowUpSuggestion } from '@/utils/salesIntelligence';
@@ -67,6 +67,10 @@ const ChatInterface: React.FC = () => {
   const [windowStatus, setWindowStatus] = useState<{ status: 'open' | 'expiring' | 'closed'; hoursLeft: number }>({ status: 'open', hoursLeft: 24 });
   const [timelineEvents, setTimelineEvents] = useState<{ date: string; type: string; label: string; icon: string }[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; chatId: string; contactId: string } | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('chat-sound-enabled') !== 'false');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'nina' | 'human' | 'paused'>('all');
   // Budget state
   const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
   const [budgetValue, setBudgetValue] = useState('');
@@ -90,6 +94,77 @@ const ChatInterface: React.FC = () => {
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, '0')}`;
+  };
+
+  // Sound notification for new inbound messages
+  const prevMsgCountRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (!soundEnabled) return;
+    const currentCounts: Record<string, number> = {};
+    conversations.forEach(c => { currentCounts[c.id] = c.messages.length; });
+    const prev = prevMsgCountRef.current;
+    conversations.forEach(c => {
+      const prevCount = prev[c.id] || 0;
+      if (c.messages.length > prevCount && prevCount > 0) {
+        const lastMsg = c.messages[c.messages.length - 1];
+        if (lastMsg?.fromType === 'user') {
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = 800;
+            osc.type = 'sine';
+            gain.gain.value = 0.15;
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+          } catch {}
+        }
+      }
+    });
+    prevMsgCountRef.current = currentCounts;
+  }, [conversations, soundEnabled]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [contextMenu]);
+
+  // Context menu actions
+  const handleMarkUnread = async (chatId: string) => {
+    const conv = conversations.find(c => c.id === chatId);
+    if (!conv) return;
+    const lastInbound = [...conv.messages].reverse().find(m => m.fromType === 'user');
+    if (lastInbound) {
+      await supabase.from('messages').update({ status: 'delivered', read_at: null }).eq('id', lastInbound.id);
+    }
+    refetch();
+    toast.success('Marcada como não lida');
+    setContextMenu(null);
+  };
+
+  const handleSetTemperature = async (contactId: string, temp: string) => {
+    await supabase.from('contacts').update({ lead_temperature: temp }).eq('id', contactId);
+    refetch();
+    toast.success(`Temperatura: ${temp}`);
+    setContextMenu(null);
+  };
+
+  const handleSetCustomerType = async (contactId: string, type: string) => {
+    await supabase.from('contacts').update({ customer_type: type }).eq('id', contactId);
+    refetch();
+    toast.success(`Tipo: ${type}`);
+    setContextMenu(null);
+  };
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    localStorage.setItem('chat-sound-enabled', String(next));
   };
 
   // Load tag definitions and team members
@@ -689,15 +764,14 @@ const ChatInterface: React.FC = () => {
         return false;
       }
     }
+    // Status filter
+    if (statusFilter !== 'all' && chat.status !== statusFilter) return false;
     // Temperature filter
     if (temperatureFilter !== 'all') {
-      const temp = chat.clientMemory?.lead_profile?.lead_stage;
-      const contactTemp = (chat as any).contactTemperature;
-      // Check clientMemory or tags for temperature
+      const contactTemp = chat.contactTemperature;
       const chatTags = chat.tags || [];
       const hasTemp = chatTags.some(t => t.toLowerCase().includes(temperatureFilter)) || contactTemp === temperatureFilter;
       if (!hasTemp) {
-        // Fallback: check score ranges
         const score = chat.clientMemory?.lead_profile?.qualification_score || 0;
         if (temperatureFilter === 'quente' && score < 60) return false;
         if (temperatureFilter === 'morno' && (score < 30 || score >= 60)) return false;
@@ -984,13 +1058,31 @@ const ChatInterface: React.FC = () => {
           </div>
         </div>
 
-        {/* Counters */}
-        <div className="px-4 py-1.5 border-b border-slate-800/50 flex items-center gap-3 text-[10px] text-slate-500 font-medium">
-          <span>{conversations.length} total</span>
-          <span className="w-px h-3 bg-slate-800"></span>
+        {/* Counters + Status Filter + Sound */}
+        <div className="px-4 py-1.5 border-b border-slate-800/50 flex items-center gap-2 text-[10px] text-slate-500 font-medium flex-wrap">
+          {([
+            { key: 'all' as const, label: 'Todos', count: conversations.length, color: 'text-slate-400' },
+            { key: 'nina' as const, label: '🤖', count: conversations.filter(c => c.status === 'nina').length, color: 'text-violet-400' },
+            { key: 'human' as const, label: '👤', count: conversations.filter(c => c.status === 'human').length, color: 'text-emerald-400' },
+            { key: 'paused' as const, label: '⏸', count: conversations.filter(c => c.status === 'paused').length, color: 'text-amber-400' },
+          ]).map(s => (
+            <button
+              key={s.key}
+              onClick={() => setStatusFilter(s.key)}
+              className={`px-1.5 py-0.5 rounded transition-colors ${
+                statusFilter === s.key
+                  ? 'bg-slate-700 text-white'
+                  : `${s.color} hover:bg-slate-800`
+              }`}
+            >
+              {s.label} {s.count}
+            </button>
+          ))}
+          <span className="w-px h-3 bg-slate-800 mx-1"></span>
           <span className="text-cyan-400">{myConversationsCount} minhas</span>
-          <span className="w-px h-3 bg-slate-800"></span>
-          <span className="text-amber-400">{conversations.filter(c => !c.assignedUserId).length} livres</span>
+          <button onClick={toggleSound} className="ml-auto p-1 rounded hover:bg-slate-800 transition-colors" title={soundEnabled ? 'Som ativado' : 'Som desativado'}>
+            {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-600" />}
+          </button>
         </div>
 
         {/* View Filter Tabs */}
@@ -1078,6 +1170,10 @@ const ChatInterface: React.FC = () => {
               <div 
                 key={chat.id}
                 onClick={() => setSelectedChatId(chat.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, chatId: chat.id, contactId: chat.contactId });
+                }}
                 className={`flex items-center p-4 cursor-pointer transition-all duration-200 border-b border-slate-800/30 hover:bg-slate-800/50 ${
                   selectedChatId === chat.id 
                     ? 'bg-slate-800/80 border-l-2 border-l-cyan-500' 
@@ -1120,16 +1216,36 @@ const ChatInterface: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.AUDIO ? '🎵 Áudio' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.VIDEO ? '🎬 Vídeo' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.DOCUMENT ? '📎 Documento' : 
-                     chat.lastMessage || 'Sem mensagens'}
+                    {(() => {
+                      const lastMsg = chat.messages[chat.messages.length - 1];
+                      if (!lastMsg) return 'Sem mensagens';
+                      if (lastMsg.type === MessageType.IMAGE) return '📷 Imagem';
+                      if (lastMsg.type === MessageType.AUDIO) return '🎵 Áudio';
+                      if (lastMsg.type === MessageType.VIDEO) return '🎬 Vídeo';
+                      if (lastMsg.type === MessageType.DOCUMENT) return '📎 Documento';
+                      return chat.lastMessage || 'Sem mensagens';
+                    })()}
                   </p>
                   
                   <div className="flex items-center mt-2 gap-1.5 flex-wrap">
                     {renderStatusBadge(chat.status)}
-                    {(chat as any).contactIsUrgent && (
+                    {/* Temperature badge */}
+                    {chat.contactTemperature && chat.contactTemperature !== 'frio' && (
+                      <span className={`px-1.5 py-0.5 text-[10px] rounded-md font-medium border ${
+                        chat.contactTemperature === 'quente' ? 'bg-red-500/15 border-red-500/30 text-red-400' :
+                        chat.contactTemperature === 'morno' ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' :
+                        'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                      }`}>
+                        {chat.contactTemperature === 'quente' ? '🔥' : chat.contactTemperature === 'morno' ? '🟡' : '❄️'}
+                      </span>
+                    )}
+                    {/* Customer type badge */}
+                    {chat.contactCustomerType && (
+                      <span className="px-1.5 py-0.5 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 text-[10px] rounded-md font-medium truncate max-w-[80px]">
+                        {chat.contactCustomerType}
+                      </span>
+                    )}
+                    {chat.contactIsUrgent && (
                       <span className="px-1.5 py-0.5 bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] rounded-md font-medium animate-pulse">
                         🔥
                       </span>
@@ -1163,6 +1279,37 @@ const ChatInterface: React.FC = () => {
                 </div>
               </div>
             ))
+          )}
+
+          {/* Context Menu */}
+          {contextMenu && (
+            <div 
+              className="fixed z-[100] bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-1 min-w-[200px] text-sm"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button onClick={() => handleMarkUnread(contextMenu.chatId)} className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2">
+                <Mail className="w-4 h-4" /> Marcar como não lida
+              </button>
+              <div className="border-t border-slate-700 my-1" />
+              <div className="px-4 py-1.5 text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Temperatura</div>
+              {[
+                { value: 'quente', label: '🔥 Quente', color: 'hover:bg-red-500/10' },
+                { value: 'morno', label: '🟡 Morno', color: 'hover:bg-amber-500/10' },
+                { value: 'frio', label: '❄️ Frio', color: 'hover:bg-blue-500/10' },
+              ].map(t => (
+                <button key={t.value} onClick={() => handleSetTemperature(contextMenu.contactId, t.value)} className={`w-full text-left px-4 py-1.5 text-slate-300 ${t.color} hover:text-white transition-colors`}>
+                  {t.label}
+                </button>
+              ))}
+              <div className="border-t border-slate-700 my-1" />
+              <div className="px-4 py-1.5 text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Tipo de Cliente</div>
+              {['Arquiteto', 'Construtora', 'Cliente Final', 'Lojista', 'Engenheiro', 'Designer', 'Outro'].map(type => (
+                <button key={type} onClick={() => handleSetCustomerType(contextMenu.contactId, type)} className="w-full text-left px-4 py-1.5 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
+                  {type}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>
