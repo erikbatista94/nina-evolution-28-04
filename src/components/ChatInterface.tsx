@@ -1170,6 +1170,10 @@ const ChatInterface: React.FC = () => {
               <div 
                 key={chat.id}
                 onClick={() => setSelectedChatId(chat.id)}
+                onContextMenu={(e) => {
+                  e.preventDefault();
+                  setContextMenu({ x: e.clientX, y: e.clientY, chatId: chat.id, contactId: chat.contactId });
+                }}
                 className={`flex items-center p-4 cursor-pointer transition-all duration-200 border-b border-slate-800/30 hover:bg-slate-800/50 ${
                   selectedChatId === chat.id 
                     ? 'bg-slate-800/80 border-l-2 border-l-cyan-500' 
@@ -1212,16 +1216,36 @@ const ChatInterface: React.FC = () => {
                     </span>
                   </div>
                   <p className="text-xs text-slate-500 truncate">
-                    {chat.messages[chat.messages.length - 1]?.type === MessageType.IMAGE ? '📷 Imagem' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.AUDIO ? '🎵 Áudio' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.VIDEO ? '🎬 Vídeo' : 
-                     chat.messages[chat.messages.length - 1]?.type === MessageType.DOCUMENT ? '📎 Documento' : 
-                     chat.lastMessage || 'Sem mensagens'}
+                    {(() => {
+                      const lastMsg = chat.messages[chat.messages.length - 1];
+                      if (!lastMsg) return 'Sem mensagens';
+                      if (lastMsg.type === MessageType.IMAGE) return '📷 Imagem';
+                      if (lastMsg.type === MessageType.AUDIO) return '🎵 Áudio';
+                      if (lastMsg.type === MessageType.VIDEO) return '🎬 Vídeo';
+                      if (lastMsg.type === MessageType.DOCUMENT) return '📎 Documento';
+                      return chat.lastMessage || 'Sem mensagens';
+                    })()}
                   </p>
                   
                   <div className="flex items-center mt-2 gap-1.5 flex-wrap">
                     {renderStatusBadge(chat.status)}
-                    {(chat as any).contactIsUrgent && (
+                    {/* Temperature badge */}
+                    {chat.contactTemperature && chat.contactTemperature !== 'frio' && (
+                      <span className={`px-1.5 py-0.5 text-[10px] rounded-md font-medium border ${
+                        chat.contactTemperature === 'quente' ? 'bg-red-500/15 border-red-500/30 text-red-400' :
+                        chat.contactTemperature === 'morno' ? 'bg-amber-500/15 border-amber-500/30 text-amber-400' :
+                        'bg-blue-500/15 border-blue-500/30 text-blue-400'
+                      }`}>
+                        {chat.contactTemperature === 'quente' ? '🔥' : chat.contactTemperature === 'morno' ? '🟡' : '❄️'}
+                      </span>
+                    )}
+                    {/* Customer type badge */}
+                    {chat.contactCustomerType && (
+                      <span className="px-1.5 py-0.5 bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 text-[10px] rounded-md font-medium truncate max-w-[80px]">
+                        {chat.contactCustomerType}
+                      </span>
+                    )}
+                    {chat.contactIsUrgent && (
                       <span className="px-1.5 py-0.5 bg-red-500/15 border border-red-500/30 text-red-400 text-[10px] rounded-md font-medium animate-pulse">
                         🔥
                       </span>
@@ -1255,6 +1279,37 @@ const ChatInterface: React.FC = () => {
                 </div>
               </div>
             ))
+          )}
+
+          {/* Context Menu */}
+          {contextMenu && (
+            <div 
+              className="fixed z-[100] bg-slate-800 border border-slate-700 rounded-lg shadow-2xl py-1 min-w-[200px] text-sm"
+              style={{ top: contextMenu.y, left: contextMenu.x }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button onClick={() => handleMarkUnread(contextMenu.chatId)} className="w-full text-left px-4 py-2 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors flex items-center gap-2">
+                <Mail className="w-4 h-4" /> Marcar como não lida
+              </button>
+              <div className="border-t border-slate-700 my-1" />
+              <div className="px-4 py-1.5 text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Temperatura</div>
+              {[
+                { value: 'quente', label: '🔥 Quente', color: 'hover:bg-red-500/10' },
+                { value: 'morno', label: '🟡 Morno', color: 'hover:bg-amber-500/10' },
+                { value: 'frio', label: '❄️ Frio', color: 'hover:bg-blue-500/10' },
+              ].map(t => (
+                <button key={t.value} onClick={() => handleSetTemperature(contextMenu.contactId, t.value)} className={`w-full text-left px-4 py-1.5 text-slate-300 ${t.color} hover:text-white transition-colors`}>
+                  {t.label}
+                </button>
+              ))}
+              <div className="border-t border-slate-700 my-1" />
+              <div className="px-4 py-1.5 text-[10px] text-slate-500 uppercase font-semibold tracking-wider">Tipo de Cliente</div>
+              {['Arquiteto', 'Construtora', 'Cliente Final', 'Lojista', 'Engenheiro', 'Designer', 'Outro'].map(type => (
+                <button key={type} onClick={() => handleSetCustomerType(contextMenu.contactId, type)} className="w-full text-left px-4 py-1.5 text-slate-300 hover:bg-slate-700 hover:text-white transition-colors">
+                  {type}
+                </button>
+              ))}
+            </div>
           )}
         </div>
       </div>
