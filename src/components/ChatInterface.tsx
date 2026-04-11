@@ -67,6 +67,10 @@ const ChatInterface: React.FC = () => {
   const [windowStatus, setWindowStatus] = useState<{ status: 'open' | 'expiring' | 'closed'; hoursLeft: number }>({ status: 'open', hoursLeft: 24 });
   const [timelineEvents, setTimelineEvents] = useState<{ date: string; type: string; label: string; icon: string }[]>([]);
   const [showTimeline, setShowTimeline] = useState(false);
+  // Context menu state
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; chatId: string; contactId: string } | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('chat-sound-enabled') !== 'false');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'nina' | 'human' | 'paused'>('all');
   // Budget state
   const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
   const [budgetValue, setBudgetValue] = useState('');
