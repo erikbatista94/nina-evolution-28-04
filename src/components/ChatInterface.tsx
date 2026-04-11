@@ -764,15 +764,14 @@ const ChatInterface: React.FC = () => {
         return false;
       }
     }
+    // Status filter
+    if (statusFilter !== 'all' && chat.status !== statusFilter) return false;
     // Temperature filter
     if (temperatureFilter !== 'all') {
-      const temp = chat.clientMemory?.lead_profile?.lead_stage;
-      const contactTemp = (chat as any).contactTemperature;
-      // Check clientMemory or tags for temperature
+      const contactTemp = chat.contactTemperature;
       const chatTags = chat.tags || [];
       const hasTemp = chatTags.some(t => t.toLowerCase().includes(temperatureFilter)) || contactTemp === temperatureFilter;
       if (!hasTemp) {
-        // Fallback: check score ranges
         const score = chat.clientMemory?.lead_profile?.qualification_score || 0;
         if (temperatureFilter === 'quente' && score < 60) return false;
         if (temperatureFilter === 'morno' && (score < 30 || score >= 60)) return false;
