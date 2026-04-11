@@ -96,6 +96,77 @@ const ChatInterface: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
+  // Sound notification for new inbound messages
+  const prevMsgCountRef = useRef<Record<string, number>>({});
+  useEffect(() => {
+    if (!soundEnabled) return;
+    const currentCounts: Record<string, number> = {};
+    conversations.forEach(c => { currentCounts[c.id] = c.messages.length; });
+    const prev = prevMsgCountRef.current;
+    conversations.forEach(c => {
+      const prevCount = prev[c.id] || 0;
+      if (c.messages.length > prevCount && prevCount > 0) {
+        const lastMsg = c.messages[c.messages.length - 1];
+        if (lastMsg?.fromType === 'user') {
+          try {
+            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.frequency.value = 800;
+            osc.type = 'sine';
+            gain.gain.value = 0.15;
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.15);
+          } catch {}
+        }
+      }
+    });
+    prevMsgCountRef.current = currentCounts;
+  }, [conversations, soundEnabled]);
+
+  // Close context menu on click outside
+  useEffect(() => {
+    if (!contextMenu) return;
+    const handler = () => setContextMenu(null);
+    window.addEventListener('click', handler);
+    return () => window.removeEventListener('click', handler);
+  }, [contextMenu]);
+
+  // Context menu actions
+  const handleMarkUnread = async (chatId: string) => {
+    const conv = conversations.find(c => c.id === chatId);
+    if (!conv) return;
+    const lastInbound = [...conv.messages].reverse().find(m => m.fromType === 'user');
+    if (lastInbound) {
+      await supabase.from('messages').update({ status: 'delivered', read_at: null }).eq('id', lastInbound.id);
+    }
+    refetch();
+    toast.success('Marcada como não lida');
+    setContextMenu(null);
+  };
+
+  const handleSetTemperature = async (contactId: string, temp: string) => {
+    await supabase.from('contacts').update({ lead_temperature: temp }).eq('id', contactId);
+    refetch();
+    toast.success(`Temperatura: ${temp}`);
+    setContextMenu(null);
+  };
+
+  const handleSetCustomerType = async (contactId: string, type: string) => {
+    await supabase.from('contacts').update({ customer_type: type }).eq('id', contactId);
+    refetch();
+    toast.success(`Tipo: ${type}`);
+    setContextMenu(null);
+  };
+
+  const toggleSound = () => {
+    const next = !soundEnabled;
+    setSoundEnabled(next);
+    localStorage.setItem('chat-sound-enabled', String(next));
+  };
+
   // Load tag definitions and team members
   useEffect(() => {
     api.fetchTagDefinitions().then(setAvailableTags).catch(err => {
