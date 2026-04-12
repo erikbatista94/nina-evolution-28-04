@@ -170,7 +170,41 @@ const ChatInterface: React.FC = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
     localStorage.setItem('chat-sound-enabled', String(next));
+    setNotifSound(next);
   };
+
+  const togglePush = async () => {
+    if (notifPermission === 'unsupported') {
+      toast.error('Seu navegador não suporta notificações');
+      return;
+    }
+    if (notifPermission === 'default') {
+      const result = await Notification.requestPermission();
+      setNotifPermission(result);
+      if (result === 'granted') {
+        setPushEnabled(true);
+        localStorage.setItem('chat-notifications-enabled', 'true');
+        setNotifPush(true);
+        toast.success('Notificações ativadas!');
+      } else {
+        toast.error('Permissão de notificação negada');
+      }
+      return;
+    }
+    if (notifPermission === 'denied') {
+      toast.error('Notificações bloqueadas pelo navegador. Altere nas configurações do navegador.');
+      return;
+    }
+    const next = !pushEnabled;
+    setPushEnabled(next);
+    localStorage.setItem('chat-notifications-enabled', String(next));
+    setNotifPush(next);
+  };
+
+  // Sync selectedChatId with the hook for notification suppression
+  useEffect(() => {
+    setSelectedChatForNotif(selectedChatId);
+  }, [selectedChatId, setSelectedChatForNotif]);
 
   // Load tag definitions and team members
   useEffect(() => {
