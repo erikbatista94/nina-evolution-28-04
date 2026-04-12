@@ -26,6 +26,11 @@ export function useConversations() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(true);
+
+  // Notification preferences — set from ChatInterface via exposed setter
+  const notifSoundRef = useRef(localStorage.getItem('chat-sound-enabled') !== 'false');
+  const notifPushRef = useRef(localStorage.getItem('chat-notifications-enabled') !== 'false');
+  const selectedChatIdRef = useRef<string | null>(null);
   
   // Track processed message IDs to prevent duplicates across re-renders
   const processedMessageIds = useRef(new Set<string>());
