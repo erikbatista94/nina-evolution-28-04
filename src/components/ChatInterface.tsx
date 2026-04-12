@@ -70,6 +70,11 @@ const ChatInterface: React.FC = () => {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; chatId: string; contactId: string } | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('chat-sound-enabled') !== 'false');
+  const [pushEnabled, setPushEnabled] = useState(() => localStorage.getItem('chat-notifications-enabled') !== 'false');
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+    return Notification.permission;
+  });
   const [statusFilter, setStatusFilter] = useState<'all' | 'nina' | 'human' | 'paused'>('all');
   // Budget state
   const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
