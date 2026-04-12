@@ -12,6 +12,14 @@ import {
   MessageType
 } from '@/types';
 import { toast } from 'sonner';
+import {
+  playNotificationSound,
+  showBrowserNotification,
+  isMessageAlreadyNotified,
+  markMessageNotified,
+  seedNotifiedIds,
+  isPageHidden,
+} from '@/utils/notifications';
 
 export function useConversations() {
   const [conversations, setConversations] = useState<UIConversation[]>([]);
