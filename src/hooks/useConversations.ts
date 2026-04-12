@@ -109,11 +109,15 @@ export function useConversations() {
       
       // Reset processed IDs on fresh fetch and populate with existing messages
       processedMessageIds.current.clear();
+      const allMsgIds: string[] = [];
       data.forEach(conv => {
         conv.messages.forEach(msg => {
           processedMessageIds.current.add(msg.id);
+          allMsgIds.push(msg.id);
         });
       });
+      // Seed notification dedup so existing messages don't trigger alerts
+      seedNotifiedIds(allMsgIds);
       
       setConversations(data);
     } catch (err) {
