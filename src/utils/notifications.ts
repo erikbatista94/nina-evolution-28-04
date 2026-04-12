@@ -49,10 +49,9 @@ export function showBrowserNotification(
     const notification = new Notification(title, {
       body,
       icon: '/favicon.ico',
-      tag: `msg-${conversationId}`, // collapses multiple from same conv
-      renotify: true,
-      silent: true, // we play our own sound
-    });
+      tag: `msg-${conversationId}`,
+      silent: true,
+    } as NotificationOptions);
 
     notification.onclick = () => {
       window.focus();
