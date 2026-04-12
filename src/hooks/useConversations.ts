@@ -154,6 +154,34 @@ export function useConversations() {
             console.log('[Realtime] Message already processed (by ID), skipping:', newMessage.id);
             return;
           }
+
+          // --- Notification for inbound client messages ---
+          if (
+            newMessage.from_type === 'user' &&
+            !isMessageAlreadyNotified(newMessage.id)
+          ) {
+            markMessageNotified(newMessage.id);
+            const isViewingThisChat =
+              !isPageHidden() &&
+              selectedChatIdRef.current === newMessage.conversation_id;
+
+            // Play sound if enabled
+            if (notifSoundRef.current) {
+              playNotificationSound();
+            }
+
+            // Show browser notification if enabled and not staring at this chat
+            if (notifPushRef.current && !isViewingThisChat) {
+              // Find contact name from current state
+              const convInState = conversations.find(c => c.id === newMessage.conversation_id);
+              const contactName = convInState?.contactName || 'Cliente';
+              showBrowserNotification(
+                contactName,
+                newMessage.content || '',
+                newMessage.conversation_id
+              );
+            }
+          }
           
           setConversations(prev => {
             // Check if conversation exists in our state
