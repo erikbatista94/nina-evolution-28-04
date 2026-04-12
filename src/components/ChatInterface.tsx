@@ -32,7 +32,7 @@ const EMOJI_CATEGORIES = [
 ];
 
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch, setNotifSound, setNotifPush, setSelectedChatForNotif } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
