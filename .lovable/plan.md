@@ -1,31 +1,75 @@
 
 
-## Plano: 5 Melhorias — Menu Contexto + 4 Melhorias Úteis
+## Parte 1 — 3 Melhorias Novas Sugeridas (não implementar agora)
 
-### 1. Menu de contexto (botão direito) nas conversas ✅ Aprovado
-Ao clicar com botão direito em uma conversa na lista lateral:
-- **Marcar como não lida** — seta `unreadCount` localmente e atualiza `messages.status` no banco
-- **Temperatura** → Quente / Morno / Frio → atualiza `lead_temperature` em `contacts`
-- **Tipo de cliente** → Arquiteto / Construtora / Cliente Final / Lojista / Engenheiro / Outro → atualiza `customer_type` em `contacts`
+### 1. Resumo Automático da Conversa no Card do Pipeline
+**Por que é boa:** Hoje o vendedor precisa abrir o drawer do deal e ler mensagens para entender o contexto. Um resumo de 1-2 linhas gerado a partir do `client_memory.interaction_summary` e `sales_intelligence.next_best_action` direto no card do Kanban daria contexto imediato sem clique.
+**O que muda:** No componente Kanban, cada card exibiria uma linha como "Cliente interessado em porcelanato, aguardando orçamento" extraída dos dados que já existem no `client_memory`.
+**Esforço:** Baixo (frontend only, dados já existem)
+**Risco:** Baixo
 
-### 2. Badges de tipo de cliente e temperatura na lista ✅ Aprovado
-Exibir badges visuais (🔥/🟡/❄️ + "Arquiteto", "Construtora" etc.) no card da conversa na lista lateral. Campos já existem no banco (`customer_type`, `lead_temperature`), só falta popular no `UIConversation` e renderizar.
+### 2. Painel de Follow-ups Pendentes no Dashboard
+**Por que é boa:** Vendedores esquecem de retornar para leads. Um bloco no Dashboard mostrando "5 leads sem resposta há +24h" com link direto para a conversa reduziria perda de leads.
+**O que muda:** Novo bloco no Dashboard que consulta conversas onde `last_message_at` tem mais de X horas e a última mensagem é do tipo `user` (cliente esperando resposta). Clicável para abrir a conversa.
+**Esforço:** Baixo (query simples + componente pequeno)
+**Risco:** Baixo
 
-### 3. Notificação sonora em nova mensagem recebida
-Tocar um som curto (beep) quando chega uma mensagem inbound em qualquer conversa. Usar `new Audio()` com um data URI base64 de um beep curto (sem arquivo externo). Opção de silenciar via botão no header da lista.
-
-### 4. Contador de conversas por status no header
-Adicionar no topo da lista lateral contadores clicáveis: "🤖 Nina: 12 | 👤 Humano: 5 | ⏸ Pausado: 3". Clicar filtra a lista por aquele status. Já temos os dados, é só `conversations.filter(c => c.status === x).length`.
-
-### 5. Preview da última mídia na lista de conversas
-Quando a última mensagem é imagem, mostrar um thumbnail pequeno (20x20) ao lado do texto "📷 Imagem" na lista lateral. Para áudio, mostrar duração se disponível. Usa o `mediaUrl` que já vem no `UIMessage`.
+### 3. Exportação Rápida de Contatos (CSV)
+**Por que é boa:** Operação comercial frequentemente precisa exportar a base de leads para planilhas, campanhas ou relatórios externos. Hoje não há como fazer isso.
+**O que muda:** Botão "Exportar CSV" na tela de Contatos que gera download com nome, telefone, email, temperatura, tipo, tags, data do último contato.
+**Esforço:** Baixo (frontend only, dados já carregados)
+**Risco:** Baixo
 
 ---
 
-### Arquivos afetados
-- `src/types.ts` — adicionar `contactCustomerType` e `contactTemperature` ao `UIConversation`
-- `src/components/ChatInterface.tsx` — menu contexto, badges, filtro por status, som, thumbnail
-- `src/hooks/useConversations.ts` — popular novos campos e sincronizar via Realtime
+## Parte 2 — Implementar Sistema de Notificações (Som + Push Nativo)
 
-Sem migrations, sem edge functions, sem refatoração.
+### O que será feito
+
+1. **Criar utilitário `src/utils/notifications.ts`** — módulo central com:
+   - `requestNotificationPermission()` — pede permissão ao navegador
+   - `getNotificationStatus()` — retorna 'granted' | 'denied' | 'default'
+   - `showBrowserNotification(title, body, conversationId)` — exibe notificação nativa; ao clicar, foca a janela e navega para `/chat` com query param `?conv=ID`
+   - `playNotificationSound()` — toca beep via AudioContext
+   - Deduplicação interna via `Set<string>` de message IDs já notificados
+
+2. **Modificar `src/hooks/useConversations.ts`** — no handler de Realtime INSERT de mensagens:
+   - Quando `newMessage.from_type === 'user'` E o ID não está no set de dedup:
+     - Chamar `showBrowserNotification()` com nome do contato e trecho da mensagem
+     - Chamar `playNotificationSound()` se som habilitado
+   - Usar `document.visibilityState` e `selectedChatId` para suprimir notificação quando o usuário está vendo a conversa ativa
+   - Respeitar escopo do vendedor (já filtrado pelo Realtime/RLS existente)
+
+3. **Modificar `src/components/ChatInterface.tsx`** — no header da lista lateral:
+   - Manter toggle de som existente (Volume2/VolumeX)
+   - Adicionar toggle de notificação do navegador (Bell/BellOff)
+   - Mostrar badge de status: "Permitido" / "Bloqueado" / "Desativado"
+   - Botão para pedir permissão se status === 'default'
+   - Salvar preferências em localStorage (`chat-notifications-enabled`)
+
+4. **Navegação ao clicar na notificação** — `notification.onclick` faz:
+   - `window.focus()`
+   - `window.location.hash` ou `navigate('/chat?conv=ID')` 
+   - O ChatInterface já lê query params ou pode ser ajustado para auto-selecionar a conversa
+
+5. **Suprimir spam** — lógica de visibilidade:
+   - Se `document.visibilityState === 'visible'` E a conversa ativa === conversa da mensagem → não mostrar push (só som se habilitado)
+   - Se `document.hidden` ou conversa diferente → mostrar push + som
+
+### Arquivos alterados
+- **Novo:** `src/utils/notifications.ts`
+- **Editado:** `src/hooks/useConversations.ts` (integrar notificações no handler Realtime)
+- **Editado:** `src/components/ChatInterface.tsx` (controles de notificação no header + auto-select por query param)
+
+### Deduplicação
+- `Set<string>` de message IDs já notificados no módulo `notifications.ts`
+- Combinado com o `processedMessageIds` já existente no useConversations
+
+### Como testar
+1. Abrir o Preview → Chat → clicar no ícone de sino para pedir permissão
+2. Permitir notificações no navegador
+3. Simular mensagem via webhook ou Realtime
+4. Verificar: som toca + notificação aparece no sistema
+5. Clicar na notificação → foca a aba e abre a conversa correta
+6. Testar com a conversa ativa aberta → não deve mostrar push redundante
 
