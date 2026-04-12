@@ -4,7 +4,7 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
   Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock,
-  AlertTriangle, Shield, History, Volume2, VolumeX, Thermometer, Building2, Copy
+  AlertTriangle, Shield, History, Volume2, VolumeX, Thermometer, Building2, Copy, Bell, BellOff
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, getMessageDateLabel } from '../types';
 import { calculateCloseProbability, getFollowUpSuggestion } from '@/utils/salesIntelligence';
