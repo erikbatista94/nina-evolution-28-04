@@ -4,7 +4,7 @@ import {
   Search, MoreVertical, Phone, Paperclip, Send, Check, CheckCheck, 
   Smile, Play, Loader2, MessageSquare, Info, X, Mail, 
   Tag, Bot, User, Pause, Brain, Plus, Users, ExternalLink, Calendar, Zap, Mic, MapPin, Clock,
-  AlertTriangle, Shield, History, Volume2, VolumeX, Thermometer, Building2, Copy
+  AlertTriangle, Shield, History, Volume2, VolumeX, Thermometer, Building2, Copy, Bell, BellOff
 } from 'lucide-react';
 import { MessageDirection, MessageType, UIConversation, UIMessage, ConversationStatus, TagDefinition, getMessageDateLabel } from '../types';
 import { calculateCloseProbability, getFollowUpSuggestion } from '@/utils/salesIntelligence';
@@ -32,7 +32,7 @@ const EMOJI_CATEGORIES = [
 ];
 
 const ChatInterface: React.FC = () => {
-  const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch } = useConversations();
+  const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch, setNotifSound, setNotifPush, setSelectedChatForNotif } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
@@ -70,6 +70,11 @@ const ChatInterface: React.FC = () => {
   // Context menu state
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; chatId: string; contactId: string } | null>(null);
   const [soundEnabled, setSoundEnabled] = useState(() => localStorage.getItem('chat-sound-enabled') !== 'false');
+  const [pushEnabled, setPushEnabled] = useState(() => localStorage.getItem('chat-notifications-enabled') !== 'false');
+  const [notifPermission, setNotifPermission] = useState<NotificationPermission | 'unsupported'>(() => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'unsupported';
+    return Notification.permission;
+  });
   const [statusFilter, setStatusFilter] = useState<'all' | 'nina' | 'human' | 'paused'>('all');
   // Budget state
   const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
@@ -96,36 +101,23 @@ const ChatInterface: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Sound notification for new inbound messages
-  const prevMsgCountRef = useRef<Record<string, number>>({});
-  useEffect(() => {
-    if (!soundEnabled) return;
-    const currentCounts: Record<string, number> = {};
-    conversations.forEach(c => { currentCounts[c.id] = c.messages.length; });
-    const prev = prevMsgCountRef.current;
-    conversations.forEach(c => {
-      const prevCount = prev[c.id] || 0;
-      if (c.messages.length > prevCount && prevCount > 0) {
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (lastMsg?.fromType === 'user') {
-          try {
-            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.value = 800;
-            osc.type = 'sine';
-            gain.gain.value = 0.15;
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
-          } catch {}
-        }
-      }
-    });
-    prevMsgCountRef.current = currentCounts;
-  }, [conversations, soundEnabled]);
+  // Sound notification is now handled centrally in useConversations via notifications.ts
 
+  // Auto-select conversation from ?conv= query param (e.g. from browser notification click)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const convId = params.get('conv');
+    if (convId && conversations.length > 0 && !selectedChatId) {
+      const exists = conversations.some(c => c.id === convId);
+      if (exists) {
+        setSelectedChatId(convId);
+        // Clean up the URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('conv');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [conversations, selectedChatId]);
   // Close context menu on click outside
   useEffect(() => {
     if (!contextMenu) return;
@@ -165,7 +157,41 @@ const ChatInterface: React.FC = () => {
     const next = !soundEnabled;
     setSoundEnabled(next);
     localStorage.setItem('chat-sound-enabled', String(next));
+    setNotifSound(next);
   };
+
+  const togglePush = async () => {
+    if (notifPermission === 'unsupported') {
+      toast.error('Seu navegador não suporta notificações');
+      return;
+    }
+    if (notifPermission === 'default') {
+      const result = await Notification.requestPermission();
+      setNotifPermission(result);
+      if (result === 'granted') {
+        setPushEnabled(true);
+        localStorage.setItem('chat-notifications-enabled', 'true');
+        setNotifPush(true);
+        toast.success('Notificações ativadas!');
+      } else {
+        toast.error('Permissão de notificação negada');
+      }
+      return;
+    }
+    if (notifPermission === 'denied') {
+      toast.error('Notificações bloqueadas pelo navegador. Altere nas configurações do navegador.');
+      return;
+    }
+    const next = !pushEnabled;
+    setPushEnabled(next);
+    localStorage.setItem('chat-notifications-enabled', String(next));
+    setNotifPush(next);
+  };
+
+  // Sync selectedChatId with the hook for notification suppression
+  useEffect(() => {
+    setSelectedChatForNotif(selectedChatId);
+  }, [selectedChatId, setSelectedChatForNotif]);
 
   // Load tag definitions and team members
   useEffect(() => {
@@ -1082,6 +1108,24 @@ const ChatInterface: React.FC = () => {
           <span className="text-cyan-400">{myConversationsCount} minhas</span>
           <button onClick={toggleSound} className="ml-auto p-1 rounded hover:bg-slate-800 transition-colors" title={soundEnabled ? 'Som ativado' : 'Som desativado'}>
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-600" />}
+          </button>
+          <button
+            onClick={togglePush}
+            className="p-1 rounded hover:bg-slate-800 transition-colors"
+            title={
+              notifPermission === 'unsupported' ? 'Navegador não suporta notificações' :
+              notifPermission === 'denied' ? 'Notificações bloqueadas pelo navegador' :
+              notifPermission === 'default' ? 'Clique para ativar notificações' :
+              pushEnabled ? 'Notificações do navegador ativadas' : 'Notificações do navegador desativadas'
+            }
+          >
+            {notifPermission === 'denied' ? (
+              <BellOff className="w-3.5 h-3.5 text-red-400" />
+            ) : pushEnabled && notifPermission === 'granted' ? (
+              <Bell className="w-3.5 h-3.5 text-amber-400" />
+            ) : (
+              <BellOff className="w-3.5 h-3.5 text-slate-600" />
+            )}
           </button>
         </div>
 

@@ -12,12 +12,25 @@ import {
   MessageType
 } from '@/types';
 import { toast } from 'sonner';
+import {
+  playNotificationSound,
+  showBrowserNotification,
+  isMessageAlreadyNotified,
+  markMessageNotified,
+  seedNotifiedIds,
+  isPageHidden,
+} from '@/utils/notifications';
 
 export function useConversations() {
   const [conversations, setConversations] = useState<UIConversation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [realtimeConnected, setRealtimeConnected] = useState(true);
+
+  // Notification preferences — set from ChatInterface via exposed setter
+  const notifSoundRef = useRef(localStorage.getItem('chat-sound-enabled') !== 'false');
+  const notifPushRef = useRef(localStorage.getItem('chat-notifications-enabled') !== 'false');
+  const selectedChatIdRef = useRef<string | null>(null);
   
   // Track processed message IDs to prevent duplicates across re-renders
   const processedMessageIds = useRef(new Set<string>());
@@ -96,11 +109,15 @@ export function useConversations() {
       
       // Reset processed IDs on fresh fetch and populate with existing messages
       processedMessageIds.current.clear();
+      const allMsgIds: string[] = [];
       data.forEach(conv => {
         conv.messages.forEach(msg => {
           processedMessageIds.current.add(msg.id);
+          allMsgIds.push(msg.id);
         });
       });
+      // Seed notification dedup so existing messages don't trigger alerts
+      seedNotifiedIds(allMsgIds);
       
       setConversations(data);
     } catch (err) {
@@ -136,6 +153,34 @@ export function useConversations() {
           if (processedMessageIds.current.has(newMessage.id)) {
             console.log('[Realtime] Message already processed (by ID), skipping:', newMessage.id);
             return;
+          }
+
+          // --- Notification for inbound client messages ---
+          if (
+            newMessage.from_type === 'user' &&
+            !isMessageAlreadyNotified(newMessage.id)
+          ) {
+            markMessageNotified(newMessage.id);
+            const isViewingThisChat =
+              !isPageHidden() &&
+              selectedChatIdRef.current === newMessage.conversation_id;
+
+            // Play sound if enabled
+            if (notifSoundRef.current) {
+              playNotificationSound();
+            }
+
+            // Show browser notification if enabled and not staring at this chat
+            if (notifPushRef.current && !isViewingThisChat) {
+              // Find contact name from current state
+              const convInState = conversations.find(c => c.id === newMessage.conversation_id);
+              const contactName = convInState?.contactName || 'Cliente';
+              showBrowserNotification(
+                contactName,
+                newMessage.content || '',
+                newMessage.conversation_id
+              );
+            }
           }
           
           setConversations(prev => {
@@ -608,6 +653,11 @@ export function useConversations() {
     }
   }, []);
 
+  // Setters for notification config (called by ChatInterface)
+  const setNotifSound = useCallback((v: boolean) => { notifSoundRef.current = v; }, []);
+  const setNotifPush = useCallback((v: boolean) => { notifPushRef.current = v; }, []);
+  const setSelectedChatForNotif = useCallback((id: string | null) => { selectedChatIdRef.current = id; }, []);
+
   return {
     conversations,
     loading,
@@ -619,6 +669,9 @@ export function useConversations() {
     updateStatus,
     markAsRead,
     assignConversation,
-    refetch: fetchConversations
+    refetch: fetchConversations,
+    setNotifSound,
+    setNotifPush,
+    setSelectedChatForNotif,
   };
 }
