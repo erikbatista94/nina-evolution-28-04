@@ -653,6 +653,11 @@ export function useConversations() {
     }
   }, []);
 
+  // Setters for notification config (called by ChatInterface)
+  const setNotifSound = useCallback((v: boolean) => { notifSoundRef.current = v; }, []);
+  const setNotifPush = useCallback((v: boolean) => { notifPushRef.current = v; }, []);
+  const setSelectedChatForNotif = useCallback((id: string | null) => { selectedChatIdRef.current = id; }, []);
+
   return {
     conversations,
     loading,
@@ -664,6 +669,9 @@ export function useConversations() {
     updateStatus,
     markAsRead,
     assignConversation,
-    refetch: fetchConversations
+    refetch: fetchConversations,
+    setNotifSound,
+    setNotifPush,
+    setSelectedChatForNotif,
   };
 }
