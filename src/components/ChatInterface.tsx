@@ -103,6 +103,21 @@ const ChatInterface: React.FC = () => {
 
   // Sound notification is now handled centrally in useConversations via notifications.ts
 
+  // Auto-select conversation from ?conv= query param (e.g. from browser notification click)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const convId = params.get('conv');
+    if (convId && conversations.length > 0 && !selectedChatId) {
+      const exists = conversations.some(c => c.id === convId);
+      if (exists) {
+        setSelectedChatId(convId);
+        // Clean up the URL
+        const url = new URL(window.location.href);
+        url.searchParams.delete('conv');
+        window.history.replaceState({}, '', url.toString());
+      }
+    }
+  }, [conversations, selectedChatId]);
   // Close context menu on click outside
   useEffect(() => {
     if (!contextMenu) return;
