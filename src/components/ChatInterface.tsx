@@ -101,35 +101,7 @@ const ChatInterface: React.FC = () => {
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
-  // Sound notification for new inbound messages
-  const prevMsgCountRef = useRef<Record<string, number>>({});
-  useEffect(() => {
-    if (!soundEnabled) return;
-    const currentCounts: Record<string, number> = {};
-    conversations.forEach(c => { currentCounts[c.id] = c.messages.length; });
-    const prev = prevMsgCountRef.current;
-    conversations.forEach(c => {
-      const prevCount = prev[c.id] || 0;
-      if (c.messages.length > prevCount && prevCount > 0) {
-        const lastMsg = c.messages[c.messages.length - 1];
-        if (lastMsg?.fromType === 'user') {
-          try {
-            const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.frequency.value = 800;
-            osc.type = 'sine';
-            gain.gain.value = 0.15;
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.15);
-          } catch {}
-        }
-      }
-    });
-    prevMsgCountRef.current = currentCounts;
-  }, [conversations, soundEnabled]);
+  // Sound notification is now handled centrally in useConversations via notifications.ts
 
   // Close context menu on click outside
   useEffect(() => {
