@@ -1122,6 +1122,24 @@ const ChatInterface: React.FC = () => {
           <button onClick={toggleSound} className="ml-auto p-1 rounded hover:bg-slate-800 transition-colors" title={soundEnabled ? 'Som ativado' : 'Som desativado'}>
             {soundEnabled ? <Volume2 className="w-3.5 h-3.5 text-emerald-400" /> : <VolumeX className="w-3.5 h-3.5 text-slate-600" />}
           </button>
+          <button
+            onClick={togglePush}
+            className="p-1 rounded hover:bg-slate-800 transition-colors"
+            title={
+              notifPermission === 'unsupported' ? 'Navegador não suporta notificações' :
+              notifPermission === 'denied' ? 'Notificações bloqueadas pelo navegador' :
+              notifPermission === 'default' ? 'Clique para ativar notificações' :
+              pushEnabled ? 'Notificações do navegador ativadas' : 'Notificações do navegador desativadas'
+            }
+          >
+            {notifPermission === 'denied' ? (
+              <BellOff className="w-3.5 h-3.5 text-red-400" />
+            ) : pushEnabled && notifPermission === 'granted' ? (
+              <Bell className="w-3.5 h-3.5 text-amber-400" />
+            ) : (
+              <BellOff className="w-3.5 h-3.5 text-slate-600" />
+            )}
+          </button>
         </div>
 
         {/* View Filter Tabs */}
