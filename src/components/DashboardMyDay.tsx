@@ -369,6 +369,35 @@ const DashboardMyDay: React.FC = () => {
         </div>
       )}
 
+      {/* Bloco — Aguardando Resposta (+24h) */}
+      {awaitingResponse.length > 0 && (
+        <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <UserX className="h-5 w-5 text-orange-400" />
+            <h3 className="text-lg font-semibold">Aguardando Sua Resposta</h3>
+            <span className="ml-auto text-xs text-muted-foreground">{awaitingResponse.length} lead{awaitingResponse.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="space-y-2">
+            {awaitingResponse.map(item => (
+              <button
+                key={item.conversation_id}
+                onClick={() => navigate(`/chat?conversation=${item.conversation_id}`)}
+                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-orange-500/10 transition-colors text-left group"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{item.contact_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <Clock className="inline h-3 w-3 mr-1" />
+                    Esperando há {item.hours_waiting}h
+                  </p>
+                </div>
+                <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Bloco 3 — Leads em Risco (SLA) */}
       <div className="rounded-2xl border border-border bg-card p-5 shadow-lg">
         <div className="flex items-center gap-2 mb-4">
