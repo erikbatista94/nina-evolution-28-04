@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { Search, UserPlus, MessageSquare, Loader2, Phone, Users, Thermometer, MapPin, Briefcase, Filter, X, Copy, Mail } from 'lucide-react';
+import { Search, UserPlus, MessageSquare, Loader2, Phone, Users, Thermometer, MapPin, Briefcase, Filter, X, Copy, Mail, Download } from 'lucide-react';
 import HighlightText from './HighlightText';
 import { ContactsTableSkeleton } from './SkeletonCard';
 import { toast } from 'sonner';
@@ -153,10 +153,44 @@ const Contacts: React.FC = () => {
           <h2 className="text-3xl font-bold tracking-tight text-white">Contatos</h2>
           <p className="text-sm text-slate-400 mt-1">CRM de leads e clientes com qualificação automática.</p>
         </div>
-        <Button className="shadow-lg shadow-primary/20 opacity-50 cursor-not-allowed" disabled title="Em breve">
-          <UserPlus className="w-4 h-4 mr-2" />
-          Novo Contato
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            className="border-slate-700 text-slate-300 hover:bg-slate-800"
+            onClick={() => {
+              if (filteredContacts.length === 0) return;
+              const headers = ['Nome', 'Telefone', 'Email', 'Temperatura', 'Tipo', 'Status', 'Cidade', 'Tags', 'Responsável', 'Último Contato'];
+              const rows = filteredContacts.map(c => [
+                c.name || '',
+                c.phone || '',
+                c.email || '',
+                c.leadTemperature || '',
+                c.customerType || '',
+                c.leadStatus || '',
+                c.city || '',
+                (c.tags || []).join('; '),
+                getOwnerName(c.assignedUserId || null) || '',
+                c.lastActivity ? new Date(c.lastActivity).toLocaleDateString('pt-BR') : ''
+              ]);
+              const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+              const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `contatos_${new Date().toISOString().slice(0, 10)}.csv`;
+              a.click();
+              URL.revokeObjectURL(url);
+              toast.success(`${filteredContacts.length} contatos exportados`);
+            }}
+          >
+            <Download className="w-4 h-4 mr-2" />
+            Exportar CSV
+          </Button>
+          <Button className="shadow-lg shadow-primary/20 opacity-50 cursor-not-allowed" disabled title="Em breve">
+            <UserPlus className="w-4 h-4 mr-2" />
+            Novo Contato
+          </Button>
+        </div>
       </div>
 
       {/* Search + Filter Toggle */}

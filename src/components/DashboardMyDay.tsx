@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Calendar, AlertTriangle, Clock, ExternalLink, Loader2, MessageCircle, RotateCcw, Star } from 'lucide-react';
+import { MessageSquare, Calendar, AlertTriangle, Clock, ExternalLink, Loader2, MessageCircle, RotateCcw, Star, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAlerts } from '@/hooks/useAlerts';
