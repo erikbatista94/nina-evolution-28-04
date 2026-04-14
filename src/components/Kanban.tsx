@@ -607,7 +607,23 @@ const Kanban: React.FC = () => {
                       </div>
 
                       <h4 className="font-semibold text-white text-sm mb-0.5 leading-tight">{deal.title}</h4>
-                      <p className="text-[10px] text-slate-400 mb-2">{deal.company}</p>
+                      <p className="text-[10px] text-slate-400 mb-1">{deal.company}</p>
+                      {(() => {
+                        const mem = deal.clientMemory;
+                        const summary = mem?.interaction_summary?.last_contact_reason
+                          || mem?.sales_intelligence?.next_best_action;
+                        const products = mem?.lead_profile?.products_discussed?.slice(0, 2)?.join(', ');
+                        const contextLine = summary && summary !== 'qualify' && summary !== 'unknown'
+                          ? summary
+                          : products
+                            ? `Interesse: ${products}`
+                            : null;
+                        return contextLine ? (
+                          <p className="text-[9px] text-cyan-400/70 mb-1.5 leading-snug line-clamp-1 italic" title={contextLine}>
+                            💬 {contextLine}
+                          </p>
+                        ) : null;
+                      })()}
 
                       <div className="flex items-center gap-1.5 mb-2 flex-wrap">
                          {deal.tags.map(tag => (

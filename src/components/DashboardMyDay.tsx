@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { MessageSquare, Calendar, AlertTriangle, Clock, ExternalLink, Loader2, MessageCircle, RotateCcw, Star } from 'lucide-react';
+import { MessageSquare, Calendar, AlertTriangle, Clock, ExternalLink, Loader2, MessageCircle, RotateCcw, Star, UserX } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useAlerts } from '@/hooks/useAlerts';
@@ -44,6 +44,13 @@ interface TopLead {
   city: string | null;
 }
 
+interface AwaitingResponse {
+  conversation_id: string;
+  contact_name: string;
+  last_message_at: string;
+  hours_waiting: number;
+}
+
 const levelConfig = {
   stalled: { label: 'Lead Parado', color: 'bg-red-500/10 border-red-500/30 text-red-400' },
   loss_risk: { label: 'Risco de Perda', color: 'bg-orange-500/10 border-orange-500/30 text-orange-400' },
@@ -60,6 +67,7 @@ const DashboardMyDay: React.FC = () => {
   const [appointments, setAppointments] = useState<TodayAppointment[]>([]);
   const [followups, setFollowups] = useState<FollowupTask[]>([]);
   const [topLeads, setTopLeads] = useState<TopLead[]>([]);
+  const [awaitingResponse, setAwaitingResponse] = useState<AwaitingResponse[]>([]);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingAppts, setLoadingAppts] = useState(true);
 
@@ -139,10 +147,50 @@ const DashboardMyDay: React.FC = () => {
       setTopLeads((data as TopLead[]) || []);
     };
 
+    const fetchAwaitingResponse = async () => {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Get conversations assigned to user where last message is old
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('id, last_message_at, contacts(name, call_name)')
+        .eq('assigned_user_id', user.id)
+        .eq('is_active', true)
+        .lt('last_message_at', cutoff)
+        .order('last_message_at', { ascending: true })
+        .limit(10);
+
+      if (convs && convs.length > 0) {
+        // Check which ones have last message from 'user' (client)
+        const results: AwaitingResponse[] = [];
+        for (const conv of convs) {
+          const { data: lastMsg } = await supabase
+            .from('messages')
+            .select('from_type')
+            .eq('conversation_id', conv.id)
+            .order('sent_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (lastMsg?.from_type === 'user') {
+            const contact = conv.contacts as any;
+            const hours = Math.round((Date.now() - new Date(conv.last_message_at).getTime()) / (1000 * 60 * 60));
+            results.push({
+              conversation_id: conv.id,
+              contact_name: contact?.call_name || contact?.name || 'Desconhecido',
+              last_message_at: conv.last_message_at,
+              hours_waiting: hours,
+            });
+          }
+        }
+        setAwaitingResponse(results);
+      }
+    };
+
     fetchConversations();
     fetchAppointments();
     fetchFollowups();
     fetchTopLeads();
+    fetchAwaitingResponse();
   }, [user]);
 
   const stalledAlerts = alerts.filter(a => a.level === 'stalled');
@@ -316,6 +364,35 @@ const DashboardMyDay: React.FC = () => {
                   <span className="text-sm font-bold text-amber-400">{lead.lead_score}pts</span>
                 </div>
               </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Bloco — Aguardando Resposta (+24h) */}
+      {awaitingResponse.length > 0 && (
+        <div className="rounded-2xl border border-orange-500/30 bg-orange-500/5 p-5 shadow-lg">
+          <div className="flex items-center gap-2 mb-4">
+            <UserX className="h-5 w-5 text-orange-400" />
+            <h3 className="text-lg font-semibold">Aguardando Sua Resposta</h3>
+            <span className="ml-auto text-xs text-muted-foreground">{awaitingResponse.length} lead{awaitingResponse.length !== 1 ? 's' : ''}</span>
+          </div>
+          <div className="space-y-2">
+            {awaitingResponse.map(item => (
+              <button
+                key={item.conversation_id}
+                onClick={() => navigate(`/chat?conversation=${item.conversation_id}`)}
+                className="w-full flex items-center justify-between p-3 rounded-xl hover:bg-orange-500/10 transition-colors text-left group"
+              >
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{item.contact_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    <Clock className="inline h-3 w-3 mr-1" />
+                    Esperando há {item.hours_waiting}h
+                  </p>
+                </div>
+                <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
+              </button>
             ))}
           </div>
         </div>
