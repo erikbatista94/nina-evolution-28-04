@@ -124,16 +124,32 @@ const AlertsPanel: React.FC = () => {
   return (
     <div className="flex-1 h-full overflow-auto p-6">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-primary" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Bell className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Alertas de SLA</h1>
+              <p className="text-sm text-muted-foreground">
+                {alertCount === 0 ? 'Nenhum alerta pendente' : `${alertCount} alerta${alertCount > 1 ? 's' : ''} pendente${alertCount > 1 ? 's' : ''}`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Alertas de SLA</h1>
-            <p className="text-sm text-muted-foreground">
-              {alertCount === 0 ? 'Nenhum alerta pendente' : `${alertCount} alerta${alertCount > 1 ? 's' : ''} pendente${alertCount > 1 ? 's' : ''}`}
-            </p>
-          </div>
+          {alertCount > 1 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1.5"
+              onClick={async () => {
+                for (const a of alerts) await resolveAlert(a.id);
+                toast.success(`${alertCount} alertas resolvidos`);
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Resolver Todos
+            </Button>
+          )}
         </div>
 
         {alertCount === 0 ? (
