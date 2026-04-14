@@ -44,6 +44,13 @@ interface TopLead {
   city: string | null;
 }
 
+interface AwaitingResponse {
+  conversation_id: string;
+  contact_name: string;
+  last_message_at: string;
+  hours_waiting: number;
+}
+
 const levelConfig = {
   stalled: { label: 'Lead Parado', color: 'bg-red-500/10 border-red-500/30 text-red-400' },
   loss_risk: { label: 'Risco de Perda', color: 'bg-orange-500/10 border-orange-500/30 text-orange-400' },
