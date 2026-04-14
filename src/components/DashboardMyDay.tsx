@@ -67,6 +67,7 @@ const DashboardMyDay: React.FC = () => {
   const [appointments, setAppointments] = useState<TodayAppointment[]>([]);
   const [followups, setFollowups] = useState<FollowupTask[]>([]);
   const [topLeads, setTopLeads] = useState<TopLead[]>([]);
+  const [awaitingResponse, setAwaitingResponse] = useState<AwaitingResponse[]>([]);
   const [loadingConvs, setLoadingConvs] = useState(true);
   const [loadingAppts, setLoadingAppts] = useState(true);
 
