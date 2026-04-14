@@ -1,11 +1,12 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useAlerts, SlaAlert } from '@/hooks/useAlerts';
 import { useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
-import { Bell, Clock, AlertTriangle, XCircle, MessageSquare, ExternalLink } from 'lucide-react';
+import { Bell, Clock, AlertTriangle, XCircle, MessageSquare, ExternalLink, Copy, CheckCheck, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { toast } from 'sonner';
 
 const levelConfig = {
   respond_now: {
@@ -33,9 +34,19 @@ const AlertCard: React.FC<{ alert: SlaAlert; onOpenChat: (id: string) => void; o
   onOpenChat,
   onResolve,
 }) => {
+  const [copied, setCopied] = useState(false);
   const config = levelConfig[alert.level];
   const Icon = config.icon;
   const timeAgo = formatDistanceToNow(new Date(alert.last_client_message_at), { addSuffix: true, locale: ptBR });
+
+  const handleCopy = () => {
+    if (alert.suggested_message) {
+      navigator.clipboard.writeText(alert.suggested_message);
+      setCopied(true);
+      toast.success('Mensagem copiada!');
+      setTimeout(() => setCopied(false), 2000);
+    }
+  };
 
   return (
     <div className={`rounded-xl border p-4 ${config.color} transition-all hover:scale-[1.01]`}>
@@ -53,9 +64,16 @@ const AlertCard: React.FC<{ alert: SlaAlert; onOpenChat: (id: string) => void; o
       </div>
 
       {alert.suggested_message && (
-        <div className="mt-3 p-2.5 rounded-lg bg-background/30 border border-border/30">
+        <div className="mt-3 p-2.5 rounded-lg bg-background/30 border border-border/30 group/msg relative">
           <p className="text-xs opacity-60 mb-1">Mensagem sugerida:</p>
-          <p className="text-xs italic">"{alert.suggested_message}"</p>
+          <p className="text-xs italic pr-8">"{alert.suggested_message}"</p>
+          <button
+            onClick={handleCopy}
+            className="absolute top-2 right-2 p-1 rounded hover:bg-background/50 transition-colors opacity-60 hover:opacity-100"
+            title="Copiar mensagem"
+          >
+            {copied ? <CheckCheck className="w-3.5 h-3.5 text-green-400" /> : <Copy className="w-3.5 h-3.5" />}
+          </button>
         </div>
       )}
 
@@ -106,16 +124,32 @@ const AlertsPanel: React.FC = () => {
   return (
     <div className="flex-1 h-full overflow-auto p-6">
       <div className="max-w-3xl mx-auto">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-            <Bell className="w-5 h-5 text-primary" />
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+              <Bell className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-bold text-foreground">Alertas de SLA</h1>
+              <p className="text-sm text-muted-foreground">
+                {alertCount === 0 ? 'Nenhum alerta pendente' : `${alertCount} alerta${alertCount > 1 ? 's' : ''} pendente${alertCount > 1 ? 's' : ''}`}
+              </p>
+            </div>
           </div>
-          <div>
-            <h1 className="text-xl font-bold text-foreground">Alertas de SLA</h1>
-            <p className="text-sm text-muted-foreground">
-              {alertCount === 0 ? 'Nenhum alerta pendente' : `${alertCount} alerta${alertCount > 1 ? 's' : ''} pendente${alertCount > 1 ? 's' : ''}`}
-            </p>
-          </div>
+          {alertCount > 1 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs gap-1.5"
+              onClick={async () => {
+                for (const a of alerts) await resolveAlert(a.id);
+                toast.success(`${alertCount} alertas resolvidos`);
+              }}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Resolver Todos
+            </Button>
+          )}
         </div>
 
         {alertCount === 0 ? (
