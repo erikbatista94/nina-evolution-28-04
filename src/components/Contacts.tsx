@@ -170,7 +170,7 @@ const Contacts: React.FC = () => {
                 c.city || '',
                 (c.tags || []).join('; '),
                 getOwnerName(c.assignedUserId || null) || '',
-                c.lastActivity ? new Date(c.lastActivity).toLocaleDateString('pt-BR') : ''
+                c.lastContact ? new Date(c.lastContact).toLocaleDateString('pt-BR') : ''
               ]);
               const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
               const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
