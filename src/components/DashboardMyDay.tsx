@@ -147,10 +147,50 @@ const DashboardMyDay: React.FC = () => {
       setTopLeads((data as TopLead[]) || []);
     };
 
+    const fetchAwaitingResponse = async () => {
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      // Get conversations assigned to user where last message is old
+      const { data: convs } = await supabase
+        .from('conversations')
+        .select('id, last_message_at, contacts(name, call_name)')
+        .eq('assigned_user_id', user.id)
+        .eq('is_active', true)
+        .lt('last_message_at', cutoff)
+        .order('last_message_at', { ascending: true })
+        .limit(10);
+
+      if (convs && convs.length > 0) {
+        // Check which ones have last message from 'user' (client)
+        const results: AwaitingResponse[] = [];
+        for (const conv of convs) {
+          const { data: lastMsg } = await supabase
+            .from('messages')
+            .select('from_type')
+            .eq('conversation_id', conv.id)
+            .order('sent_at', { ascending: false })
+            .limit(1)
+            .single();
+
+          if (lastMsg?.from_type === 'user') {
+            const contact = conv.contacts as any;
+            const hours = Math.round((Date.now() - new Date(conv.last_message_at).getTime()) / (1000 * 60 * 60));
+            results.push({
+              conversation_id: conv.id,
+              contact_name: contact?.call_name || contact?.name || 'Desconhecido',
+              last_message_at: conv.last_message_at,
+              hours_waiting: hours,
+            });
+          }
+        }
+        setAwaitingResponse(results);
+      }
+    };
+
     fetchConversations();
     fetchAppointments();
     fetchFollowups();
     fetchTopLeads();
+    fetchAwaitingResponse();
   }, [user]);
 
   const stalledAlerts = alerts.filter(a => a.level === 'stalled');
