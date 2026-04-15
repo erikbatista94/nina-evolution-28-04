@@ -1,31 +1,31 @@
 
 
-## 3 Melhorias Novas (5 créditos no total)
+## 3 Melhorias — 5 créditos no total
 
-### 1. Exportação Rápida de Contatos (CSV)
-**Por que é boa:** A operação comercial frequentemente precisa exportar leads para planilhas, campanhas de marketing ou relatórios externos. Hoje não existe nenhuma forma de fazer isso no sistema.
-**O que muda:** Botão "Exportar CSV" no header da tela de Contatos. Gera download instantâneo com: nome, telefone, email, temperatura, tipo de cliente, tags, cidade, responsável, data do último contato.
-**Esforço:** Baixo (frontend only, dados já estão carregados no componente)
+### 1. Busca Global com Atalho de Teclado (Ctrl+K)
+**Por que é boa:** Hoje o vendedor precisa navegar manualmente entre páginas para encontrar um contato, conversa ou deal. Uma busca global tipo "spotlight" com `Ctrl+K` permite encontrar qualquer coisa em segundos — contato por nome/telefone, conversa, deal no pipeline — e navegar direto.
+**O que muda:** Componente modal de busca (overlay) ativado por `Ctrl+K` ou ícone na Sidebar. Busca nos dados já carregados (contatos, conversas) via Supabase query leve. Cada resultado clicável leva à página correta (`/chat?conv=`, `/contacts`, `/pipeline`).
+**Esforço:** Médio (novo componente + query + atalho global)
 **Risco:** Baixo
 
-### 2. Resumo Automático da Conversa no Card do Pipeline
-**Por que é boa:** Hoje o vendedor precisa abrir o drawer do deal para entender o contexto. Um resumo de 1 linha extraído do `client_memory.interaction_summary` direto no card do Kanban dá contexto imediato sem clique.
-**O que muda:** Cada card do Kanban exibe uma linha tipo "Cliente interessado em porcelanato, aguardando orçamento" usando dados que já existem no banco.
-**Esforço:** Baixo (frontend only, dados já vêm no deal/contact)
+### 2. Indicador de "Digitando agora" / Atividade Recente na Lista de Chats
+**Por que é boa:** Vendedores não sabem quais leads estão online/ativos neste momento. Mostrar um badge pulsante "mensagem recente" (ex: bolinha verde) nos contatos que enviaram mensagem nos últimos 5 minutos destaca quem precisa de atenção imediata.
+**O que muda:** Na lista lateral do chat, contatos com `lastMessageAt` < 5min recebem um indicador verde pulsante. Sem backend novo — usa timestamp que já existe no `UIConversation`.
+**Esforço:** Baixo (CSS + lógica de timestamp)
 **Risco:** Baixo
 
-### 3. Painel de Follow-ups Pendentes no Dashboard
-**Por que é boa:** Vendedores esquecem de retornar para leads. Um bloco no Dashboard mostrando "5 leads sem resposta há +24h" com link direto para a conversa reduziria perda de oportunidades.
-**O que muda:** Novo bloco no Dashboard que consulta conversas onde a última mensagem é do cliente e tem mais de 24h sem resposta do vendedor. Cada item é clicável e leva direto ao chat.
-**Esforço:** Baixo (query simples + componente pequeno)
+### 3. Atalho de Ações Rápidas no Card do Pipeline (Whatsapp + Agendar)
+**Por que é boa:** Hoje o vendedor precisa abrir o drawer do deal para enviar mensagem ou agendar visita. Dois botões de ação rápida direto no card (ícone WhatsApp → abre chat, ícone Calendário → abre agendamento) eliminam cliques desnecessários.
+**O que muda:** No Kanban, cada card ganha 2 ícones pequenos no hover: 💬 (navega para `/chat?conv=ID`) e 📅 (navega para `/scheduling`). Usa dados que já existem no deal (`conversation_id`, `contact_id`).
+**Esforço:** Baixo (frontend only, 2 botões + navegação)
 **Risco:** Baixo
 
 ---
 
 ### Arquivos afetados
-- **Melhoria 1:** `src/components/Contacts.tsx` — botão + função `downloadCSV`
-- **Melhoria 2:** `src/components/Kanban.tsx` — linha de resumo no card
-- **Melhoria 3:** `src/components/Dashboard.tsx` ou `src/components/DashboardMyDay.tsx` — novo bloco de follow-ups
+- **Melhoria 1:** Novo `src/components/GlobalSearch.tsx` + edição em `src/App.tsx` (ou `Sidebar.tsx`) para montar o componente e registrar `Ctrl+K`
+- **Melhoria 2:** `src/components/ChatInterface.tsx` — badge pulsante na lista lateral
+- **Melhoria 3:** `src/components/Kanban.tsx` — botões de ação rápida no card
 
-Todas são frontend-only, sem migrations, sem edge functions.
+Todas frontend-only, sem migrations, sem edge functions.
 
