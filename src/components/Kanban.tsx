@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Search, MoreHorizontal, DollarSign, Loader2, CalendarClock, Tag, X, 
   Building, User, Calendar, ArrowRight, CheckCircle2, Circle, 
