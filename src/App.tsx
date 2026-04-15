@@ -18,6 +18,7 @@ import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider } from './hooks/useAuth';
 import { Toaster } from 'sonner';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
+import GlobalSearch from './components/GlobalSearch';
 
 const AppLayout: React.FC = () => {
   return (
