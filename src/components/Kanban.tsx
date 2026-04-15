@@ -23,6 +23,7 @@ import { calculateCloseProbability, validateWinChecklist } from '@/utils/salesIn
 const Kanban: React.FC = () => {
   const { sdrName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [stages, setStages] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
