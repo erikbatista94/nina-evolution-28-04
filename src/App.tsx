@@ -18,11 +18,13 @@ import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider } from './hooks/useAuth';
 import { Toaster } from 'sonner';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
+import GlobalSearch from './components/GlobalSearch';
 
 const AppLayout: React.FC = () => {
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <KeyboardShortcutsModal />
+      <GlobalSearch />
       <div className="fixed top-0 left-0 w-[500px] h-[500px] bg-primary/20 rounded-full blur-[128px] pointer-events-none -translate-x-1/2 -translate-y-1/2 z-0"></div>
       <div className="fixed bottom-0 right-0 w-[500px] h-[500px] bg-accent/10 rounded-full blur-[128px] pointer-events-none translate-x-1/2 translate-y-1/2 z-0"></div>
       

@@ -1232,11 +1232,19 @@ const ChatInterface: React.FC = () => {
                       className="w-full h-full rounded-full object-cover border border-slate-800" 
                     />
                   </div>
-                  {chat.unreadCount > 0 ? (
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-cyan-500 border-2 border-slate-900 rounded-full animate-pulse"></span>
-                  ) : (
-                    <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-slate-600 border-2 border-slate-900 rounded-full"></span>
-                  )}
+                  {(() => {
+                    const raw = chat.lastMessageRawTime;
+                    const isRecent = raw && (Date.now() - new Date(raw).getTime()) < 5 * 60 * 1000;
+                    const lastMsg = chat.messages[chat.messages.length - 1];
+                    const isFromClient = lastMsg && lastMsg.fromType === 'user';
+                    if (chat.unreadCount > 0) {
+                      return <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-cyan-500 border-2 border-slate-900 rounded-full animate-pulse"></span>;
+                    }
+                    if (isRecent && isFromClient) {
+                      return <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-emerald-400 border-2 border-slate-900 rounded-full animate-pulse" title="Ativo agora"></span>;
+                    }
+                    return <span className="absolute bottom-0 right-0 w-3.5 h-3.5 bg-slate-600 border-2 border-slate-900 rounded-full"></span>;
+                  })()}
                 </div>
                 
                 <div className="ml-3 flex-1 min-w-0">

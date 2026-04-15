@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { 
   Plus, Search, MoreHorizontal, DollarSign, Loader2, CalendarClock, Tag, X, 
   Building, User, Calendar, ArrowRight, CheckCircle2, Circle, 
@@ -22,6 +23,7 @@ import { calculateCloseProbability, validateWinChecklist } from '@/utils/salesIn
 const Kanban: React.FC = () => {
   const { sdrName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
+  const navigate = useNavigate();
   const [deals, setDeals] = useState<Deal[]>([]);
   const [stages, setStages] = useState<KanbanColumn[]>([]);
   const [loading, setLoading] = useState(true);
@@ -635,17 +637,32 @@ const Kanban: React.FC = () => {
 
                       <div className="flex items-center justify-between pt-2 border-t border-slate-800">
                          <div className="flex items-center gap-1.5 text-slate-300 text-xs font-bold">
-                            <DollarSign className="w-3 h-3 text-emerald-500" />
-                            {formatCurrency(deal.value)}
+                             <DollarSign className="w-3 h-3 text-emerald-500" />
+                             {formatCurrency(deal.value)}
                          </div>
                          <div className="flex items-center gap-2">
-                            {deal.dueDate && (
-                                <div className="text-[9px] text-slate-500 flex items-center gap-1" title="Data de previsão">
-                                    <CalendarClock className="w-3 h-3" />
-                                    {new Date(deal.dueDate).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
-                                </div>
-                            )}
-                            <img src={deal.ownerAvatar} alt="Owner" className="w-5 h-5 rounded-full border border-slate-700" />
+                             {/* Quick action buttons */}
+                             <button
+                               onClick={(e) => { e.stopPropagation(); navigate(`/chat${deal.conversationId ? `?conversation=${deal.conversationId}` : ''}`); }}
+                               className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-cyan-500/20 transition-all"
+                               title="Abrir conversa"
+                             >
+                               <MessageSquare className="w-3.5 h-3.5 text-cyan-400" />
+                             </button>
+                             <button
+                               onClick={(e) => { e.stopPropagation(); navigate('/scheduling'); }}
+                               className="opacity-0 group-hover:opacity-100 p-1 rounded hover:bg-amber-500/20 transition-all"
+                               title="Agendar visita"
+                             >
+                               <Calendar className="w-3.5 h-3.5 text-amber-400" />
+                             </button>
+                             {deal.dueDate && (
+                                 <div className="text-[9px] text-slate-500 flex items-center gap-1" title="Data de previsão">
+                                     <CalendarClock className="w-3 h-3" />
+                                     {new Date(deal.dueDate).toLocaleDateString('pt-BR', {day: '2-digit', month: '2-digit'})}
+                                 </div>
+                             )}
+                             <img src={deal.ownerAvatar} alt="Owner" className="w-5 h-5 rounded-full border border-slate-700" />
                          </div>
                       </div>
                     </div>
