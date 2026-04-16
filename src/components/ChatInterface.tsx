@@ -1176,8 +1176,8 @@ const ChatInterface: React.FC = () => {
             </Select>
           )}
 
-          {/* Temperature filter chips */}
-          <div className="flex gap-1 px-3 pb-2">
+          {/* Temperature filter chips + mark all as read */}
+          <div className="flex gap-1 px-3 pb-2 items-center">
             {([
               { key: 'all' as const, label: 'Todos', emoji: '' },
               { key: 'quente' as const, label: 'Quente', emoji: '🔥' },
@@ -1196,6 +1196,29 @@ const ChatInterface: React.FC = () => {
                 {t.emoji} {t.label}
               </button>
             ))}
+            {filteredConversations.some(c => c.unreadCount > 0) && (
+              <button
+                onClick={async () => {
+                  const ids = filteredConversations.filter(c => c.unreadCount > 0).map(c => c.id);
+                  if (ids.length === 0) return;
+                  const { error } = await supabase
+                    .from('messages')
+                    .update({ status: 'read', read_at: new Date().toISOString() })
+                    .in('conversation_id', ids)
+                    .eq('from_type', 'user')
+                    .neq('status', 'read');
+                  if (error) {
+                    toast.error('Erro ao marcar como lidas');
+                  } else {
+                    toast.success(`${ids.length} conversa(s) marcadas como lidas`);
+                  }
+                }}
+                className="ml-auto px-2 py-1 text-[10px] rounded-md border border-slate-700/50 bg-slate-800/50 text-slate-400 hover:text-cyan-300 hover:border-cyan-500/40 transition-colors"
+                title="Marcar todas as conversas visíveis como lidas"
+              >
+                ✓ Marcar lidas
+              </button>
+            )}
           </div>
         </div>
 
