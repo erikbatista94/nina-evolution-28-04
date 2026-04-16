@@ -417,6 +417,28 @@ const Kanban: React.FC = () => {
                 className="w-full pl-9 pr-4 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-200 focus:ring-1 focus:ring-primary outline-none placeholder:text-slate-600"
              />
            </div>
+          {/* Quick temperature chips */}
+          <div className="hidden md:flex items-center gap-1 px-1 py-1 bg-slate-900/60 border border-slate-800 rounded-lg">
+            {([
+              { key: 'all', label: 'Todas', cls: 'text-slate-300' },
+              { key: 'quente', label: '🔥', cls: 'text-red-400' },
+              { key: 'morno', label: '🌤', cls: 'text-amber-400' },
+              { key: 'frio', label: '❄️', cls: 'text-sky-400' },
+            ] as const).map(t => (
+              <button
+                key={t.key}
+                onClick={() => setFilterTemperature(t.key)}
+                title={`Temperatura: ${t.label}`}
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
+                  filterTemperature === t.key
+                    ? 'bg-slate-700 text-white'
+                    : `hover:bg-slate-800 ${t.cls}`
+                }`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
           <Button 
             variant="outline" 
             className={`border-slate-700 text-slate-300 hover:bg-slate-800 ${hasActiveFilters ? 'border-cyan-500 text-cyan-400' : ''}`}

@@ -19,8 +19,10 @@ import { AuthProvider } from './hooks/useAuth';
 import { Toaster } from 'sonner';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import GlobalSearch from './components/GlobalSearch';
+import { useUnreadTabTitle } from './hooks/useUnreadTabTitle';
 
 const AppLayout: React.FC = () => {
+  useUnreadTabTitle();
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <KeyboardShortcutsModal />
