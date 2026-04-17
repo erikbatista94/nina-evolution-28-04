@@ -1516,6 +1516,49 @@ const ChatInterface: React.FC = () => {
                 >
                   <Pause className="w-5 h-5" />
                 </Button>
+                {/* Take ownership button */}
+                {user?.id && activeChat.assignedUserId !== user.id && (() => {
+                  const isUnassigned = !activeChat.assignedUserId;
+                  const canTake = isUnassigned || isAdmin;
+                  if (!canTake) return null;
+                  const assignedMember = teamMembers.find(m => m.user_id === activeChat.assignedUserId);
+                  const assignedName = assignedMember?.name?.split(' ')[0] || 'outro agente';
+                  return (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={`text-xs h-8 px-2 ${
+                        isUnassigned
+                          ? 'text-amber-400 hover:bg-amber-500/10 border border-amber-500/30'
+                          : 'text-cyan-400 hover:bg-cyan-500/10 border border-cyan-500/30'
+                      }`}
+                      title={isUnassigned ? 'Atribuir esta conversa a você' : `Reatribuir (atualmente: ${assignedName})`}
+                      onClick={async () => {
+                        if (!isUnassigned) {
+                          const ok = window.confirm(`Esta conversa está com ${assignedName}. Deseja reatribuir para você?`);
+                          if (!ok) return;
+                        }
+                        const previousUserId = activeChat.assignedUserId;
+                        try {
+                          await assignConversation(activeChat.id, user.id);
+                          await supabase.from('conversation_ownership_log').insert({
+                            conversation_id: activeChat.id,
+                            user_id: user.id,
+                            previous_user_id: previousUserId,
+                            action: isUnassigned ? 'claim' : 'reassign',
+                            notes: isUnassigned ? 'Auto-assumida via header' : `Reatribuída de ${assignedName}`,
+                          });
+                          toast.success(isUnassigned ? 'Você assumiu esta conversa' : 'Conversa reatribuída a você');
+                        } catch (err: any) {
+                          toast.error(err?.message || 'Erro ao assumir conversa');
+                        }
+                      }}
+                    >
+                      <Users className="w-3.5 h-3.5 mr-1" />
+                      {isUnassigned ? 'Assumir' : 'Reatribuir'}
+                    </Button>
+                  );
+                })()}
                 <div className="h-6 w-px bg-slate-800 mx-1"></div>
                 <Button 
                   variant="ghost" 
