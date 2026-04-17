@@ -23,6 +23,7 @@ import AudioRecorder from './AudioRecorder';
 import TemplateModal from './TemplateModal';
 import HighlightText from './HighlightText';
 import { ChatListSkeleton } from './SkeletonCard';
+import { useAlerts } from '@/hooks/useAlerts';
 
 const EMOJI_CATEGORIES = [
   { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
@@ -35,6 +36,18 @@ const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch, setNotifSound, setNotifPush, setSelectedChatForNotif } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
+  const { alerts: slaAlerts } = useAlerts();
+  const slaByConversation = React.useMemo(() => {
+    const map = new Map<string, 'respond_now' | 'loss_risk' | 'stalled'>();
+    const priority = { stalled: 3, loss_risk: 2, respond_now: 1 } as const;
+    for (const a of slaAlerts) {
+      const current = map.get(a.conversation_id);
+      if (!current || priority[a.level] > priority[current]) {
+        map.set(a.conversation_id, a.level);
+      }
+    }
+    return map;
+  }, [slaAlerts]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(true);
@@ -1196,6 +1209,19 @@ const ChatInterface: React.FC = () => {
                 {t.emoji} {t.label}
               </button>
             ))}
+            {isAdmin && viewFilter === 'all' && (
+              <button
+                onClick={() => setAssignedFilter(assignedFilter === 'unassigned' ? 'all' : 'unassigned')}
+                className={`px-2 py-1 text-[10px] rounded-md border transition-colors ${
+                  assignedFilter === 'unassigned'
+                    ? 'bg-amber-500/20 border-amber-500/40 text-amber-300'
+                    : 'bg-slate-800/50 border-slate-700/50 text-slate-500 hover:text-slate-300'
+                }`}
+                title="Mostrar apenas conversas sem responsável"
+              >
+                ⚠️ Não atribuídas
+              </button>
+            )}
             {filteredConversations.some(c => c.unreadCount > 0) && (
               <button
                 onClick={async () => {
@@ -1304,6 +1330,24 @@ const ChatInterface: React.FC = () => {
                   
                   <div className="flex items-center mt-2 gap-1.5 flex-wrap">
                     {renderStatusBadge(chat.status)}
+                    {/* SLA badge */}
+                    {(() => {
+                      const sla = slaByConversation.get(chat.id);
+                      if (!sla) return null;
+                      const cfg = sla === 'stalled'
+                        ? { cls: 'bg-red-500/20 border-red-500/40 text-red-300 animate-pulse', label: '⏱ SLA crítico' }
+                        : sla === 'loss_risk'
+                        ? { cls: 'bg-orange-500/20 border-orange-500/40 text-orange-300', label: '⚠ Risco' }
+                        : { cls: 'bg-amber-500/20 border-amber-500/40 text-amber-300', label: '⏰ Responder' };
+                      return (
+                        <span
+                          className={`px-1.5 py-0.5 text-[10px] rounded-md font-medium border ${cfg.cls}`}
+                          title={`SLA: ${sla}`}
+                        >
+                          {cfg.label}
+                        </span>
+                      );
+                    })()}
                     {/* Temperature badge */}
                     {chat.contactTemperature && chat.contactTemperature !== 'frio' && (
                       <span className={`px-1.5 py-0.5 text-[10px] rounded-md font-medium border ${
