@@ -23,6 +23,7 @@ import AudioRecorder from './AudioRecorder';
 import TemplateModal from './TemplateModal';
 import HighlightText from './HighlightText';
 import { ChatListSkeleton } from './SkeletonCard';
+import { useAlerts } from '@/hooks/useAlerts';
 
 const EMOJI_CATEGORIES = [
   { label: '😀 Smileys', emojis: ['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😗','😙','😚','🙂','🤗','🤩','🤔','🤨','😐','😑','😶','🙄','😏','😣','😥','😮','🤐','😯','😪','😫','😴','😌','😛','😜','😝','🤤','😒','😓','😔','😕','🙃','🤑','😲','🤯','😳','🥺','😱','😨','😰','😢','😭','😤','😠','😡','🤬','🤮','🤢','🤧','😇','🥳','🥴','🥱','😈'] },
@@ -35,6 +36,18 @@ const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch, setNotifSound, setNotifPush, setSelectedChatForNotif } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
+  const { alerts: slaAlerts } = useAlerts();
+  const slaByConversation = React.useMemo(() => {
+    const map = new Map<string, 'respond_now' | 'loss_risk' | 'stalled'>();
+    const priority = { stalled: 3, loss_risk: 2, respond_now: 1 } as const;
+    for (const a of slaAlerts) {
+      const current = map.get(a.conversation_id);
+      if (!current || priority[a.level] > priority[current]) {
+        map.set(a.conversation_id, a.level);
+      }
+    }
+    return map;
+  }, [slaAlerts]);
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [inputText, setInputText] = useState('');
   const [showProfileInfo, setShowProfileInfo] = useState(true);
