@@ -69,12 +69,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
-    
-    return { error: error as Error | null };
+    // Validate Supabase config is present (catches missing env vars in published build)
+    if (!import.meta.env.VITE_SUPABASE_URL || !import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY) {
+      return { error: new Error('SUPABASE_CONFIG_MISSING') };
+    }
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      return { error: error as Error | null };
+    } catch (err: any) {
+      // Network-level failures (TypeError: Failed to fetch, CORS, DNS, offline)
+      console.error('[signIn] network/transport error:', err);
+      const message = err?.message || String(err);
+      if (message.includes('Failed to fetch') || message.includes('NetworkError') || err?.name === 'TypeError') {
+        return { error: new Error('NETWORK_ERROR') };
+      }
+      if (message.toLowerCase().includes('cors')) {
+        return { error: new Error('CORS_NOT_ALLOWED') };
+      }
+      return { error: new Error(message) };
+    }
   };
 
   const signOut = async () => {

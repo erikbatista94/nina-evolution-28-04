@@ -54,12 +54,21 @@ const Auth: React.FC = () => {
     try {
       const { error } = await signIn(email, password);
       if (error) {
-        if (error.message.includes('Invalid login credentials')) {
-          toast.error('Email ou senha incorretos');
-        } else if (error.message.includes('Email not confirmed')) {
-          toast.error('Por favor, confirme seu email antes de fazer login');
+        const msg = error.message || '';
+        if (msg === 'NETWORK_ERROR') {
+          toast.error('Erro de rede. Verifique sua conexão e tente novamente.');
+        } else if (msg === 'SUPABASE_CONFIG_MISSING') {
+          toast.error('Configuração ausente do Supabase. Contate o administrador.');
+        } else if (msg === 'CORS_NOT_ALLOWED') {
+          toast.error('Domínio não autorizado no servidor de autenticação.');
+        } else if (msg.includes('Invalid login credentials') || msg.includes('invalid_grant')) {
+          toast.error('Credenciais inválidas. Verifique seu email e senha.');
+        } else if (msg.includes('Email not confirmed')) {
+          toast.error('Por favor, confirme seu email antes de fazer login.');
+        } else if (msg.includes('Too many requests') || msg.includes('rate limit')) {
+          toast.error('Muitas tentativas. Aguarde alguns minutos e tente novamente.');
         } else {
-          toast.error(error.message);
+          toast.error(`Erro ao entrar: ${msg}`);
         }
         return;
       }
