@@ -1716,6 +1716,12 @@ export type Database = {
         }
         Returns: boolean
       }
+      mika_nina_contacts_by_tag: { Args: { tag: string }; Returns: Json }
+      mika_nina_contacts_recent: { Args: never; Returns: Json }
+      mika_nina_conversations_active: { Args: never; Returns: Json }
+      mika_nina_messages_recent: { Args: never; Returns: Json }
+      mika_nina_search_contact: { Args: { nome: string }; Returns: Json }
+      mika_nina_summary: { Args: never; Returns: Json }
       search_knowledge: {
         Args: { p_query: string; p_tenant_id?: string; p_top_k?: number }
         Returns: {
