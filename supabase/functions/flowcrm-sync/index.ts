@@ -203,6 +203,11 @@ serve(async (req) => {
       return respondOk({ ok: false, error: `Unknown event: ${event}` });
     }
 
+    // Add seller fields to both events when available
+    if (sellerName) payload.seller_name = sellerName;
+    if (sellerEmail) payload.seller_email = sellerEmail;
+    if (sellerId) payload.seller_id = sellerId;
+
     // Fire request
     let httpStatus: number | null = null;
     let success = false;
