@@ -53,7 +53,7 @@ serve(async (req) => {
     // Load contact
     const { data: contact, error: contactErr } = await supabase
       .from('contacts')
-      .select('id, name, call_name, phone_number, city, source, customer_type, job_size, interest_services, notes, client_memory')
+      .select('id, name, call_name, phone_number, city, source, customer_type, job_size, interest_services, notes, client_memory, assigned_user_id')
       .eq('id', contact_id)
       .maybeSingle();
 
@@ -61,6 +61,71 @@ serve(async (req) => {
       console.error('[FlowCRM] Contact not found:', contact_id, contactErr);
       return respondOk({ ok: false, error: 'contact not found' });
     }
+
+    // === RESOLVE SELLER (vendedor responsável) ===
+    // Priority: conversation.assigned_user_id → contact.assigned_user_id → client_memory.assigned_user_id
+    let sellerUserId: string | null = null;
+
+    if (conversation_id) {
+      const { data: conv } = await supabase
+        .from('conversations')
+        .select('assigned_user_id')
+        .eq('id', conversation_id)
+        .maybeSingle();
+      if (conv?.assigned_user_id) sellerUserId = conv.assigned_user_id;
+    }
+
+    if (!sellerUserId && contact.assigned_user_id) {
+      sellerUserId = contact.assigned_user_id;
+    }
+
+    if (!sellerUserId) {
+      const memSeller = (contact.client_memory as any)?.assigned_user_id
+        ?? (contact.client_memory as any)?.seller?.user_id;
+      if (memSeller) sellerUserId = memSeller;
+    }
+
+    let sellerName: string | null = null;
+    let sellerEmail: string | null = null;
+    let sellerId: string | null = null; // team_members.id
+
+    if (sellerUserId) {
+      // Prefer team_members (has whatsapp/google email + name)
+      const { data: tm } = await supabase
+        .from('team_members')
+        .select('id, name, email, google_calendar_email')
+        .eq('user_id', sellerUserId)
+        .maybeSingle();
+
+      if (tm) {
+        sellerId = tm.id;
+        sellerName = tm.name || null;
+        sellerEmail = tm.google_calendar_email || tm.email || null;
+      }
+
+      // Fallback to profiles for name if missing
+      if (!sellerName) {
+        const { data: prof } = await supabase
+          .from('profiles')
+          .select('full_name')
+          .eq('user_id', sellerUserId)
+          .maybeSingle();
+        if (prof?.full_name) sellerName = prof.full_name;
+      }
+
+      // Fallback to auth.users for email if missing
+      if (!sellerEmail) {
+        try {
+          const { data: authUser } = await supabase.auth.admin.getUserById(sellerUserId);
+          if (authUser?.user?.email) sellerEmail = authUser.user.email;
+        } catch (e) {
+          console.warn('[FlowCRM] Could not fetch auth user email:', e);
+        }
+      }
+    }
+
+    const hasSeller = !!(sellerName || sellerEmail || sellerId);
+    console.log(`[FlowCRM] Seller resolved: name=${sellerName} email=${sellerEmail} id=${sellerId} hasSeller=${hasSeller}`);
 
     // === DEDUPLICATION FOR LEAD EVENT ===
     if (event === 'lead') {
