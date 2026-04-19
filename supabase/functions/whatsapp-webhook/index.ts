@@ -205,6 +205,18 @@ serve(async (req) => {
             }
             contact = newContact;
             console.log('[Webhook] Created new contact:', contact.id);
+
+            // Fire-and-forget: notify FlowCRM about new lead
+            EdgeRuntime.waitUntil(
+              fetch(`${supabaseUrl}/functions/v1/flowcrm-sync`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${supabaseServiceKey}`,
+                },
+                body: JSON.stringify({ event: 'lead', contact_id: contact.id }),
+              }).catch(err => console.error('[Webhook] FlowCRM lead sync error:', err))
+            );
           } else {
             const updates: any = { last_activity: new Date().toISOString() };
             if (contactName && !contact.name) {
