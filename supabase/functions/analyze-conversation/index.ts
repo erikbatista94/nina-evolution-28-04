@@ -504,14 +504,12 @@ Preencha o máximo de campos possível com base nas informações da conversa. S
         try {
           const fcUrl = Deno.env.get('SUPABASE_URL')!;
           const fcKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-          // @ts-ignore EdgeRuntime is available in Supabase edge functions
-          EdgeRuntime.waitUntil(
-            fetch(`${fcUrl}/functions/v1/flowcrm-sync`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fcKey}` },
-              body: JSON.stringify({ event: 'qualification', contact_id, conversation_id }),
-            }).catch(err => console.error('[Analyze] FlowCRM qualification sync error:', err))
-          );
+          // fire-and-forget; we intentionally do not await
+          fetch(`${fcUrl}/functions/v1/flowcrm-sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${fcKey}` },
+            body: JSON.stringify({ event: 'qualification', contact_id, conversation_id }),
+          }).catch(err => console.error('[Analyze] FlowCRM qualification sync error:', err));
         } catch (e) {
           console.error('[Analyze] FlowCRM trigger error:', e);
         }
