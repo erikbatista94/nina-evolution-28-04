@@ -250,6 +250,10 @@ serve(async (req) => {
           success,
           error: errorSnippet,
           phone,
+          seller_name: sellerName,
+          seller_email: sellerEmail,
+          seller_id: sellerId,
+          has_seller: hasSeller,
         },
       });
     } catch (logErr) {
