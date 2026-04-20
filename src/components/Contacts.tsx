@@ -405,6 +405,7 @@ const Contacts: React.FC = () => {
                               </div>
                             )}
                             {ownerName && <div className="text-[10px] text-slate-600">👤 {ownerName}</div>}
+                            <div className="mt-0.5">{renderSyncBadge(contact.id)}</div>
                           </div>
                         </div>
                       </td>
