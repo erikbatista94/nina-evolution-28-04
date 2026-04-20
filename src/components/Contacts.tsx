@@ -10,6 +10,14 @@ import { Contact, TeamMember } from '../types';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useFlowCRMSyncStatuses, type FlowCRMSyncStatus } from '@/hooks/useFlowCRMSyncStatus';
+
+const SYNC_BADGE: Record<FlowCRMSyncStatus, { dot: string; label: string; title: (info: string) => string }> = {
+  synced:  { dot: 'bg-emerald-500', label: 'Sincronizado', title: (i) => `FlowCRM: sincronizado ${i}` },
+  stale:   { dot: 'bg-yellow-500',  label: 'Pendente',     title: (i) => `FlowCRM: sync antigo ${i}` },
+  pending: { dot: 'bg-slate-500',   label: 'Pendente',     title: () => 'FlowCRM: nunca sincronizado' },
+  error:   { dot: 'bg-red-500',     label: 'Erro',         title: (i) => `FlowCRM: falha na última sync ${i}` },
+};
 
 // Auto-generate tags from structured fields
 function generateAutoTags(contact: Contact): { label: string; color: string }[] {
