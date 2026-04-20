@@ -122,6 +122,28 @@ const Contacts: React.FC = () => {
     });
   }, [contacts, searchTerm, filterOwner, filterType, filterStatus, filterTemp, filterCity, filterTimeframe, filterProject, filterInteraction]);
 
+  // Realtime FlowCRM sync statuses for contacts on screen
+  const visibleIds = useMemo(() => filteredContacts.map(c => c.id), [filteredContacts]);
+  const syncStatuses = useFlowCRMSyncStatuses(visibleIds);
+
+  const renderSyncBadge = (contactId: string) => {
+    const info = syncStatuses[contactId];
+    const status = info?.status ?? 'pending';
+    const cfg = SYNC_BADGE[status];
+    const ago = info?.lastSyncAt
+      ? new Date(info.lastSyncAt).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+      : '';
+    return (
+      <span
+        className="inline-flex items-center gap-1.5 text-[10px] text-slate-400"
+        title={cfg.title(ago ? `(${ago})` : '')}
+      >
+        <span className={`w-1.5 h-1.5 rounded-full ${cfg.dot}`} />
+        FlowCRM: {cfg.label}
+      </span>
+    );
+  };
+
   const getTemperatureBadge = (temp: string | null) => {
     switch (temp) {
       case 'quente': return <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold bg-red-500/15 text-red-400 border border-red-500/30">🔴 Quente</span>;
