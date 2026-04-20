@@ -7,6 +7,7 @@ import { useAlerts } from '@/hooks/useAlerts';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { formatDistanceToNow } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import MyScorecard from './MyScorecard';
 
 interface PendingConversation {
   id: string;
@@ -211,6 +212,9 @@ const DashboardMyDay: React.FC = () => {
         <h2 className="text-3xl font-bold tracking-tight">{greeting()} 👋</h2>
         <p className="text-muted-foreground mt-1">Aqui está o resumo do seu dia.</p>
       </div>
+
+      {/* Meu Placar — performance pessoal e ranking */}
+      <MyScorecard showRanking={true} />
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Bloco 1 — Conversas Pendentes */}

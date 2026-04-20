@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import DashboardMyDay from './DashboardMyDay';
 import DashboardSlaBlock from './DashboardSlaBlock';
+import MyScorecard from './MyScorecard';
 
 type PeriodFilter = 'today' | '7days' | '30days';
 
@@ -268,6 +269,12 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Scorecard — admin can pick a seller, otherwise team-wide ranking using own id */}
+      <MyScorecard
+        targetUserId={selectedSeller !== 'all' ? selectedSeller : user?.id}
+        showRanking={true}
+      />
 
       {/* SLA Block for Admin */}
       <DashboardSlaBlock filterUserId={selectedSeller !== 'all' ? selectedSeller : undefined} />
