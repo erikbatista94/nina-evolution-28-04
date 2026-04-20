@@ -20,9 +20,11 @@ import { Toaster } from 'sonner';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import GlobalSearch from './components/GlobalSearch';
 import { useUnreadTabTitle } from './hooks/useUnreadTabTitle';
+import { useFlowCRMSyncToast } from './hooks/useFlowCRMSyncToast';
 
 const AppLayout: React.FC = () => {
   useUnreadTabTitle();
+  useFlowCRMSyncToast();
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <KeyboardShortcutsModal />
