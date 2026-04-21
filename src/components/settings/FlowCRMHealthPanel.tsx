@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity, CheckCircle2, XCircle, AlertTriangle, RefreshCw, UserX, Clock } from 'lucide-react';
+import { Activity, CheckCircle2, XCircle, AlertTriangle, RefreshCw, UserX, Clock, Send } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SyncEvent {
   id: string;
@@ -26,6 +27,36 @@ const FlowCRMHealthPanel: React.FC = () => {
   const [recentFailures, setRecentFailures] = useState<SyncEvent[]>([]);
   const [recentEvents, setRecentEvents] = useState<SyncEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState<Record<string, boolean>>({});
+
+  const handleResend = useCallback(async (ev: SyncEvent) => {
+    const ed = ev.event_data ?? {};
+    if (!ev.contact_id || !ed.event) {
+      toast.error('Evento sem contato ou tipo válido para reenvio');
+      return;
+    }
+    setResending((p) => ({ ...p, [ev.id]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('flowcrm-sync', {
+        body: {
+          event: ed.event,
+          contact_id: ev.contact_id,
+          conversation_id: ev.conversation_id,
+          force: true,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Reenvio bem-sucedido (HTTP ${data.http_status})`);
+      } else {
+        toast.error(`Reenvio falhou${data?.http_status ? ` (HTTP ${data.http_status})` : ''}`);
+      }
+    } catch (e: any) {
+      toast.error(`Erro ao reenviar: ${e?.message || 'desconhecido'}`);
+    } finally {
+      setResending((p) => ({ ...p, [ev.id]: false }));
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -189,9 +220,20 @@ const FlowCRMHealthPanel: React.FC = () => {
                       {ed.error ? String(ed.error).slice(0, 200) : 'Sem mensagem de erro'}
                     </div>
                   </div>
-                  <div className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
-                    <Clock className="w-3 h-3" />
-                    {formatTime(e.created_at)}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResend(e)}
+                      disabled={!!resending[e.id]}
+                      className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-50"
+                      title="Reenviar este evento ao FlowCRM (ignora deduplicação)"
+                    >
+                      {resending[e.id] ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                      Reenviar
+                    </button>
+                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatTime(e.created_at)}
+                    </div>
                   </div>
                 </div>
               );

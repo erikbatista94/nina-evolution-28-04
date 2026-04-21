@@ -38,11 +38,12 @@ serve(async (req) => {
     });
 
   try {
-    const { event, contact_id, conversation_id } = await req.json();
+    const { event, contact_id, conversation_id, force } = await req.json();
 
     if (!event || !contact_id) {
       return respondOk({ ok: false, error: 'Missing event or contact_id' });
     }
+    const forceResend = force === true;
 
     const token = Deno.env.get('FLOWCRM_TOKEN');
     if (!token) {
@@ -128,7 +129,7 @@ serve(async (req) => {
     console.log(`[FlowCRM] Seller resolved: name=${sellerName} email=${sellerEmail} id=${sellerId} hasSeller=${hasSeller}`);
 
     // === DEDUPLICATION FOR LEAD EVENT ===
-    if (event === 'lead') {
+    if (event === 'lead' && !forceResend) {
       // Check if a successful lead sync already happened for this contact
       const { data: existingLead } = await supabase
         .from('conversation_events')
@@ -147,7 +148,7 @@ serve(async (req) => {
     }
 
     // === DEDUPLICATION FOR QUALIFICATION EVENT ===
-    if (event === 'qualification') {
+    if (event === 'qualification' && !forceResend) {
       const memory = (contact.client_memory ?? {}) as Record<string, any>;
       if (memory.flowcrm_qualified_at) {
         console.log('[FlowCRM] Qualification already synced for contact', contact_id, '— skipping');
@@ -254,6 +255,7 @@ serve(async (req) => {
           seller_email: sellerEmail,
           seller_id: sellerId,
           has_seller: hasSeller,
+          manual_resend: forceResend,
         },
       });
     } catch (logErr) {
