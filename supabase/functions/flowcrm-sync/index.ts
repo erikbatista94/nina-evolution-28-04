@@ -255,6 +255,7 @@ serve(async (req) => {
           seller_email: sellerEmail,
           seller_id: sellerId,
           has_seller: hasSeller,
+          manual_resend: forceResend,
         },
       });
     } catch (logErr) {
