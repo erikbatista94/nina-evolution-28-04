@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity, CheckCircle2, XCircle, AlertTriangle, RefreshCw, UserX, Clock } from 'lucide-react';
+import { Activity, CheckCircle2, XCircle, AlertTriangle, RefreshCw, UserX, Clock, Send } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface SyncEvent {
   id: string;
