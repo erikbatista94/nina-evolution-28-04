@@ -190,9 +190,20 @@ const FlowCRMHealthPanel: React.FC = () => {
                       {ed.error ? String(ed.error).slice(0, 200) : 'Sem mensagem de erro'}
                     </div>
                   </div>
-                  <div className="text-xs text-slate-500 flex items-center gap-1 shrink-0">
-                    <Clock className="w-3 h-3" />
-                    {formatTime(e.created_at)}
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => handleResend(e)}
+                      disabled={!!resending[e.id]}
+                      className="flex items-center gap-1 px-2 py-1 text-xs rounded-md border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 disabled:opacity-50"
+                      title="Reenviar este evento ao FlowCRM (ignora deduplicação)"
+                    >
+                      {resending[e.id] ? <RefreshCw className="w-3 h-3 animate-spin" /> : <Send className="w-3 h-3" />}
+                      Reenviar
+                    </button>
+                    <div className="text-xs text-slate-500 flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {formatTime(e.created_at)}
+                    </div>
                   </div>
                 </div>
               );
