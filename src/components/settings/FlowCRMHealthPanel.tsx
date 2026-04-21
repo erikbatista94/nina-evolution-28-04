@@ -27,6 +27,36 @@ const FlowCRMHealthPanel: React.FC = () => {
   const [recentFailures, setRecentFailures] = useState<SyncEvent[]>([]);
   const [recentEvents, setRecentEvents] = useState<SyncEvent[]>([]);
   const [loading, setLoading] = useState(true);
+  const [resending, setResending] = useState<Record<string, boolean>>({});
+
+  const handleResend = useCallback(async (ev: SyncEvent) => {
+    const ed = ev.event_data ?? {};
+    if (!ev.contact_id || !ed.event) {
+      toast.error('Evento sem contato ou tipo válido para reenvio');
+      return;
+    }
+    setResending((p) => ({ ...p, [ev.id]: true }));
+    try {
+      const { data, error } = await supabase.functions.invoke('flowcrm-sync', {
+        body: {
+          event: ed.event,
+          contact_id: ev.contact_id,
+          conversation_id: ev.conversation_id,
+          force: true,
+        },
+      });
+      if (error) throw error;
+      if (data?.success) {
+        toast.success(`Reenvio bem-sucedido (HTTP ${data.http_status})`);
+      } else {
+        toast.error(`Reenvio falhou${data?.http_status ? ` (HTTP ${data.http_status})` : ''}`);
+      }
+    } catch (e: any) {
+      toast.error(`Erro ao reenviar: ${e?.message || 'desconhecido'}`);
+    } finally {
+      setResending((p) => ({ ...p, [ev.id]: false }));
+    }
+  }, []);
 
   const load = useCallback(async () => {
     setLoading(true);
