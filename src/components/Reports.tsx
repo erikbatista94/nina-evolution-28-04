@@ -40,6 +40,7 @@ interface AdvancedData {
   objections: { title: string; category: string; count: number; triggers: string }[];
   funnel: { stage: string; count: number; total_value: number; conversion_pct: number }[];
   sellerRanking: { seller: string; leads: number; deals: number; appointments: number; rate: number; sla: number }[];
+  sources: { source: string; leads: number; pct: number; qualified: number; appointments: number; conversionRate: number }[];
   objectionsSampled: number;
 }
 
