@@ -1611,6 +1611,10 @@ export type Database = {
       }
     }
     Functions: {
+      assign_conversation_now: {
+        Args: { p_conversation_id: string }
+        Returns: string
+      }
       claim_message_processing_batch: {
         Args: { p_limit?: number }
         Returns: {
