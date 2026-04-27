@@ -707,6 +707,39 @@ async function processQueueItem(
     return;
   }
 
+  // === Resolver vendedor real atribuído (ground truth para a IA) ===
+  // Se ainda não há atribuição, tenta reatribuir on-demand usando o round-robin do banco
+  if (!conversation.assigned_user_id) {
+    try {
+      const { data: assignedNow } = await supabase.rpc('assign_conversation_now', {
+        p_conversation_id: conversation.id,
+      });
+      if (assignedNow) {
+        conversation.assigned_user_id = assignedNow;
+        console.log('[Nina] On-demand assignment ->', assignedNow);
+      } else {
+        console.log('[Nina] No eligible seller available for on-demand assignment');
+      }
+    } catch (assignErr) {
+      console.warn('[Nina] On-demand assignment failed (non-blocking):', assignErr);
+    }
+  }
+
+  let assignedSeller: { name: string } | null = null;
+  if (conversation.assigned_user_id) {
+    const { data: tm } = await supabase
+      .from('team_members')
+      .select('name')
+      .eq('user_id', conversation.assigned_user_id)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (tm?.name) {
+      assignedSeller = { name: tm.name };
+      console.log('[Nina] Assigned seller resolved:', tm.name);
+    }
+  }
+  // === /vendedor atribuído ===
+
   // Check if auto-response is enabled
   if (!settings?.auto_response_enabled) {
     console.log('[Nina] Auto-response disabled, marking as processed without responding');
@@ -745,6 +778,25 @@ async function processQueueItem(
 
   // Process template variables ({{ data_hora }}, {{ dia_semana }}, etc.)
   let processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact);
+
+  // === REGRA RÍGIDA: nome do vendedor atribuído ===
+  // Garante que a IA jamais cite um nome diferente do vendedor real da conversa
+  if (assignedSeller?.name) {
+    processedPrompt += `\n\n[VENDEDOR ATRIBUÍDO À CONVERSA]\n` +
+      `Nome real do vendedor responsável: "${assignedSeller.name}".\n` +
+      `Quando precisar mencionar quem dará continuidade, encaminhar ou transferir o atendimento, ` +
+      `use EXATAMENTE este nome ("${assignedSeller.name}"). ` +
+      `NUNCA invente, troque, abrevie ou cite outro nome de vendedor/consultor/atendente.\n`;
+  } else {
+    processedPrompt += `\n\n[VENDEDOR ATRIBUÍDO À CONVERSA]\n` +
+      `Nenhum vendedor foi atribuído ainda a esta conversa.\n` +
+      `Você está PROIBIDA de citar qualquer nome de vendedor, consultor ou atendente. ` +
+      `Se precisar mencionar continuidade do atendimento, use frase neutra como ` +
+      `"vou encaminhar seu atendimento para um consultor da nossa equipe".\n`;
+  }
+  // Anexa o vendedor à conversa para uso posterior (sanitização defensiva)
+  conversation.__assignedSeller = assignedSeller;
+  // === /regra rígida ===
 
   // === KB RAG INJECTION ===
   try {
@@ -1138,6 +1190,29 @@ async function queueTextResponse(
   delay: number,
   appointmentCreated?: any
 ) {
+  // Sanitização defensiva: se a IA citou um nome de vendedor diferente do real
+  // (ou citou nome qualquer quando não há atribuição), substitui por frase neutra.
+  const assignedSeller: { name: string } | null = conversation.__assignedSeller || null;
+  const sanitized = sanitizeSellerMention(aiContent, assignedSeller);
+  if (sanitized.changed) {
+    console.warn('[Nina] Sanitized seller mention. original->cleaned');
+    aiContent = sanitized.text;
+    try {
+      await supabase.from('conversation_events').insert({
+        conversation_id: conversation.id,
+        contact_id: conversation.contact_id,
+        event_type: 'ai_name_sanitized',
+        event_data: {
+          assigned_seller: assignedSeller?.name || null,
+          reason: sanitized.reason,
+          removed_names: sanitized.removed,
+        },
+      });
+    } catch (logErr) {
+      console.warn('[Nina] Failed to log sanitization event (non-blocking):', logErr);
+    }
+  }
+
   // Break message into chunks if enabled
   const messageChunks = settings?.message_breaking_enabled 
     ? breakMessageIntoChunks(aiContent)
@@ -1481,4 +1556,92 @@ function getAdaptiveSettings(
   }
 
   return defaultSettings;
+}
+
+// ============================================================
+// Sanitização defensiva: nomes de vendedores citados pela IA
+// ============================================================
+// Lista de nomes próprios "permitidos" só se forem o vendedor atribuído.
+// Padrões cobrem encaminhamento típico: "vou te passar para o Fulano",
+// "o Fulano vai te atender", "com a Fulana", "para a Fulana", etc.
+function sanitizeSellerMention(
+  text: string,
+  assignedSeller: { name: string } | null
+): { text: string; changed: boolean; reason?: string; removed: string[] } {
+  if (!text) return { text, changed: false, removed: [] };
+
+  // Verbos/contextos que indicam encaminhamento humano
+  const handoffContext = /(encaminh|transfer|passar|continuar|atender|falar com|conversar com|chamar|chamando|entrará em contato|entrar em contato)/i;
+  if (!handoffContext.test(text)) {
+    return { text, changed: false, removed: [] };
+  }
+
+  // Captura padrões "para o/a/com o/a NOME(s)" — nome = palavra(s) capitalizadas
+  // Aceita nome simples ou composto (ex: "Lucas Braga")
+  const namePattern = /\b((?:para|com|pelo|pela|ao|à)\s+(?:o|a)\s+|com\s+(?:o|a)\s+)?\b([A-ZÁ-Ú][a-zá-ú]+(?:\s+[A-ZÁ-Ú][a-zá-ú]+)?)\b/g;
+
+  // Lista de palavras capitalizadas que NÃO são nomes de vendedor (whitelist contextual)
+  const notSellerNames = new Set([
+    'Nina', 'Whatsapp', 'WhatsApp', 'Google', 'Calendar', 'Brasil', 'Brasília',
+    'São', 'Paulo', 'Rio', 'Janeiro', 'Gesso', 'Gilmar', 'GG', 'Vendas', 'Suporte',
+    'Cliente', 'Olá', 'Bom', 'Boa', 'Tarde', 'Noite', 'Dia',
+  ]);
+
+  const allowedFirstName = assignedSeller?.name?.split(/\s+/)[0] || '';
+  const allowedFullName = assignedSeller?.name || '';
+
+  const removed: string[] = [];
+  let changed = false;
+  let reason: string | undefined;
+
+  // Substituições conservadoras: só atua em frases que tenham contexto de handoff E nome próprio
+  const sentences = text.split(/(?<=[.!?\n])\s+/);
+  const cleanedSentences = sentences.map((sentence) => {
+    if (!handoffContext.test(sentence)) return sentence;
+
+    let mutated = sentence;
+    let sentenceChanged = false;
+
+    mutated = mutated.replace(namePattern, (match, prefix, name) => {
+      if (!name) return match;
+      if (notSellerNames.has(name)) return match;
+      // Se é o vendedor real (nome completo ou primeiro nome), mantém
+      if (
+        allowedFullName &&
+        (name === allowedFullName || name === allowedFirstName)
+      ) {
+        return match;
+      }
+      // Heurística: só considera "nome de pessoa" se aparecer prefix de handoff
+      // ou se a frase claramente nomeia alguém para atender
+      const looksLikePersonContext =
+        /\b(para|com|pelo|pela|ao|à)\s+(o|a)\s+/i.test(prefix || '') ||
+        /\b(vai|vou|irá|atender|continuar|falar)\b/i.test(sentence);
+      if (!looksLikePersonContext) return match;
+
+      removed.push(name);
+      sentenceChanged = true;
+      // Substitui por termo neutro mantendo o prefixo se houver
+      const neutral = assignedSeller?.name
+        ? assignedSeller.name
+        : 'um consultor da nossa equipe';
+      return `${prefix || ''}${neutral}`.trim();
+    });
+
+    if (sentenceChanged) changed = true;
+    return mutated;
+  });
+
+  if (changed) {
+    reason = assignedSeller
+      ? 'wrong_seller_name_replaced_with_assigned'
+      : 'no_assigned_seller_neutralized';
+  }
+
+  return {
+    text: cleanedSentences.join(' '),
+    changed,
+    reason,
+    removed,
+  };
 }
