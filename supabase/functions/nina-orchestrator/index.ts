@@ -779,6 +779,25 @@ async function processQueueItem(
   // Process template variables ({{ data_hora }}, {{ dia_semana }}, etc.)
   let processedPrompt = processPromptTemplate(enhancedSystemPrompt, conversation.contact);
 
+  // === REGRA RÍGIDA: nome do vendedor atribuído ===
+  // Garante que a IA jamais cite um nome diferente do vendedor real da conversa
+  if (assignedSeller?.name) {
+    processedPrompt += `\n\n[VENDEDOR ATRIBUÍDO À CONVERSA]\n` +
+      `Nome real do vendedor responsável: "${assignedSeller.name}".\n` +
+      `Quando precisar mencionar quem dará continuidade, encaminhar ou transferir o atendimento, ` +
+      `use EXATAMENTE este nome ("${assignedSeller.name}"). ` +
+      `NUNCA invente, troque, abrevie ou cite outro nome de vendedor/consultor/atendente.\n`;
+  } else {
+    processedPrompt += `\n\n[VENDEDOR ATRIBUÍDO À CONVERSA]\n` +
+      `Nenhum vendedor foi atribuído ainda a esta conversa.\n` +
+      `Você está PROIBIDA de citar qualquer nome de vendedor, consultor ou atendente. ` +
+      `Se precisar mencionar continuidade do atendimento, use frase neutra como ` +
+      `"vou encaminhar seu atendimento para um consultor da nossa equipe".\n`;
+  }
+  // Anexa o vendedor à conversa para uso posterior (sanitização defensiva)
+  conversation.__assignedSeller = assignedSeller;
+  // === /regra rígida ===
+
   // === KB RAG INJECTION ===
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
