@@ -223,7 +223,7 @@ const Reports: React.FC = () => {
       const sinceStr = since.toISOString();
 
       // 1) Contacts for qualification
-      let cq = supabase.from('contacts').select('customer_type, city, neighborhood, interest_services, job_size, has_project, start_timeframe, lead_temperature, lead_score, assigned_user_id').gte('created_at', sinceStr);
+      let cq = supabase.from('contacts').select('id, source, customer_type, city, neighborhood, interest_services, job_size, has_project, start_timeframe, lead_temperature, lead_score, assigned_user_id').gte('created_at', sinceStr);
       if (filterSeller !== 'all') cq = cq.eq('assigned_user_id', filterSeller);
       const { data: contacts } = await cq.limit(1000);
 
