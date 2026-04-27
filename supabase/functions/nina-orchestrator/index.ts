@@ -1557,3 +1557,91 @@ function getAdaptiveSettings(
 
   return defaultSettings;
 }
+
+// ============================================================
+// Sanitização defensiva: nomes de vendedores citados pela IA
+// ============================================================
+// Lista de nomes próprios "permitidos" só se forem o vendedor atribuído.
+// Padrões cobrem encaminhamento típico: "vou te passar para o Fulano",
+// "o Fulano vai te atender", "com a Fulana", "para a Fulana", etc.
+function sanitizeSellerMention(
+  text: string,
+  assignedSeller: { name: string } | null
+): { text: string; changed: boolean; reason?: string; removed: string[] } {
+  if (!text) return { text, changed: false, removed: [] };
+
+  // Verbos/contextos que indicam encaminhamento humano
+  const handoffContext = /(encaminh|transfer|passar|continuar|atender|falar com|conversar com|chamar|chamando|entrará em contato|entrar em contato)/i;
+  if (!handoffContext.test(text)) {
+    return { text, changed: false, removed: [] };
+  }
+
+  // Captura padrões "para o/a/com o/a NOME(s)" — nome = palavra(s) capitalizadas
+  // Aceita nome simples ou composto (ex: "Lucas Braga")
+  const namePattern = /\b((?:para|com|pelo|pela|ao|à)\s+(?:o|a)\s+|com\s+(?:o|a)\s+)?\b([A-ZÁ-Ú][a-zá-ú]+(?:\s+[A-ZÁ-Ú][a-zá-ú]+)?)\b/g;
+
+  // Lista de palavras capitalizadas que NÃO são nomes de vendedor (whitelist contextual)
+  const notSellerNames = new Set([
+    'Nina', 'Whatsapp', 'WhatsApp', 'Google', 'Calendar', 'Brasil', 'Brasília',
+    'São', 'Paulo', 'Rio', 'Janeiro', 'Gesso', 'Gilmar', 'GG', 'Vendas', 'Suporte',
+    'Cliente', 'Olá', 'Bom', 'Boa', 'Tarde', 'Noite', 'Dia',
+  ]);
+
+  const allowedFirstName = assignedSeller?.name?.split(/\s+/)[0] || '';
+  const allowedFullName = assignedSeller?.name || '';
+
+  const removed: string[] = [];
+  let changed = false;
+  let reason: string | undefined;
+
+  // Substituições conservadoras: só atua em frases que tenham contexto de handoff E nome próprio
+  const sentences = text.split(/(?<=[.!?\n])\s+/);
+  const cleanedSentences = sentences.map((sentence) => {
+    if (!handoffContext.test(sentence)) return sentence;
+
+    let mutated = sentence;
+    let sentenceChanged = false;
+
+    mutated = mutated.replace(namePattern, (match, prefix, name) => {
+      if (!name) return match;
+      if (notSellerNames.has(name)) return match;
+      // Se é o vendedor real (nome completo ou primeiro nome), mantém
+      if (
+        allowedFullName &&
+        (name === allowedFullName || name === allowedFirstName)
+      ) {
+        return match;
+      }
+      // Heurística: só considera "nome de pessoa" se aparecer prefix de handoff
+      // ou se a frase claramente nomeia alguém para atender
+      const looksLikePersonContext =
+        /\b(para|com|pelo|pela|ao|à)\s+(o|a)\s+/i.test(prefix || '') ||
+        /\b(vai|vou|irá|atender|continuar|falar)\b/i.test(sentence);
+      if (!looksLikePersonContext) return match;
+
+      removed.push(name);
+      sentenceChanged = true;
+      // Substitui por termo neutro mantendo o prefixo se houver
+      const neutral = assignedSeller?.name
+        ? assignedSeller.name
+        : 'um consultor da nossa equipe';
+      return `${prefix || ''}${neutral}`.trim();
+    });
+
+    if (sentenceChanged) changed = true;
+    return mutated;
+  });
+
+  if (changed) {
+    reason = assignedSeller
+      ? 'wrong_seller_name_replaced_with_assigned'
+      : 'no_assigned_seller_neutralized';
+  }
+
+  return {
+    text: cleanedSentences.join(' '),
+    changed,
+    reason,
+    removed,
+  };
+}
