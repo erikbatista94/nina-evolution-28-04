@@ -351,11 +351,46 @@ const Reports: React.FC = () => {
       }
       ranking.sort((a, b) => b.rate - a.rate);
 
+      // 5) Sources (Origem dos Leads — para tráfego pago)
+      const contactIds = cs.map((c: any) => c.id).filter(Boolean);
+      let apptByContact: Record<string, number> = {};
+      if (contactIds.length > 0) {
+        const { data: appts } = await supabase
+          .from('appointments')
+          .select('contact_id')
+          .in('contact_id', contactIds)
+          .gte('created_at', sinceStr)
+          .limit(1000);
+        (appts || []).forEach((a: any) => {
+          if (a.contact_id) apptByContact[a.contact_id] = (apptByContact[a.contact_id] || 0) + 1;
+        });
+      }
+      const sourceAgg: Record<string, { leads: number; qualified: number; appointments: number }> = {};
+      cs.forEach((c: any) => {
+        const src = (c.source && String(c.source).trim()) || 'Não informado';
+        if (!sourceAgg[src]) sourceAgg[src] = { leads: 0, qualified: 0, appointments: 0 };
+        sourceAgg[src].leads++;
+        if ((c.lead_score || 0) >= 30) sourceAgg[src].qualified++;
+        if (apptByContact[c.id]) sourceAgg[src].appointments++;
+      });
+      const totalLeadsSrc = cs.length;
+      const sources = Object.entries(sourceAgg)
+        .map(([source, v]) => ({
+          source,
+          leads: v.leads,
+          pct: totalLeadsSrc > 0 ? Math.round((v.leads / totalLeadsSrc) * 100) : 0,
+          qualified: v.qualified,
+          appointments: v.appointments,
+          conversionRate: v.leads > 0 ? Math.round((v.appointments / v.leads) * 100) : 0,
+        }))
+        .sort((a, b) => b.leads - a.leads);
+
       setAdvData({
         qualification: { byType, byCity, byNeighborhood, byService, byJobSize, byProject, byTimeframe, byTemperature, byScoreRange },
         objections,
         funnel,
         sellerRanking: ranking,
+        sources,
         objectionsSampled: filteredMsgs.length,
       });
     } catch (err) {
