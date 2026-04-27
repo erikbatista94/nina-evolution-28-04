@@ -707,6 +707,39 @@ async function processQueueItem(
     return;
   }
 
+  // === Resolver vendedor real atribuído (ground truth para a IA) ===
+  // Se ainda não há atribuição, tenta reatribuir on-demand usando o round-robin do banco
+  if (!conversation.assigned_user_id) {
+    try {
+      const { data: assignedNow } = await supabase.rpc('assign_conversation_now', {
+        p_conversation_id: conversation.id,
+      });
+      if (assignedNow) {
+        conversation.assigned_user_id = assignedNow;
+        console.log('[Nina] On-demand assignment ->', assignedNow);
+      } else {
+        console.log('[Nina] No eligible seller available for on-demand assignment');
+      }
+    } catch (assignErr) {
+      console.warn('[Nina] On-demand assignment failed (non-blocking):', assignErr);
+    }
+  }
+
+  let assignedSeller: { name: string } | null = null;
+  if (conversation.assigned_user_id) {
+    const { data: tm } = await supabase
+      .from('team_members')
+      .select('name')
+      .eq('user_id', conversation.assigned_user_id)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (tm?.name) {
+      assignedSeller = { name: tm.name };
+      console.log('[Nina] Assigned seller resolved:', tm.name);
+    }
+  }
+  // === /vendedor atribuído ===
+
   // Check if auto-response is enabled
   if (!settings?.auto_response_enabled) {
     console.log('[Nina] Auto-response disabled, marking as processed without responding');
