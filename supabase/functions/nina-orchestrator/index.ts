@@ -1190,6 +1190,29 @@ async function queueTextResponse(
   delay: number,
   appointmentCreated?: any
 ) {
+  // Sanitização defensiva: se a IA citou um nome de vendedor diferente do real
+  // (ou citou nome qualquer quando não há atribuição), substitui por frase neutra.
+  const assignedSeller: { name: string } | null = conversation.__assignedSeller || null;
+  const sanitized = sanitizeSellerMention(aiContent, assignedSeller);
+  if (sanitized.changed) {
+    console.warn('[Nina] Sanitized seller mention. original->cleaned');
+    aiContent = sanitized.text;
+    try {
+      await supabase.from('conversation_events').insert({
+        conversation_id: conversation.id,
+        contact_id: conversation.contact_id,
+        event_type: 'ai_name_sanitized',
+        event_data: {
+          assigned_seller: assignedSeller?.name || null,
+          reason: sanitized.reason,
+          removed_names: sanitized.removed,
+        },
+      });
+    } catch (logErr) {
+      console.warn('[Nina] Failed to log sanitization event (non-blocking):', logErr);
+    }
+  }
+
   // Break message into chunks if enabled
   const messageChunks = settings?.message_breaking_enabled 
     ? breakMessageIntoChunks(aiContent)
