@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Download, Loader2, Users, TrendingUp, Clock, Award, ShieldAlert, Filter } from 'lucide-react';
+import { BarChart3, Download, Loader2, Users, TrendingUp, Clock, Award, ShieldAlert, Filter, Megaphone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { api } from '@/services/api';
 import { TeamMember } from '@/types';
