@@ -559,6 +559,14 @@ const Reports: React.FC = () => {
     downloadCSV('ranking-vendedores', [['seller', 'leads', 'deals', 'appointments', 'rate', 'sla'], ...advData.sellerRanking.map(r => [r.seller, String(r.leads), String(r.deals), String(r.appointments), String(r.rate), String(r.sla)])]);
   };
 
+  const exportSourcesCSV = () => {
+    if (!advData) return;
+    downloadCSV('origem-leads', [
+      ['canal', 'leads', 'pct_total', 'qualificados', 'agendados', 'taxa_conversao_pct'],
+      ...advData.sources.map(s => [s.source, String(s.leads), String(s.pct), String(s.qualified), String(s.appointments), String(s.conversionRate)]),
+    ]);
+  };
+
   const handleHeaderCSV = () => {
     if (activeTab === 'performance') exportPerfCSV();
     else if (activeTab === 'advanced') { exportQualificationCSV(); exportFunnelCSV(); }
