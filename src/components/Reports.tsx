@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, Download, Loader2, Users, TrendingUp, Clock, Award, ShieldAlert, Filter } from 'lucide-react';
+import { BarChart3, Download, Loader2, Users, TrendingUp, Clock, Award, ShieldAlert, Filter, Megaphone } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { api } from '@/services/api';
 import { TeamMember } from '@/types';
@@ -40,6 +40,7 @@ interface AdvancedData {
   objections: { title: string; category: string; count: number; triggers: string }[];
   funnel: { stage: string; count: number; total_value: number; conversion_pct: number }[];
   sellerRanking: { seller: string; leads: number; deals: number; appointments: number; rate: number; sla: number }[];
+  sources: { source: string; leads: number; pct: number; qualified: number; appointments: number; conversionRate: number }[];
   objectionsSampled: number;
 }
 
@@ -222,7 +223,7 @@ const Reports: React.FC = () => {
       const sinceStr = since.toISOString();
 
       // 1) Contacts for qualification
-      let cq = supabase.from('contacts').select('customer_type, city, neighborhood, interest_services, job_size, has_project, start_timeframe, lead_temperature, lead_score, assigned_user_id').gte('created_at', sinceStr);
+      let cq = supabase.from('contacts').select('id, source, customer_type, city, neighborhood, interest_services, job_size, has_project, start_timeframe, lead_temperature, lead_score, assigned_user_id').gte('created_at', sinceStr);
       if (filterSeller !== 'all') cq = cq.eq('assigned_user_id', filterSeller);
       const { data: contacts } = await cq.limit(1000);
 
@@ -350,11 +351,46 @@ const Reports: React.FC = () => {
       }
       ranking.sort((a, b) => b.rate - a.rate);
 
+      // 5) Sources (Origem dos Leads — para tráfego pago)
+      const contactIds = cs.map((c: any) => c.id).filter(Boolean);
+      let apptByContact: Record<string, number> = {};
+      if (contactIds.length > 0) {
+        const { data: appts } = await supabase
+          .from('appointments')
+          .select('contact_id')
+          .in('contact_id', contactIds)
+          .gte('created_at', sinceStr)
+          .limit(1000);
+        (appts || []).forEach((a: any) => {
+          if (a.contact_id) apptByContact[a.contact_id] = (apptByContact[a.contact_id] || 0) + 1;
+        });
+      }
+      const sourceAgg: Record<string, { leads: number; qualified: number; appointments: number }> = {};
+      cs.forEach((c: any) => {
+        const src = (c.source && String(c.source).trim()) || 'Não informado';
+        if (!sourceAgg[src]) sourceAgg[src] = { leads: 0, qualified: 0, appointments: 0 };
+        sourceAgg[src].leads++;
+        if ((c.lead_score || 0) >= 30) sourceAgg[src].qualified++;
+        if (apptByContact[c.id]) sourceAgg[src].appointments++;
+      });
+      const totalLeadsSrc = cs.length;
+      const sources = Object.entries(sourceAgg)
+        .map(([source, v]) => ({
+          source,
+          leads: v.leads,
+          pct: totalLeadsSrc > 0 ? Math.round((v.leads / totalLeadsSrc) * 100) : 0,
+          qualified: v.qualified,
+          appointments: v.appointments,
+          conversionRate: v.leads > 0 ? Math.round((v.appointments / v.leads) * 100) : 0,
+        }))
+        .sort((a, b) => b.leads - a.leads);
+
       setAdvData({
         qualification: { byType, byCity, byNeighborhood, byService, byJobSize, byProject, byTimeframe, byTemperature, byScoreRange },
         objections,
         funnel,
         sellerRanking: ranking,
+        sources,
         objectionsSampled: filteredMsgs.length,
       });
     } catch (err) {
@@ -521,6 +557,14 @@ const Reports: React.FC = () => {
   const exportRankingCSV = () => {
     if (!advData) return;
     downloadCSV('ranking-vendedores', [['seller', 'leads', 'deals', 'appointments', 'rate', 'sla'], ...advData.sellerRanking.map(r => [r.seller, String(r.leads), String(r.deals), String(r.appointments), String(r.rate), String(r.sla)])]);
+  };
+
+  const exportSourcesCSV = () => {
+    if (!advData) return;
+    downloadCSV('origem-leads', [
+      ['canal', 'leads', 'pct_total', 'qualificados', 'agendados', 'taxa_conversao_pct'],
+      ...advData.sources.map(s => [s.source, String(s.leads), String(s.pct), String(s.qualified), String(s.appointments), String(s.conversionRate)]),
+    ]);
   };
 
   const handleHeaderCSV = () => {
@@ -828,6 +872,65 @@ const Reports: React.FC = () => {
                   {renderQualTable('Porte da Obra', advData.qualification.byJobSize)}
                   {renderQualTable('Prazo de Início', advData.qualification.byTimeframe)}
                 </div>
+              </div>
+
+              {/* ── Bloco A2: Origem dos Leads (Tráfego Pago) ── */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold text-white flex items-center gap-2"><Megaphone className="w-5 h-5 text-pink-400" /> Origem dos Leads <span className="text-xs font-normal text-slate-500">(Como conheceu a GG)</span></h3>
+                  <button onClick={exportSourcesCSV} className="flex items-center gap-1.5 px-2.5 py-1.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 rounded-lg text-xs hover:bg-emerald-500/20 transition-colors">
+                    <Download className="w-3.5 h-3.5" /> CSV p/ Tráfego
+                  </button>
+                </div>
+                <p className="text-xs text-slate-500">Use estes dados para alocar investimento de mídia paga e identificar canais de maior conversão.</p>
+
+                {/* Top 4 cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  {advData.sources.slice(0, 4).map((s, i) => (
+                    <div key={s.source} className={`p-3 rounded-xl border ${i === 0 ? 'bg-pink-500/5 border-pink-500/30' : 'bg-slate-900 border-slate-800'}`}>
+                      <p className="text-[10px] text-slate-500 uppercase truncate" title={s.source}>{s.source}</p>
+                      <p className={`text-xl font-bold mt-0.5 ${i === 0 ? 'text-pink-400' : 'text-slate-200'}`}>{s.leads}</p>
+                      <p className="text-[10px] text-slate-500 mt-0.5">{s.pct}% do total · {s.conversionRate}% agendam</p>
+                    </div>
+                  ))}
+                  {advData.sources.length === 0 && (
+                    <div className="col-span-full p-4 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs text-slate-500">Nenhum lead com origem registrada no período.</div>
+                  )}
+                </div>
+
+                {/* Detailed table */}
+                {advData.sources.length > 0 && (
+                  <div className="rounded-xl bg-slate-900 border border-slate-800 overflow-hidden">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="text-[10px] text-slate-500 uppercase border-b border-slate-800">
+                          <th className="text-left p-3 font-medium">#</th>
+                          <th className="text-left p-3 font-medium">Canal</th>
+                          <th className="text-center p-3 font-medium">Leads</th>
+                          <th className="text-center p-3 font-medium">% do Total</th>
+                          <th className="text-center p-3 font-medium">Qualificados</th>
+                          <th className="text-center p-3 font-medium">Agendados</th>
+                          <th className="text-center p-3 font-medium">Conversão</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {advData.sources.map((s, i) => (
+                          <tr key={s.source} className="border-b border-slate-800/50 hover:bg-slate-800/30 transition-colors">
+                            <td className="p-3 text-sm text-slate-500">{i + 1}</td>
+                            <td className="p-3 text-sm text-slate-200 font-medium">{s.source}</td>
+                            <td className="p-3 text-center text-sm text-slate-200 font-semibold">{s.leads}</td>
+                            <td className="p-3 text-center text-xs text-slate-400">{s.pct}%</td>
+                            <td className="p-3 text-center text-sm text-cyan-400">{s.qualified}</td>
+                            <td className="p-3 text-center text-sm text-violet-400">{s.appointments}</td>
+                            <td className="p-3 text-center">
+                              <span className={`text-sm font-bold ${s.conversionRate >= 30 ? 'text-emerald-400' : s.conversionRate >= 10 ? 'text-amber-400' : 'text-slate-500'}`}>{s.conversionRate}%</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
 
               {/* ── Bloco B: Objeções ── */}
