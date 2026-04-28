@@ -270,18 +270,26 @@ async function combineAndTranscribeMessages(
 
     let content = dbMsg.content || '';
 
-    // Get media ID for any media type
-    const mediaId = messageData.audio?.id || messageData.image?.id || messageData.video?.id || messageData.document?.id;
-    const mediaType = messageData.type; // 'audio', 'image', 'video', 'document'
+    // Evolution: media is inside messageData.message.{type}Message
+    const evMsg = messageData?.message || {};
+    let mediaType: string | null = null;
+    let mediaNode: any = null;
+    if (evMsg.imageMessage) { mediaType = 'image'; mediaNode = evMsg.imageMessage; }
+    else if (evMsg.audioMessage) { mediaType = 'audio'; mediaNode = evMsg.audioMessage; }
+    else if (evMsg.videoMessage) { mediaType = 'video'; mediaNode = evMsg.videoMessage; }
+    else if (evMsg.documentMessage) { mediaType = 'document'; mediaNode = evMsg.documentMessage; }
+
+    const mediaUrl = mediaNode?.url || null;
+    const evoMessageId = messageData?.key?.id;
 
     // Handle media download + upload to Storage (for all media types)
-    if (mediaId && settings?.whatsapp_access_token && ['image', 'video', 'document'].includes(mediaType)) {
-      console.log(`[MessageGrouper] Downloading ${mediaType} media:`, mediaId);
-      const mediaResult = await downloadWhatsAppMedia(settings, mediaId);
+    if (mediaType && mediaNode && ['image', 'video', 'document'].includes(mediaType)) {
+      console.log(`[MessageGrouper] Downloading ${mediaType} media via Evolution`);
+      const mediaResult = await downloadEvolutionMedia(settings, evoMessageId, mediaUrl, mediaNode?.mimetype);
       if (mediaResult) {
-        const ext = getFileExtension(mediaType, messageData[mediaType]?.mime_type, messageData[mediaType]?.filename);
+        const ext = getFileExtension(mediaType, mediaNode?.mimetype, mediaNode?.fileName);
         const storagePath = `${dbMsg.conversation_id}/${dbMsg.id}.${ext}`;
-        const mimeType = mediaResult.mimeType || messageData[mediaType]?.mime_type || getMimeType(mediaType);
+        const mimeType = mediaResult.mimeType || mediaNode?.mimetype || getMimeType(mediaType);
         
         const publicUrl = await uploadMediaToStorage(supabase, supabaseUrl, mediaResult.buffer, storagePath, mimeType);
         if (publicUrl) {
@@ -289,17 +297,14 @@ async function combineAndTranscribeMessages(
             .from('messages')
             .update({ media_url: publicUrl })
             .eq('id', dbMsg.id);
-          console.log(`[MessageGrouper] Uploaded ${mediaType} to Storage:`, publicUrl);
         }
       }
     }
 
     // Handle audio transcription
     if (mediaType === 'audio') {
-      const audioMediaId = messageData.audio?.id;
-      if (audioMediaId && settings?.whatsapp_access_token && lovableApiKey) {
-        console.log('[MessageGrouper] Transcribing audio:', audioMediaId);
-        const mediaResult = await downloadWhatsAppMedia(settings, audioMediaId);
+      if (lovableApiKey && (mediaUrl || evoMessageId)) {
+        const mediaResult = await downloadEvolutionMedia(settings, evoMessageId, mediaUrl, mediaNode?.mimetype || 'audio/ogg');
         if (mediaResult) {
           // Upload audio to storage too
           const storagePath = `${dbMsg.conversation_id}/${dbMsg.id}.ogg`;
