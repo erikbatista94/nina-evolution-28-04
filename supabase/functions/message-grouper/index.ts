@@ -59,7 +59,8 @@ serve(async (req) => {
     // Group messages by phone number
     const grouped: Record<string, typeof readyMessages> = {};
     for (const msg of readyMessages) {
-      const phone = msg.message_data?.from;
+      // Evolution stores remoteJid in key.remoteJid; fallback to legacy `from`
+      const phone = msg.message_data?.key?.remoteJid || msg.message_data?.from;
       if (!phone) continue;
       if (!grouped[phone]) grouped[phone] = [];
       grouped[phone].push(msg);
@@ -75,30 +76,29 @@ serve(async (req) => {
       try {
         console.log(`[MessageGrouper] Processing group for ${phoneNumber} with ${messages.length} messages`);
 
-        // Get the phone_number_id from the first message
+        // For Evolution, phone_number_id stores the instance name
         const phoneNumberId = messages[0].phone_number_id;
 
-        // Get owner settings for this phone_number_id
+        // Get owner settings by evolution_instance
         let { data: ownerSettings } = await supabase
           .from('nina_settings')
-          .select('user_id, whatsapp_access_token')
-          .eq('whatsapp_phone_number_id', phoneNumberId)
+          .select('user_id, evolution_api_url, evolution_api_key, evolution_instance')
+          .eq('evolution_instance', phoneNumberId)
           .maybeSingle();
 
-        // Fallback: buscar qualquer settings com token (single-tenant)
-        if (!ownerSettings?.whatsapp_access_token) {
-          console.log(`[MessageGrouper] No settings found for phone_number_id ${phoneNumberId}, trying fallback`);
+        // Fallback: any settings with Evolution configured (single-tenant)
+        if (!ownerSettings?.evolution_api_key) {
+          console.log(`[MessageGrouper] No settings for instance ${phoneNumberId}, fallback`);
           const { data: fallbackSettings } = await supabase
             .from('nina_settings')
-            .select('user_id, whatsapp_access_token')
-            .not('whatsapp_access_token', 'is', null)
+            .select('user_id, evolution_api_url, evolution_api_key, evolution_instance')
+            .not('evolution_api_key', 'is', null)
             .limit(1)
             .maybeSingle();
           if (fallbackSettings) {
             ownerSettings = fallbackSettings;
-            console.log('[MessageGrouper] Using fallback settings');
           } else {
-            console.warn('[MessageGrouper] No settings with whatsapp_access_token found');
+            console.warn('[MessageGrouper] No Evolution settings found');
           }
         }
 
