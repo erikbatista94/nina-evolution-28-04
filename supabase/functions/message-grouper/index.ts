@@ -59,7 +59,8 @@ serve(async (req) => {
     // Group messages by phone number
     const grouped: Record<string, typeof readyMessages> = {};
     for (const msg of readyMessages) {
-      const phone = msg.message_data?.from;
+      // Evolution stores remoteJid in key.remoteJid; fallback to legacy `from`
+      const phone = msg.message_data?.key?.remoteJid || msg.message_data?.from;
       if (!phone) continue;
       if (!grouped[phone]) grouped[phone] = [];
       grouped[phone].push(msg);
@@ -75,30 +76,29 @@ serve(async (req) => {
       try {
         console.log(`[MessageGrouper] Processing group for ${phoneNumber} with ${messages.length} messages`);
 
-        // Get the phone_number_id from the first message
+        // For Evolution, phone_number_id stores the instance name
         const phoneNumberId = messages[0].phone_number_id;
 
-        // Get owner settings for this phone_number_id
+        // Get owner settings by evolution_instance
         let { data: ownerSettings } = await supabase
           .from('nina_settings')
-          .select('user_id, whatsapp_access_token')
-          .eq('whatsapp_phone_number_id', phoneNumberId)
+          .select('user_id, evolution_api_url, evolution_api_key, evolution_instance')
+          .eq('evolution_instance', phoneNumberId)
           .maybeSingle();
 
-        // Fallback: buscar qualquer settings com token (single-tenant)
-        if (!ownerSettings?.whatsapp_access_token) {
-          console.log(`[MessageGrouper] No settings found for phone_number_id ${phoneNumberId}, trying fallback`);
+        // Fallback: any settings with Evolution configured (single-tenant)
+        if (!ownerSettings?.evolution_api_key) {
+          console.log(`[MessageGrouper] No settings for instance ${phoneNumberId}, fallback`);
           const { data: fallbackSettings } = await supabase
             .from('nina_settings')
-            .select('user_id, whatsapp_access_token')
-            .not('whatsapp_access_token', 'is', null)
+            .select('user_id, evolution_api_url, evolution_api_key, evolution_instance')
+            .not('evolution_api_key', 'is', null)
             .limit(1)
             .maybeSingle();
           if (fallbackSettings) {
             ownerSettings = fallbackSettings;
-            console.log('[MessageGrouper] Using fallback settings');
           } else {
-            console.warn('[MessageGrouper] No settings with whatsapp_access_token found');
+            console.warn('[MessageGrouper] No Evolution settings found');
           }
         }
 
@@ -270,18 +270,26 @@ async function combineAndTranscribeMessages(
 
     let content = dbMsg.content || '';
 
-    // Get media ID for any media type
-    const mediaId = messageData.audio?.id || messageData.image?.id || messageData.video?.id || messageData.document?.id;
-    const mediaType = messageData.type; // 'audio', 'image', 'video', 'document'
+    // Evolution: media is inside messageData.message.{type}Message
+    const evMsg = messageData?.message || {};
+    let mediaType: string | null = null;
+    let mediaNode: any = null;
+    if (evMsg.imageMessage) { mediaType = 'image'; mediaNode = evMsg.imageMessage; }
+    else if (evMsg.audioMessage) { mediaType = 'audio'; mediaNode = evMsg.audioMessage; }
+    else if (evMsg.videoMessage) { mediaType = 'video'; mediaNode = evMsg.videoMessage; }
+    else if (evMsg.documentMessage) { mediaType = 'document'; mediaNode = evMsg.documentMessage; }
+
+    const mediaUrl = mediaNode?.url || null;
+    const evoMessageId = messageData?.key?.id;
 
     // Handle media download + upload to Storage (for all media types)
-    if (mediaId && settings?.whatsapp_access_token && ['image', 'video', 'document'].includes(mediaType)) {
-      console.log(`[MessageGrouper] Downloading ${mediaType} media:`, mediaId);
-      const mediaResult = await downloadWhatsAppMedia(settings, mediaId);
+    if (mediaType && mediaNode && ['image', 'video', 'document'].includes(mediaType)) {
+      console.log(`[MessageGrouper] Downloading ${mediaType} media via Evolution`);
+      const mediaResult = await downloadEvolutionMedia(settings, evoMessageId, mediaUrl, mediaNode?.mimetype);
       if (mediaResult) {
-        const ext = getFileExtension(mediaType, messageData[mediaType]?.mime_type, messageData[mediaType]?.filename);
+        const ext = getFileExtension(mediaType, mediaNode?.mimetype, mediaNode?.fileName);
         const storagePath = `${dbMsg.conversation_id}/${dbMsg.id}.${ext}`;
-        const mimeType = mediaResult.mimeType || messageData[mediaType]?.mime_type || getMimeType(mediaType);
+        const mimeType = mediaResult.mimeType || mediaNode?.mimetype || getMimeType(mediaType);
         
         const publicUrl = await uploadMediaToStorage(supabase, supabaseUrl, mediaResult.buffer, storagePath, mimeType);
         if (publicUrl) {
@@ -289,17 +297,14 @@ async function combineAndTranscribeMessages(
             .from('messages')
             .update({ media_url: publicUrl })
             .eq('id', dbMsg.id);
-          console.log(`[MessageGrouper] Uploaded ${mediaType} to Storage:`, publicUrl);
         }
       }
     }
 
     // Handle audio transcription
     if (mediaType === 'audio') {
-      const audioMediaId = messageData.audio?.id;
-      if (audioMediaId && settings?.whatsapp_access_token && lovableApiKey) {
-        console.log('[MessageGrouper] Transcribing audio:', audioMediaId);
-        const mediaResult = await downloadWhatsAppMedia(settings, audioMediaId);
+      if (lovableApiKey && (mediaUrl || evoMessageId)) {
+        const mediaResult = await downloadEvolutionMedia(settings, evoMessageId, mediaUrl, mediaNode?.mimetype || 'audio/ogg');
         if (mediaResult) {
           // Upload audio to storage too
           const storagePath = `${dbMsg.conversation_id}/${dbMsg.id}.ogg`;
@@ -387,54 +392,64 @@ function getMimeType(mediaType: string): string {
   return defaults[mediaType] || 'application/octet-stream';
 }
 
-// Download media from WhatsApp API
-async function downloadWhatsAppMedia(settings: any, mediaId: string): Promise<{ buffer: ArrayBuffer; mimeType: string | null } | null> {
-  if (!settings?.whatsapp_access_token) {
-    console.error('[MessageGrouper] No WhatsApp access token configured');
+// Download media via Evolution API.
+// Strategy: 1) try POST /chat/getBase64FromMediaMessage/{instance} (works for encrypted WA media)
+//           2) fallback to direct GET on mediaUrl (rarely works due to WA encryption)
+async function downloadEvolutionMedia(
+  settings: any,
+  evoMessageId: string | undefined,
+  mediaUrl: string | null,
+  defaultMime: string | null
+): Promise<{ buffer: ArrayBuffer; mimeType: string | null } | null> {
+  if (!settings?.evolution_api_url || !settings?.evolution_api_key || !settings?.evolution_instance) {
+    console.error('[MessageGrouper] Evolution API not configured');
     return null;
   }
+  const base = settings.evolution_api_url.replace(/\/+$/, '');
+  const headers = { 'apikey': settings.evolution_api_key, 'Content-Type': 'application/json' };
 
-  try {
-    const mediaInfoResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${mediaId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${settings.whatsapp_access_token}`
+  // 1. Try Evolution helper that decrypts and returns base64
+  if (evoMessageId) {
+    try {
+      const res = await fetch(
+        `${base}/chat/getBase64FromMediaMessage/${settings.evolution_instance}`,
+        {
+          method: 'POST', headers,
+          body: JSON.stringify({ message: { key: { id: evoMessageId } }, convertToMp4: false }),
         }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data?.base64 || data?.media || data?.data;
+        const mime = data?.mimetype || defaultMime || null;
+        if (b64) {
+          const bin = atob(b64);
+          const buffer = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) buffer[i] = bin.charCodeAt(i);
+          return { buffer: buffer.buffer, mimeType: mime };
+        }
+      } else {
+        console.warn('[MessageGrouper] getBase64FromMediaMessage failed:', res.status);
       }
-    );
-
-    if (!mediaInfoResponse.ok) {
-      console.error('[MessageGrouper] Failed to get media info:', await mediaInfoResponse.text());
-      return null;
+    } catch (err) {
+      console.error('[MessageGrouper] getBase64 error:', err);
     }
-
-    const mediaInfo = await mediaInfoResponse.json();
-    const mediaUrl = mediaInfo.url;
-    const mimeType = mediaInfo.mime_type || null;
-
-    if (!mediaUrl) {
-      console.error('[MessageGrouper] No media URL in response');
-      return null;
-    }
-
-    const mediaResponse = await fetch(mediaUrl, {
-      headers: {
-        'Authorization': `Bearer ${settings.whatsapp_access_token}`
-      }
-    });
-
-    if (!mediaResponse.ok) {
-      console.error('[MessageGrouper] Failed to download media:', await mediaResponse.text());
-      return null;
-    }
-
-    const buffer = await mediaResponse.arrayBuffer();
-    return { buffer, mimeType };
-  } catch (error) {
-    console.error('[MessageGrouper] Error downloading media:', error);
-    return null;
   }
+
+  // 2. Fallback: direct fetch (will only work if media is unencrypted/proxied)
+  if (mediaUrl) {
+    try {
+      const r = await fetch(mediaUrl);
+      if (r.ok) {
+        const buffer = await r.arrayBuffer();
+        return { buffer, mimeType: r.headers.get('content-type') || defaultMime };
+      }
+    } catch (err) {
+      console.error('[MessageGrouper] direct media fetch error:', err);
+    }
+  }
+
+  return null;
 }
 
 

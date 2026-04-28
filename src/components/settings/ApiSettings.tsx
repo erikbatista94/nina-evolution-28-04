@@ -9,9 +9,10 @@ import { useAuth } from '@/hooks/useAuth';
 
 interface NinaSettings {
   id?: string;
-  whatsapp_access_token: string | null;
-  whatsapp_phone_number_id: string | null;
-  whatsapp_verify_token: string | null;
+  evolution_api_url: string | null;
+  evolution_api_key: string | null;
+  evolution_instance: string | null;
+  evolution_connection_status: string | null;
   elevenlabs_api_key: string | null;
   elevenlabs_voice_id: string;
   elevenlabs_model: string | null;
@@ -111,9 +112,10 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const generateUniqueToken = () => `verify-${crypto.randomUUID().slice(0, 8)}`;
   
   const [settings, setSettings] = useState<NinaSettings>({
-    whatsapp_access_token: null,
-    whatsapp_phone_number_id: null,
-    whatsapp_verify_token: generateUniqueToken(),
+    evolution_api_url: null,
+    evolution_api_key: null,
+    evolution_instance: null,
+    evolution_connection_status: null,
     elevenlabs_api_key: null,
     elevenlabs_voice_id: '33B4UnXyTNbgLmdEDh5P',
     elevenlabs_model: 'eleven_turbo_v2_5',
@@ -192,12 +194,13 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
       }
 
       // Load settings from global data
-      const uniqueToken = data.whatsapp_verify_token || generateUniqueToken();
+      const uniqueToken = (data as any).evolution_connection_status || generateUniqueToken();
       setSettings({
         id: data.id,
-        whatsapp_access_token: data.whatsapp_access_token,
-        whatsapp_phone_number_id: data.whatsapp_phone_number_id,
-        whatsapp_verify_token: uniqueToken,
+        evolution_api_key: (data as any).evolution_api_key ?? null,
+        evolution_instance: (data as any).evolution_instance ?? null,
+        evolution_api_url: (data as any).evolution_api_url ?? null,
+        evolution_connection_status: (data as any).evolution_connection_status ?? null,
         elevenlabs_api_key: data.elevenlabs_api_key,
         elevenlabs_voice_id: data.elevenlabs_voice_id,
         elevenlabs_model: data.elevenlabs_model,
@@ -225,8 +228,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      if (settings.whatsapp_phone_number_id && !/^\d+$/.test(settings.whatsapp_phone_number_id)) {
-        toast.error('Phone Number ID deve conter apenas números');
+      if (settings.evolution_api_url && !/^https?:\/\//.test(settings.evolution_api_url)) {
+        toast.error('URL da Evolution API deve começar com http:// ou https://');
         return;
       }
 
@@ -234,9 +237,9 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
       const { error } = await supabase
         .from('nina_settings')
         .update({
-          whatsapp_access_token: settings.whatsapp_access_token,
-          whatsapp_phone_number_id: settings.whatsapp_phone_number_id,
-          whatsapp_verify_token: settings.whatsapp_verify_token,
+          evolution_api_key: settings.evolution_api_key,
+          evolution_instance: settings.evolution_instance,
+          evolution_api_url: settings.evolution_api_url,
           elevenlabs_api_key: settings.elevenlabs_api_key,
           elevenlabs_voice_id: settings.elevenlabs_voice_id,
           elevenlabs_model: settings.elevenlabs_model,
@@ -335,7 +338,7 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   };
 
   const handleTestMessage = async () => {
-    if (!settings.whatsapp_access_token || !settings.whatsapp_phone_number_id) {
+    if (!settings.evolution_api_key || !settings.evolution_instance) {
       toast.error('⚠️ Preencha e SALVE as credenciais do WhatsApp primeiro!', {
         description: 'Clique em "Salvar Alterações" no topo da página antes de testar.'
       });
@@ -475,7 +478,7 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
     }
   };
 
-  const whatsappConfigured = settings.whatsapp_access_token && settings.whatsapp_phone_number_id;
+  const whatsappConfigured = settings.evolution_api_key && settings.evolution_instance;
   const elevenlabsConfigured = settings.elevenlabs_api_key;
   const gcalConfigured = settings.google_client_id && settings.google_client_secret && settings.google_refresh_token && settings.google_calendar_id;
 
@@ -594,8 +597,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             <div className="relative">
               <input
                 type={showWhatsAppToken ? "text" : "password"}
-                value={settings.whatsapp_access_token || ''}
-                onChange={(e) => setSettings({ ...settings, whatsapp_access_token: e.target.value })}
+                value={settings.evolution_api_key || ''}
+                onChange={(e) => setSettings({ ...settings, evolution_api_key: e.target.value })}
                 placeholder="EAAxxxxxxxxxxxxxxx..."
                 className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 pr-10 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               />
@@ -615,8 +618,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             </label>
             <input
               type="text"
-              value={settings.whatsapp_phone_number_id || ''}
-              onChange={(e) => setSettings({ ...settings, whatsapp_phone_number_id: e.target.value })}
+              value={settings.evolution_instance || ''}
+              onChange={(e) => setSettings({ ...settings, evolution_instance: e.target.value })}
               placeholder="123456789012345"
               className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 placeholder:text-slate-600 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
             />
@@ -653,8 +656,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
               <label className="text-xs font-medium text-slate-400 mb-1.5 block">Verify Token</label>
               <input
                 type="text"
-                value={settings.whatsapp_verify_token || ''}
-                onChange={(e) => setSettings({ ...settings, whatsapp_verify_token: e.target.value })}
+                value={settings.evolution_api_url || ''}
+                onChange={(e) => setSettings({ ...settings, evolution_api_url: e.target.value })}
                 className="h-9 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 text-sm text-slate-100 focus:outline-none focus:ring-2 focus:ring-cyan-500/50"
               />
             </div>

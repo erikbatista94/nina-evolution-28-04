@@ -103,46 +103,39 @@ serve(async (req) => {
         });
       }
 
-      // Check WhatsApp
-      if (settings.whatsapp_access_token && settings.whatsapp_phone_number_id) {
-        // Test WhatsApp API connection
+      // Check Evolution API
+      if (settings.evolution_api_url && settings.evolution_api_key && settings.evolution_instance) {
         try {
-          const waResponse = await fetch(
-            `https://graph.facebook.com/v18.0/${settings.whatsapp_phone_number_id}`,
-            {
-              headers: { Authorization: `Bearer ${settings.whatsapp_access_token}` },
-            }
-          );
-          
-          if (waResponse.ok) {
-            const waData = await waResponse.json();
+          const base = settings.evolution_api_url.replace(/\/+$/, '');
+          const stRes = await fetch(`${base}/instance/connectionState/${settings.evolution_instance}`, {
+            headers: { 'apikey': settings.evolution_api_key },
+          });
+          if (stRes.ok) {
+            const st = await stRes.json();
+            const state = st?.instance?.state || st?.state;
             results.push({
               component: 'whatsapp',
-              status: 'ok',
-              message: `WhatsApp conectado: ${waData.display_phone_number || 'Ativo'}`,
+              status: state === 'open' ? 'ok' : 'warning',
+              message: state === 'open' ? 'Evolution API conectada' : `Instância: ${state || 'desconectada'}`,
             });
           } else {
             results.push({
-              component: 'whatsapp',
-              status: 'error',
-              message: 'Token do WhatsApp inválido ou expirado',
-              details: 'Verifique as credenciais no Facebook Developer',
+              component: 'whatsapp', status: 'error',
+              message: 'Não foi possível verificar a instância',
+              details: `HTTP ${stRes.status}`,
             });
           }
         } catch (e) {
           results.push({
-            component: 'whatsapp',
-            status: 'warning',
-            message: 'Não foi possível validar WhatsApp',
-            details: 'Erro de conexão com a API',
+            component: 'whatsapp', status: 'warning',
+            message: 'Não foi possível conectar à Evolution API',
           });
         }
       } else {
         results.push({
-          component: 'whatsapp',
-          status: 'error',
-          message: 'WhatsApp não configurado',
-          details: 'Configure o token e Phone Number ID',
+          component: 'whatsapp', status: 'error',
+          message: 'Evolution API não configurada',
+          details: 'Configure URL, API key e nome da instância',
         });
       }
 

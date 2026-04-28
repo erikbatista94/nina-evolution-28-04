@@ -6,48 +6,93 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v19.0";
+// Normaliza phone para o formato Evolution: somente dígitos + @s.whatsapp.net
+function toJid(phone: string): string {
+  const digits = (phone || '').replace(/\D/g, '');
+  return `${digits}@s.whatsapp.net`;
+}
+
+function evoUrl(base: string, path: string): string {
+  const b = base.replace(/\/+$/, '');
+  const p = path.replace(/^\/+/, '');
+  return `${b}/${p}`;
+}
+
+async function evoPost(settings: any, path: string, body: any) {
+  const res = await fetch(evoUrl(settings.evolution_api_url, path), {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'apikey': settings.evolution_api_key,
+    },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let data: any;
+  try { data = JSON.parse(text); } catch { data = { raw: text }; }
+  if (!res.ok) {
+    console.error('[Sender] Evolution error', res.status, data);
+    throw new Error(data?.message || data?.error || `Evolution API ${res.status}`);
+  }
+  return data;
+}
+
+async function fetchMediaAsBase64(supabase: any, mediaUrl: string, storagePath?: string): Promise<{ base64: string; mimeType: string }> {
+  let resolvedPath = storagePath;
+  if (!resolvedPath && mediaUrl?.includes('/object/public/whatsapp-media/')) {
+    resolvedPath = decodeURIComponent(mediaUrl.split('/object/public/whatsapp-media/')[1]);
+  }
+
+  let bytes: Uint8Array;
+  let mimeType = 'application/octet-stream';
+
+  if (resolvedPath) {
+    const { data, error } = await supabase.storage.from('whatsapp-media').download(resolvedPath);
+    if (error || !data) throw new Error(`Storage download failed: ${error?.message || 'no data'}`);
+    bytes = new Uint8Array(await data.arrayBuffer());
+    mimeType = (data as Blob).type || mimeType;
+  } else {
+    const r = await fetch(mediaUrl);
+    if (!r.ok) throw new Error(`Failed to fetch media: ${r.status}`);
+    bytes = new Uint8Array(await r.arrayBuffer());
+    mimeType = r.headers.get('content-type') || mimeType;
+  }
+
+  // Convert to base64 in chunks to avoid stack overflow
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode.apply(null, Array.from(bytes.subarray(i, i + chunkSize)) as any);
+  }
+  return { base64: btoa(binary), mimeType };
+}
 
 serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
   const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
   const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
   try {
-    console.log('[Sender] Starting send process...');
+    console.log('[Sender] Starting Evolution send process...');
 
-    const MAX_EXECUTION_TIME = 25000; // 25 seconds
+    const MAX_EXECUTION_TIME = 25000;
     const startTime = Date.now();
     let totalSent = 0;
     let iterations = 0;
-
-    console.log('[Sender] Starting polling loop');
-
-    // Cache de settings por user_id para evitar múltiplas queries
     const settingsCache: Record<string, any> = {};
 
     while (Date.now() - startTime < MAX_EXECUTION_TIME) {
       iterations++;
-      console.log(`[Sender] Iteration ${iterations}, elapsed: ${Date.now() - startTime}ms`);
 
-      // Claim batch of messages to send
       const { data: queueItems, error: claimError } = await supabase
         .rpc('claim_send_queue_batch', { p_limit: 10 });
 
-      if (claimError) {
-        console.error('[Sender] Error claiming batch:', claimError);
-        throw claimError;
-      }
+      if (claimError) throw claimError;
 
       if (!queueItems || queueItems.length === 0) {
-        console.log('[Sender] No messages ready to send, checking for scheduled messages...');
-        
-        // Check for messages scheduled in the next 5 seconds
-        const { data: upcoming, error: upcomingError } = await supabase
+        const { data: upcoming } = await supabase
           .from('send_queue')
           .select('id, scheduled_at')
           .eq('status', 'pending')
@@ -56,154 +101,102 @@ serve(async (req) => {
           .order('scheduled_at', { ascending: true })
           .limit(1);
 
-        if (upcomingError) {
-          console.error('[Sender] Error checking upcoming messages:', upcomingError);
-        }
-
         if (upcoming && upcoming.length > 0) {
-          const scheduledAt = new Date(upcoming[0].scheduled_at).getTime();
-          const now = Date.now();
           const waitTime = Math.min(
-            Math.max(scheduledAt - now + 100, 0),
+            Math.max(new Date(upcoming[0].scheduled_at).getTime() - Date.now() + 100, 0),
             5000
           );
-          
           if (waitTime > 0 && (Date.now() - startTime + waitTime) < MAX_EXECUTION_TIME) {
-            console.log(`[Sender] Waiting ${waitTime}ms for scheduled message at ${upcoming[0].scheduled_at}`);
-            await new Promise(resolve => setTimeout(resolve, waitTime));
+            await new Promise(r => setTimeout(r, waitTime));
             continue;
           }
         }
-        
-        // No more messages to process
-        console.log('[Sender] No more messages to process, exiting loop');
         break;
       }
 
-      console.log(`[Sender] Processing batch of ${queueItems.length} messages`);
-
       for (const item of queueItems) {
         try {
-          // Buscar user_id da conversation para multi-tenancy
-          const { data: conversation, error: convError } = await supabase
+          const { data: conversation } = await supabase
             .from('conversations')
             .select('user_id')
             .eq('id', item.conversation_id)
             .single();
 
-          if (convError || !conversation) {
-            console.error(`[Sender] Error fetching conversation ${item.conversation_id}:`, convError);
-            throw new Error('Conversation not found');
-          }
-
+          if (!conversation) throw new Error('Conversation not found');
           const userId = conversation.user_id;
-          
-          // Buscar settings do cache ou do banco com fallback triplo
+
           const cacheKey = userId || 'global';
           let settings = settingsCache[cacheKey];
           if (!settings) {
             let settingsData = null;
-
-            // 1. Tentar por user_id da conversa
             if (userId) {
               const { data } = await supabase
                 .from('nina_settings')
-                .select('whatsapp_access_token, whatsapp_phone_number_id')
+                .select('evolution_api_url, evolution_api_key, evolution_instance')
                 .eq('user_id', userId)
                 .maybeSingle();
               settingsData = data;
             }
-
-            // 2. Fallback: buscar global (user_id IS NULL)
             if (!settingsData) {
-              console.log('[Sender] No user-specific settings, trying global...');
               const { data } = await supabase
                 .from('nina_settings')
-                .select('whatsapp_access_token, whatsapp_phone_number_id')
+                .select('evolution_api_url, evolution_api_key, evolution_instance')
                 .is('user_id', null)
                 .maybeSingle();
               settingsData = data;
             }
-
-            // 3. Último fallback: qualquer settings com WhatsApp configurado
             if (!settingsData) {
-              console.log('[Sender] No global settings, fetching any with WhatsApp...');
               const { data } = await supabase
                 .from('nina_settings')
-                .select('whatsapp_access_token, whatsapp_phone_number_id')
-                .not('whatsapp_phone_number_id', 'is', null)
+                .select('evolution_api_url, evolution_api_key, evolution_instance')
+                .not('evolution_instance', 'is', null)
                 .limit(1)
                 .maybeSingle();
               settingsData = data;
             }
-
-            if (!settingsData) {
-              console.error('[Sender] No settings found with any fallback');
-              throw new Error('Settings not found');
+            if (!settingsData?.evolution_api_url || !settingsData?.evolution_api_key || !settingsData?.evolution_instance) {
+              throw new Error('Evolution API not configured');
             }
-
-            if (!settingsData.whatsapp_access_token || !settingsData.whatsapp_phone_number_id) {
-              console.error('[Sender] WhatsApp not configured in settings');
-              throw new Error('WhatsApp not configured');
-            }
-
             settings = settingsData;
             settingsCache[cacheKey] = settings;
           }
 
           await sendMessage(supabase, settings, item);
-          
-          // Mark as completed
+
           await supabase
             .from('send_queue')
-            .update({ 
-              status: 'completed', 
-              sent_at: new Date().toISOString() 
-            })
+            .update({ status: 'completed', sent_at: new Date().toISOString() })
             .eq('id', item.id);
-          
+
           totalSent++;
-          console.log(`[Sender] Successfully sent message ${item.id} (${totalSent} total)`);
         } catch (error) {
           const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-          console.error(`[Sender] Error sending item ${item.id}:`, error);
-          
-          // Mark as failed with retry
+          console.error(`[Sender] Error sending ${item.id}:`, errorMessage);
           const newRetryCount = (item.retry_count || 0) + 1;
           const shouldRetry = newRetryCount < 3;
-          
           await supabase
             .from('send_queue')
-            .update({ 
+            .update({
               status: shouldRetry ? 'pending' : 'failed',
               retry_count: newRetryCount,
               error_message: errorMessage,
-              scheduled_at: shouldRetry 
-                ? new Date(Date.now() + newRetryCount * 60000).toISOString() 
-                : null
+              scheduled_at: shouldRetry
+                ? new Date(Date.now() + newRetryCount * 60000).toISOString()
+                : null,
             })
             .eq('id', item.id);
         }
       }
     }
 
-    const executionTime = Date.now() - startTime;
-    console.log(`[Sender] Completed: sent ${totalSent} messages in ${iterations} iterations (${executionTime}ms)`);
-
-    return new Response(JSON.stringify({ 
-      sent: totalSent, 
-      iterations,
-      executionTime 
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+    return new Response(JSON.stringify({ sent: totalSent, iterations, executionTime: Date.now() - startTime }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
-    console.error('[Sender] Error:', error);
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(JSON.stringify({ error: errorMessage }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
@@ -215,7 +208,6 @@ async function resolveAgentName(supabase: any, senderUserId: string): Promise<st
     .eq('user_id', senderUserId)
     .eq('status', 'active')
     .maybeSingle();
-
   if (member?.name) return member.name;
 
   const { data: profile } = await supabase
@@ -223,261 +215,112 @@ async function resolveAgentName(supabase: any, senderUserId: string): Promise<st
     .select('full_name')
     .eq('user_id', senderUserId)
     .maybeSingle();
-
   return profile?.full_name || null;
 }
 
-async function uploadMediaToWhatsApp(
-  settings: any, supabase: any, mediaUrl: string, mimeType: string, storagePath?: string
-): Promise<string> {
-  // 1. Resolve storage path: prefer explicit storagePath, fallback to parsing mediaUrl
-  let resolvedPath = storagePath;
-  if (!resolvedPath) {
-    const parts = mediaUrl.split('/object/public/whatsapp-media/');
-    if (parts.length < 2) {
-      throw new Error(`Cannot parse storage path from media URL: ${mediaUrl}`);
-    }
-    resolvedPath = decodeURIComponent(parts[1]);
-  }
-  console.log(`[Sender] Downloading from Storage: ${resolvedPath}`);
-
-  // 2. Download from Storage (service role bypasses RLS)
-  const { data: fileData, error: downloadError } = await supabase.storage
-    .from('whatsapp-media')
-    .download(resolvedPath);
-
-  if (downloadError || !fileData) {
-    console.error('[Sender] Error downloading from Storage:', downloadError);
-    throw new Error(`Failed to download media from Storage: ${downloadError?.message || 'no data'}`);
-  }
-
-  console.log(`[Sender] Downloaded ${fileData.size} bytes, uploading to WhatsApp...`);
-
-  // 3. Map mimeType to a sensible filename
-  const extMap: Record<string, string> = {
-    'image/jpeg': 'media.jpg', 'image/png': 'media.png', 'image/webp': 'media.webp',
-    'video/mp4': 'video.mp4', 'video/3gpp': 'video.3gp',
-    'audio/ogg': 'audio.ogg', 'audio/mpeg': 'audio.mp3', 'audio/mp4': 'audio.mp4',
-    'audio/webm': 'audio.webm', 'audio/aac': 'audio.aac',
-    'application/pdf': 'document.pdf',
-    'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'document.docx',
-    'application/msword': 'document.doc',
-  };
-  const fileName = extMap[mimeType] || 'file.bin';
-
-  // 4. Upload to WhatsApp Cloud API: POST /{phone_number_id}/media
-  const form = new FormData();
-  form.append('file', new Blob([fileData], { type: mimeType }), fileName);
-  form.append('type', mimeType);
-  form.append('messaging_product', 'whatsapp');
-
-  const uploadRes = await fetch(
-    `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/media`,
-    {
-      method: 'POST',
-      headers: { 'Authorization': `Bearer ${settings.whatsapp_access_token}` },
-      body: form,
-    }
-  );
-
-  const uploadData = await uploadRes.json();
-
-  if (!uploadRes.ok || !uploadData.id) {
-    console.error('[Sender] WhatsApp media upload error:', uploadData);
-    throw new Error(uploadData.error?.message || 'WhatsApp media upload failed');
-  }
-
-  console.log('[Sender] Uploaded media to WhatsApp, ID:', uploadData.id);
-  return uploadData.id;
-}
-
 async function sendMessage(supabase: any, settings: any, queueItem: any) {
-  console.log(`[Sender] Sending message: ${queueItem.id}`);
-
-  // Get contact phone number
   const { data: contact } = await supabase
     .from('contacts')
     .select('phone_number, whatsapp_id')
     .eq('id', queueItem.contact_id)
     .maybeSingle();
+  if (!contact) throw new Error('Contact not found');
 
-  if (!contact) {
-    throw new Error('Contact not found');
-  }
+  const number = (contact.whatsapp_id || contact.phone_number || '').replace(/\D/g, '');
+  if (!number) throw new Error('Contact has no phone number');
 
-  const recipient = contact.whatsapp_id || contact.phone_number;
-
-  // Resolve agent name prefix for human messages
-  let finalContent = queueItem.content;
-  let agentName: string | null = null;
-
+  // Agent name prefix for human messages
+  let finalContent = queueItem.content || '';
   if (queueItem.from_type === 'human' && queueItem.message_id) {
     const { data: msgRecord } = await supabase
       .from('messages')
       .select('sender_user_id')
       .eq('id', queueItem.message_id)
       .maybeSingle();
-
     if (msgRecord?.sender_user_id) {
-      agentName = await resolveAgentName(supabase, msgRecord.sender_user_id);
-
+      const agentName = await resolveAgentName(supabase, msgRecord.sender_user_id);
       if (agentName && finalContent && !finalContent.startsWith(`${agentName}:`) && !finalContent.startsWith(`*${agentName}:*`)) {
         finalContent = `*${agentName}:* ${finalContent}`;
-        console.log(`[Sender] Prefixed agent name (bold): "${agentName}"`);
       }
     }
   }
 
-  // Build WhatsApp API payload
-  let payload: any = {
-    messaging_product: 'whatsapp',
-    recipient_type: 'individual',
-    to: recipient
-  };
+  const instance = settings.evolution_instance;
+  let waMessageId: string | undefined;
 
   switch (queueItem.message_type) {
-    case 'text':
-      payload.type = 'text';
-      payload.text = { body: finalContent };
-      break;
-    
-    case 'image': {
-      const meta = (queueItem.metadata as any) || {};
-      const mimeType = meta.mime_type || 'image/jpeg';
-      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
-      payload.type = 'image';
-      payload.image = { id: mediaId, caption: finalContent?.trim() || undefined };
-      if (queueItem.message_id) {
-        await supabase.from('messages').update({
-          metadata: { ...meta, whatsapp_media_id: mediaId }
-        }).eq('id', queueItem.message_id);
-      }
+    case 'text': {
+      const resp = await evoPost(settings, `/message/sendText/${instance}`, {
+        number,
+        text: finalContent,
+      });
+      waMessageId = resp?.key?.id || resp?.message?.key?.id;
       break;
     }
-    
-    case 'audio': {
-      const meta = (queueItem.metadata as any) || {};
-      const mediaId = await uploadMediaToWhatsApp(
-        settings, supabase, queueItem.media_url,
-        meta.audio_mime_type || meta.mime_type || 'audio/ogg',
-        meta.storage_path
-      );
-      payload.type = 'audio';
-      payload.audio = { id: mediaId };
-      if (queueItem.message_id) {
-        await supabase.from('messages').update({
-          metadata: { ...meta, whatsapp_media_id: mediaId }
-        }).eq('id', queueItem.message_id);
-      }
-      break;
-    }
-    
+    case 'image':
+    case 'video':
     case 'document': {
       const meta = (queueItem.metadata as any) || {};
-      const mimeType = meta.mime_type || 'application/pdf';
-      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
-      payload.type = 'document';
-      payload.document = { id: mediaId, filename: meta.filename || 'document.pdf' };
-      if (queueItem.message_id) {
-        await supabase.from('messages').update({
-          metadata: { ...meta, whatsapp_media_id: mediaId }
-        }).eq('id', queueItem.message_id);
-      }
+      const { base64, mimeType } = await fetchMediaAsBase64(supabase, queueItem.media_url, meta.storage_path);
+      const mediatype = queueItem.message_type;
+      const fileName = meta.filename ||
+        (mediatype === 'image' ? 'image.jpg' :
+         mediatype === 'video' ? 'video.mp4' : 'document.pdf');
+      const resp = await evoPost(settings, `/message/sendMedia/${instance}`, {
+        number,
+        mediatype,
+        mimetype: meta.mime_type || mimeType,
+        media: base64,
+        fileName,
+        caption: finalContent?.trim() || undefined,
+      });
+      waMessageId = resp?.key?.id || resp?.message?.key?.id;
       break;
     }
-
-    case 'video': {
+    case 'audio': {
       const meta = (queueItem.metadata as any) || {};
-      const mimeType = meta.mime_type || 'video/mp4';
-      const mediaId = await uploadMediaToWhatsApp(settings, supabase, queueItem.media_url, mimeType, meta.storage_path);
-      payload.type = 'video';
-      payload.video = { id: mediaId, caption: finalContent?.trim() || undefined };
-      if (queueItem.message_id) {
-        await supabase.from('messages').update({
-          metadata: { ...meta, whatsapp_media_id: mediaId }
-        }).eq('id', queueItem.message_id);
-      }
+      const { base64 } = await fetchMediaAsBase64(supabase, queueItem.media_url, meta.storage_path);
+      const resp = await evoPost(settings, `/message/sendWhatsAppAudio/${instance}`, {
+        number,
+        audio: base64,
+        encoding: true,
+      });
+      waMessageId = resp?.key?.id || resp?.message?.key?.id;
       break;
     }
-    
-    default:
-      payload.type = 'text';
-      payload.text = { body: finalContent };
-  }
-
-  console.log('[Sender] WhatsApp API payload:', JSON.stringify(payload, null, 2));
-
-  // Send via WhatsApp Cloud API
-  const response = await fetch(
-    `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/messages`,
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${settings.whatsapp_access_token}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(payload)
+    default: {
+      const resp = await evoPost(settings, `/message/sendText/${instance}`, {
+        number,
+        text: finalContent,
+      });
+      waMessageId = resp?.key?.id || resp?.message?.key?.id;
     }
-  );
-
-  const responseData = await response.json();
-
-  if (!response.ok) {
-    console.error('[Sender] WhatsApp API error:', responseData);
-    throw new Error(responseData.error?.message || 'WhatsApp API error');
   }
 
-  const whatsappMessageId = responseData.messages?.[0]?.id;
-  console.log('[Sender] Message sent, WA ID:', whatsappMessageId);
-
-  // Update or create message record in database
   if (queueItem.message_id) {
-    // UPDATE existing message (for human messages)
-    console.log('[Sender] Updating existing message:', queueItem.message_id);
     const updateData: any = {
-      whatsapp_message_id: whatsappMessageId,
+      whatsapp_message_id: waMessageId,
       status: 'sent',
-      sent_at: new Date().toISOString()
+      sent_at: new Date().toISOString(),
     };
-
-    // Save outgoing_text in metadata for audit if content was prefixed
     if (finalContent !== queueItem.content) {
       updateData.metadata = { ...(queueItem.metadata || {}), outgoing_text: finalContent };
     }
-
-    const { error: msgError } = await supabase
-      .from('messages')
-      .update(updateData)
-      .eq('id', queueItem.message_id);
-
-    if (msgError) {
-      console.error('[Sender] Error updating message record:', msgError);
-      // Don't throw - message was sent successfully
-    }
+    await supabase.from('messages').update(updateData).eq('id', queueItem.message_id);
   } else {
-    // INSERT new message (for Nina messages)
-    console.log('[Sender] Creating new message record');
-    const { error: msgError } = await supabase
-      .from('messages')
-      .insert({
-        conversation_id: queueItem.conversation_id,
-        whatsapp_message_id: whatsappMessageId,
-        content: queueItem.content,
-        type: queueItem.message_type,
-        from_type: queueItem.from_type,
-        status: 'sent',
-        media_url: queueItem.media_url || null,
-        sent_at: new Date().toISOString(),
-        metadata: queueItem.metadata || {}
-      });
-
-    if (msgError) {
-      console.error('[Sender] Error creating message record:', msgError);
-      // Don't throw - message was sent successfully
-    }
+    await supabase.from('messages').insert({
+      conversation_id: queueItem.conversation_id,
+      whatsapp_message_id: waMessageId,
+      content: queueItem.content,
+      type: queueItem.message_type,
+      from_type: queueItem.from_type,
+      status: 'sent',
+      media_url: queueItem.media_url || null,
+      sent_at: new Date().toISOString(),
+      metadata: queueItem.metadata || {},
+    });
   }
 
-  // Update conversation last_message_at
   await supabase
     .from('conversations')
     .update({ last_message_at: new Date().toISOString() })

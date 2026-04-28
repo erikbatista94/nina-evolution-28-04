@@ -6,8 +6,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const WHATSAPP_API_URL = "https://graph.facebook.com/v19.0";
-
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -53,7 +51,7 @@ serve(async (req) => {
       });
     }
 
-    const recipient = contact.whatsapp_id || contact.phone_number;
+    const recipient = (contact.whatsapp_id || contact.phone_number || '').replace(/\D/g, '');
 
     // 3. Get conversation user_id for settings lookup
     const { data: conversation } = await supabase
@@ -64,12 +62,12 @@ serve(async (req) => {
 
     const convUserId = conversation?.user_id;
 
-    // 4. Get WhatsApp settings
+    // 4. Get Evolution settings
     let settings = null;
     if (convUserId) {
       const { data } = await supabase
         .from('nina_settings')
-        .select('whatsapp_access_token, whatsapp_phone_number_id')
+        .select('evolution_api_url, evolution_api_key, evolution_instance')
         .eq('user_id', convUserId)
         .maybeSingle();
       settings = data;
@@ -77,7 +75,7 @@ serve(async (req) => {
     if (!settings) {
       const { data } = await supabase
         .from('nina_settings')
-        .select('whatsapp_access_token, whatsapp_phone_number_id')
+        .select('evolution_api_url, evolution_api_key, evolution_instance')
         .is('user_id', null)
         .maybeSingle();
       settings = data;
@@ -85,15 +83,15 @@ serve(async (req) => {
     if (!settings) {
       const { data } = await supabase
         .from('nina_settings')
-        .select('whatsapp_access_token, whatsapp_phone_number_id')
-        .not('whatsapp_phone_number_id', 'is', null)
+        .select('evolution_api_url, evolution_api_key, evolution_instance')
+        .not('evolution_instance', 'is', null)
         .limit(1)
         .maybeSingle();
       settings = data;
     }
 
-    if (!settings?.whatsapp_access_token || !settings?.whatsapp_phone_number_id) {
-      return new Response(JSON.stringify({ error: 'WhatsApp not configured' }), {
+    if (!settings?.evolution_api_url || !settings?.evolution_api_key || !settings?.evolution_instance) {
+      return new Response(JSON.stringify({ error: 'Evolution API not configured' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
@@ -105,64 +103,25 @@ serve(async (req) => {
       renderedContent = renderedContent.replace(new RegExp(`\\{\\{${key}\\}\\}`, 'g'), vars[key]);
     });
 
-    // 6. Build WhatsApp template payload
-    // The template_name must match the approved template on Meta Business
-    const components: any[] = [];
-    const templateVars = template.variables as any[] || [];
-    if (templateVars.length > 0) {
-      const parameters = templateVars.map((v: any) => ({
-        type: 'text',
-        text: vars[v.key] || ''
-      }));
-      components.push({
-        type: 'body',
-        parameters
-      });
-    }
-
-    const payload = {
-      messaging_product: 'whatsapp',
-      recipient_type: 'individual',
-      to: recipient,
-      type: 'template',
-      template: {
-        name: template_name,
-        language: { code: template.language || 'pt_BR' },
-        components: components.length > 0 ? components : undefined
-      }
-    };
-
-    console.log('[SendTemplate] Payload:', JSON.stringify(payload, null, 2));
-
-    // 7. Send via WhatsApp Cloud API
+    // 6. Send rendered template as plain text via Evolution
+    const base = settings.evolution_api_url.replace(/\/+$/, '');
     const response = await fetch(
-      `${WHATSAPP_API_URL}/${settings.whatsapp_phone_number_id}/messages`,
+      `${base}/message/sendText/${settings.evolution_instance}`,
       {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${settings.whatsapp_access_token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(payload)
+        headers: { 'apikey': settings.evolution_api_key, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ number: recipient, text: renderedContent }),
       }
     );
-
     const responseData = await response.json();
-
     if (!response.ok) {
-      console.error('[SendTemplate] WhatsApp API error:', responseData);
-      const errorMsg = responseData.error?.message || 'WhatsApp API error';
-      const errorCode = responseData.error?.code || response.status;
-      return new Response(JSON.stringify({ 
-        error: errorMsg, 
-        code: errorCode,
-        details: responseData.error 
-      }), {
-        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
+      console.error('[SendTemplate] Evolution error:', responseData);
+      return new Response(JSON.stringify({
+        error: responseData?.message || 'Evolution API error',
+        details: responseData,
+      }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
-
-    const whatsappMessageId = responseData.messages?.[0]?.id;
+    const whatsappMessageId = responseData?.key?.id || responseData?.message?.key?.id;
     console.log('[SendTemplate] Sent successfully, WA ID:', whatsappMessageId);
 
     // 8. Create message record
