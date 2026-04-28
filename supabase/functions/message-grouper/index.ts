@@ -392,54 +392,64 @@ function getMimeType(mediaType: string): string {
   return defaults[mediaType] || 'application/octet-stream';
 }
 
-// Download media from WhatsApp API
-async function downloadWhatsAppMedia(settings: any, mediaId: string): Promise<{ buffer: ArrayBuffer; mimeType: string | null } | null> {
-  if (!settings?.whatsapp_access_token) {
-    console.error('[MessageGrouper] No WhatsApp access token configured');
+// Download media via Evolution API.
+// Strategy: 1) try POST /chat/getBase64FromMediaMessage/{instance} (works for encrypted WA media)
+//           2) fallback to direct GET on mediaUrl (rarely works due to WA encryption)
+async function downloadEvolutionMedia(
+  settings: any,
+  evoMessageId: string | undefined,
+  mediaUrl: string | null,
+  defaultMime: string | null
+): Promise<{ buffer: ArrayBuffer; mimeType: string | null } | null> {
+  if (!settings?.evolution_api_url || !settings?.evolution_api_key || !settings?.evolution_instance) {
+    console.error('[MessageGrouper] Evolution API not configured');
     return null;
   }
+  const base = settings.evolution_api_url.replace(/\/+$/, '');
+  const headers = { 'apikey': settings.evolution_api_key, 'Content-Type': 'application/json' };
 
-  try {
-    const mediaInfoResponse = await fetch(
-      `https://graph.facebook.com/v18.0/${mediaId}`,
-      {
-        headers: {
-          'Authorization': `Bearer ${settings.whatsapp_access_token}`
+  // 1. Try Evolution helper that decrypts and returns base64
+  if (evoMessageId) {
+    try {
+      const res = await fetch(
+        `${base}/chat/getBase64FromMediaMessage/${settings.evolution_instance}`,
+        {
+          method: 'POST', headers,
+          body: JSON.stringify({ message: { key: { id: evoMessageId } }, convertToMp4: false }),
         }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        const b64 = data?.base64 || data?.media || data?.data;
+        const mime = data?.mimetype || defaultMime || null;
+        if (b64) {
+          const bin = atob(b64);
+          const buffer = new Uint8Array(bin.length);
+          for (let i = 0; i < bin.length; i++) buffer[i] = bin.charCodeAt(i);
+          return { buffer: buffer.buffer, mimeType: mime };
+        }
+      } else {
+        console.warn('[MessageGrouper] getBase64FromMediaMessage failed:', res.status);
       }
-    );
-
-    if (!mediaInfoResponse.ok) {
-      console.error('[MessageGrouper] Failed to get media info:', await mediaInfoResponse.text());
-      return null;
+    } catch (err) {
+      console.error('[MessageGrouper] getBase64 error:', err);
     }
-
-    const mediaInfo = await mediaInfoResponse.json();
-    const mediaUrl = mediaInfo.url;
-    const mimeType = mediaInfo.mime_type || null;
-
-    if (!mediaUrl) {
-      console.error('[MessageGrouper] No media URL in response');
-      return null;
-    }
-
-    const mediaResponse = await fetch(mediaUrl, {
-      headers: {
-        'Authorization': `Bearer ${settings.whatsapp_access_token}`
-      }
-    });
-
-    if (!mediaResponse.ok) {
-      console.error('[MessageGrouper] Failed to download media:', await mediaResponse.text());
-      return null;
-    }
-
-    const buffer = await mediaResponse.arrayBuffer();
-    return { buffer, mimeType };
-  } catch (error) {
-    console.error('[MessageGrouper] Error downloading media:', error);
-    return null;
   }
+
+  // 2. Fallback: direct fetch (will only work if media is unencrypted/proxied)
+  if (mediaUrl) {
+    try {
+      const r = await fetch(mediaUrl);
+      if (r.ok) {
+        const buffer = await r.arrayBuffer();
+        return { buffer, mimeType: r.headers.get('content-type') || defaultMime };
+      }
+    } catch (err) {
+      console.error('[MessageGrouper] direct media fetch error:', err);
+    }
+  }
+
+  return null;
 }
 
 
