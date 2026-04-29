@@ -39,14 +39,15 @@ export function useCompanyContext(): CompanyContext {
     }
     let cancelled = false;
     (async () => {
-      const { data } = await supabase
+      const { data: rows } = await supabase
         .from('user_roles')
         .select('role, company_id')
-        .eq('user_id', user.id)
-        .limit(1)
-        .maybeSingle();
+        .eq('user_id', user.id);
       if (cancelled) return;
-      if (data) {
+      if (rows && rows.length > 0) {
+        // Prioritize super_admin (company_id = null) > admin > others
+        const superAdminRow = rows.find(r => r.role === 'super_admin' && r.company_id === null);
+        const data = superAdminRow ?? rows[0];
         setRole((data.role as UserRole) || 'user');
         setCompanyId((data as any).company_id ?? null);
       }

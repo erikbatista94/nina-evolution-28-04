@@ -47,7 +47,7 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
           .eq('user_id', user.id)
           .maybeSingle();
 
-        const isAdmin = roleData?.role === 'admin';
+        const isAdmin = roleData?.role === 'admin' || roleData?.role === 'super_admin';
 
         if (!isAdmin) {
           // Non-admin: must exist in team_members with active status
