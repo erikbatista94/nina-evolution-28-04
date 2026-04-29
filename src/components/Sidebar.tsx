@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell, BarChart3, Building2, Zap, Crown } from 'lucide-react';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 import { useAuth } from '@/hooks/useAuth';
 import { Sidebar, SidebarBody, SidebarLink, useSidebar } from '@/components/ui/sidebar';
 import { Link } from 'react-router-dom';
@@ -21,6 +22,11 @@ const allMenuItems = [
   { id: 'team', label: 'Equipe', icon: ShieldCheck, adminOnly: false },
   { id: 'reports', label: 'Relatórios', icon: BarChart3, adminOnly: true },
   { id: 'settings', label: 'Configurações', icon: SettingsIcon, adminOnly: true },
+];
+
+const superAdminMenuItems = [
+  { id: 'companies', label: 'Empresas', icon: Building2 },
+  { id: 'instances', label: 'Instâncias', icon: Zap },
 ];
 
 const Logo = ({ companyName }: { companyName: string }) => {
@@ -60,6 +66,7 @@ const LogoIcon = () => {
 
 const SidebarContent = () => {
   const { companyName, isAdmin } = useCompanySettings();
+  const { isSuperAdmin } = useCompanyContext();
   const { user, signOut } = useAuth();
   const location = useLocation();
   const navigate = useNavigate();
@@ -75,6 +82,12 @@ const SidebarContent = () => {
     icon: <item.icon className="h-5 w-5" />,
     badge: item.id === 'alerts' && alertCount > 0 ? alertCount : undefined,
     badgeColor: item.id === 'alerts' ? (hasStalled ? 'bg-red-500' : hasLossRisk ? 'bg-orange-500' : 'bg-yellow-500') : undefined,
+  }));
+
+  const superLinks = superAdminMenuItems.map(item => ({
+    label: item.label,
+    href: `/${item.id}`,
+    icon: <item.icon className="h-5 w-5" />,
   }));
 
   const handleLogout = async () => {
@@ -110,6 +123,18 @@ const SidebarContent = () => {
         </div>
         
         <nav className="flex flex-col gap-1.5">
+          {isSuperAdmin && (
+            <>
+              {superLinks.map((link, idx) => (
+                <SidebarLink
+                  key={`sa-${idx}`}
+                  link={link}
+                  isActive={currentPath.startsWith(link.href.slice(1))}
+                />
+              ))}
+              <div className="my-2 border-t border-slate-800/50" />
+            </>
+          )}
           {links.map((link, idx) => (
             <SidebarLink
               key={idx}
@@ -150,7 +175,10 @@ const SidebarContent = () => {
             transition={{ duration: 0.2 }}
             className="flex-1 overflow-hidden"
           >
-            <p className="text-sm font-medium text-foreground group-hover:text-foreground whitespace-nowrap">{getDisplayName()}</p>
+            <p className="text-sm font-medium text-foreground group-hover:text-foreground whitespace-nowrap flex items-center gap-1.5">
+              {getDisplayName()}
+              {isSuperAdmin && <Crown className="w-3 h-3 text-amber-400" />}
+            </p>
             <p className="text-xs text-muted-foreground truncate">{user?.email || 'email@example.com'}</p>
           </motion.div>
           <motion.div
