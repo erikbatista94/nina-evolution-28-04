@@ -47,15 +47,28 @@ Deno.serve(async (req) => {
     // Use service role client for admin operations
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    // Check if requester is admin
-    const { data: isAdmin } = await adminClient.rpc('has_role', { _user_id: requesterId, _role: 'admin' });
-    if (!isAdmin) {
+    // Check if requester is admin or super_admin
+    const { data: requesterRole } = await adminClient
+      .from('user_roles')
+      .select('role, company_id')
+      .eq('user_id', requesterId)
+      .maybeSingle();
+
+    const requesterIsAdmin = requesterRole?.role === 'admin' || requesterRole?.role === 'super_admin';
+    if (!requesterIsAdmin) {
       return new Response(JSON.stringify({ error: 'Forbidden: admin role required' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    const isSuperAdmin = requesterRole?.role === 'super_admin';
+
     // Parse body
     const body = await req.json();
-    const { name, email, role, team_id, function_id, weight, whatsapp_number, status } = body;
+    const { name, email, role, team_id, function_id, weight, whatsapp_number, status, company_id: bodyCompanyId } = body;
+
+    // Determine target company: super_admin can specify, others use their own
+    const targetCompanyId = isSuperAdmin
+      ? (bodyCompanyId || requesterRole?.company_id)
+      : requesterRole?.company_id;
 
     if (!name || !email) {
       return new Response(JSON.stringify({ error: 'name and email are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -90,14 +103,15 @@ Deno.serve(async (req) => {
 
     // Map role to app_role: admin -> admin, manager/agent -> user
     const appRole = role === 'admin' ? 'admin' : 'user';
-    
-    // Update user_roles if role differs from default ('user')
-    if (appRole === 'admin') {
-      await adminClient
-        .from('user_roles')
-        .update({ role: 'admin' })
-        .eq('user_id', newUserId);
-    }
+
+    // Update user_roles: set role and company_id
+    await adminClient
+      .from('user_roles')
+      .update({
+        role: appRole,
+        company_id: targetCompanyId || null,
+      })
+      .eq('user_id', newUserId);
 
     // Map role to member_role enum
     const memberRole = role === 'admin' ? 'admin' : role === 'manager' ? 'manager' : 'agent';

@@ -7,24 +7,28 @@ import { supabase } from '@/integrations/supabase/client';
 import TeamConfigModal from './TeamConfigModal';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 
 const Team: React.FC = () => {
   const { isAdmin } = useCompanySettings();
+  const { isSuperAdmin, companyId: myCompanyId } = useCompanyContext();
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [teams, setTeams] = useState<TeamType[]>([]);
   const [functions, setFunctions] = useState<TeamFunction[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showConfigModal, setShowConfigModal] = useState(false);
-  const [formData, setFormData] = useState({ 
-    name: '', 
-    email: '', 
+  const [allCompanies, setAllCompanies] = useState<{ id: string; name: string }[]>([]);
+  const [formData, setFormData] = useState({
+    name: '',
+    email: '',
     role: 'agent',
     team_id: '',
     function_id: '',
     weight: 1,
     whatsapp_number: '',
-    status: 'active'
+    status: 'active',
+    company_id: '',
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [showEditModal, setShowEditModal] = useState(false);
@@ -68,6 +72,13 @@ const Team: React.FC = () => {
     }
   };
 
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    supabase.from('companies').select('id, name').eq('is_active', true).order('name').then(({ data }) => {
+      if (data) setAllCompanies(data);
+    });
+  }, [isSuperAdmin]);
+
   const setupRealtime = () => {
     const channel = supabase
       .channel('team-members-changes')
@@ -93,16 +104,21 @@ const Team: React.FC = () => {
       const { data: { session } } = await supabase.auth.getSession();
       if (!session) throw new Error('Not authenticated');
 
+      const targetCompanyId = isSuperAdmin
+        ? (formData.company_id || myCompanyId)
+        : myCompanyId;
+
       const { data, error } = await supabase.functions.invoke('admin-create-user', {
         body: {
           name: formData.name,
           email: formData.email,
-          role: formData.role,
+          role: isSuperAdmin ? formData.role : 'agent',
           team_id: formData.team_id || undefined,
           function_id: formData.function_id || undefined,
           weight: formData.weight,
           whatsapp_number: formData.whatsapp_number || undefined,
-          status: formData.status
+          status: formData.status,
+          company_id: targetCompanyId || undefined,
         }
       });
 
@@ -112,7 +128,7 @@ const Team: React.FC = () => {
       setCredentials({ email: formData.email, password: data.temporary_password });
       setShowModal(false);
       setShowCredentialsModal(true);
-      setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1, whatsapp_number: '', status: 'active' });
+      setFormData({ name: '', email: '', role: 'agent', team_id: '', function_id: '', weight: 1, whatsapp_number: '', status: 'active', company_id: '' });
       toast.success('Usuário criado com sucesso!');
       await loadAllData();
     } catch (error: any) {
@@ -483,16 +499,34 @@ const Team: React.FC = () => {
                         </div>
                         <p className="text-xs text-slate-500">Formato: DDI + DDD + número (ex: 5511999999999)</p>
                     </div>
+                    {isSuperAdmin && allCompanies.length > 0 && (
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium text-slate-300">Empresa <span className="text-red-400">*</span></label>
+                        <select
+                          required
+                          value={formData.company_id}
+                          onChange={(e) => setFormData({...formData, company_id: e.target.value})}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-lg p-2.5 text-sm text-white"
+                        >
+                          <option value="">Selecione a empresa</option>
+                          {allCompanies.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    )}
+
                     <div className="space-y-2">
                         <label className="text-sm font-medium text-slate-300">Nível de Acesso</label>
-                        <div className="grid grid-cols-3 gap-2">
+                        {isSuperAdmin ? (
+                          <div className="grid grid-cols-3 gap-2">
                             {['agent', 'manager', 'admin'].map((role) => (
-                                <div 
+                                <div
                                     key={role}
                                     onClick={() => setFormData({...formData, role})}
                                     className={`cursor-pointer rounded-lg border p-2 text-center transition-all ${
-                                        formData.role === role 
-                                        ? 'bg-slate-800 border-slate-500 text-white' 
+                                        formData.role === role
+                                        ? 'bg-slate-800 border-slate-500 text-white'
                                         : 'bg-slate-950 border-slate-800 text-slate-500 hover:border-slate-700'
                                     }`}
                                 >
@@ -500,7 +534,12 @@ const Team: React.FC = () => {
                                     {formData.role === role && <div className="flex justify-center"><Check className="w-3 h-3" /></div>}
                                 </div>
                             ))}
-                        </div>
+                          </div>
+                        ) : (
+                          <div className="px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm text-slate-400">
+                            Atendente (member) — administradores só podem criar membros
+                          </div>
+                        )}
                     </div>
 
                     <div className="space-y-2">

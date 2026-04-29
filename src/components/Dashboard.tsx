@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight } from 'lucide-react';
+import { Activity, DollarSign, MessageSquare, Users, Loader2, TrendingUp, TrendingDown, ArrowUpRight, Building2, Zap } from 'lucide-react';
 import { Area, AreaChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { StatMetric, TeamMember } from '../types';
 import { api } from '../services/api';
+import { supabase } from '@/integrations/supabase/client';
 import { SystemHealthCard } from './SystemHealthCard';
 import { useAuth } from '@/hooks/useAuth';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 import DashboardMyDay from './DashboardMyDay';
 import DashboardSlaBlock from './DashboardSlaBlock';
 import MyScorecard from './MyScorecard';
@@ -24,21 +26,48 @@ const periodDays: Record<PeriodFilter, number> = {
   '30days': 30
 };
 
+interface SuperAdminStats {
+  activeCompanies: number;
+  connectedInstances: number;
+  conversationsToday: number;
+}
+
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
   const { isAdmin } = useCompanySettings();
+  const { isSuperAdmin } = useCompanyContext();
   const [metrics, setMetrics] = useState<StatMetric[]>([]);
   const [chartData, setChartData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [period, setPeriod] = useState<PeriodFilter>('today');
   const [selectedSeller, setSelectedSeller] = useState<string>('all');
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
+  const [superAdminStats, setSuperAdminStats] = useState<SuperAdminStats | null>(null);
 
   useEffect(() => {
     if (isAdmin) {
       api.fetchTeam().then(setTeamMembers).catch(console.error);
     }
   }, [isAdmin]);
+
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    const fetchSuperAdminStats = async () => {
+      const todayStart = new Date();
+      todayStart.setHours(0, 0, 0, 0);
+      const [companiesRes, instancesRes, convRes] = await Promise.all([
+        supabase.from('companies').select('id', { count: 'exact', head: true }).eq('is_active', true),
+        supabase.from('instances').select('id', { count: 'exact', head: true }).eq('connection_status', 'connected').eq('is_active', true),
+        supabase.from('conversations').select('id', { count: 'exact', head: true }).gte('last_message_at', todayStart.toISOString()),
+      ]);
+      setSuperAdminStats({
+        activeCompanies: companiesRes.count || 0,
+        connectedInstances: instancesRes.count || 0,
+        conversationsToday: convRes.count || 0,
+      });
+    };
+    fetchSuperAdminStats();
+  }, [isSuperAdmin]);
 
   useEffect(() => {
     const loadData = async () => {
@@ -112,6 +141,26 @@ const Dashboard: React.FC = () => {
     <div className="p-6 space-y-8 overflow-y-auto h-full bg-slate-950 text-slate-50 custom-scrollbar">
       {/* System Health Card */}
       <SystemHealthCard />
+
+      {/* Super Admin Overview */}
+      {isSuperAdmin && superAdminStats && (
+        <div className="grid gap-4 grid-cols-3">
+          {[
+            { label: 'Empresas Ativas', value: superAdminStats.activeCompanies, icon: Building2, color: 'from-violet-500/20 to-violet-500/5 border-violet-500/20', iconColor: 'text-violet-400' },
+            { label: 'Instâncias Conectadas', value: superAdminStats.connectedInstances, icon: Zap, color: 'from-cyan-500/20 to-cyan-500/5 border-cyan-500/20', iconColor: 'text-cyan-400' },
+            { label: 'Conversas Hoje (Total)', value: superAdminStats.conversationsToday, icon: MessageSquare, color: 'from-primary/20 to-primary/5 border-primary/20', iconColor: 'text-primary' },
+          ].map((stat, i) => (
+            <div key={i} className={`relative overflow-hidden rounded-2xl border bg-slate-900/50 backdrop-blur-sm p-5 shadow-xl ${stat.color}`}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-slate-400">{stat.label}</span>
+                <stat.icon className={`h-5 w-5 ${stat.iconColor}`} />
+              </div>
+              <div className="text-3xl font-bold text-white">{stat.value}</div>
+              <div className="absolute -bottom-8 -right-8 w-20 h-20 bg-white/5 blur-2xl rounded-full" />
+            </div>
+          ))}
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>

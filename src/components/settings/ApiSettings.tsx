@@ -6,6 +6,8 @@ import { toast } from 'sonner';
 import * as Collapsible from '@radix-ui/react-collapsible';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
+import { useNavigate } from 'react-router-dom';
 
 interface NinaSettings {
   id?: string;
@@ -69,6 +71,8 @@ export interface ApiSettingsRef {
 const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const { companyName } = useCompanySettings();
   const { user } = useAuth();
+  const { isSuperAdmin, isAdmin: isTrueAdmin } = useCompanyContext();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [showEvolutionKey, setShowEvolutionKey] = useState(false);
@@ -346,6 +350,24 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
     <div className="space-y-6">
 
       {/* ── EVOLUTION API ── */}
+      {isSuperAdmin ? (
+        <div className="rounded-xl border border-violet-500/30 bg-violet-500/5 p-6 flex items-start gap-4">
+          <Zap className="w-5 h-5 text-violet-400 mt-0.5 flex-shrink-0" />
+          <div className="flex-1">
+            <h3 className="font-semibold text-white mb-1">Evolution API</h3>
+            <p className="text-sm text-slate-400 mb-3">
+              Como super_admin, as instâncias WhatsApp são gerenciadas centralmente na página de Instâncias.
+            </p>
+            <button
+              onClick={() => navigate('/instances')}
+              className="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white text-sm font-medium rounded-lg transition-colors"
+            >
+              <Zap className="w-4 h-4" />
+              Gerenciar Instâncias
+            </button>
+          </div>
+        </div>
+      ) : (
       <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -383,18 +405,25 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           </div>
         </details>
 
+        {isTrueAdmin && (
+          <div className="mb-4 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 flex items-center gap-2">
+            <WifiOff className="w-4 h-4 flex-shrink-0" />
+            Configuração gerenciada pelo super administrador. Somente leitura.
+          </div>
+        )}
+
         <div className="space-y-4 mb-4">
           <div>
             <label className="text-xs font-medium text-slate-400 mb-1.5 block">Base URL <span className="text-red-400">*</span></label>
-            <input type="url" value={settings.evolution_api_url || ''} onChange={(e) => setSettings({ ...settings, evolution_api_url: e.target.value })}
-              placeholder="https://sua-evolution-api.com" className={`${inputClass} focus:ring-cyan-500/50`} />
+            <input type="url" value={settings.evolution_api_url || ''} onChange={(e) => !isTrueAdmin && setSettings({ ...settings, evolution_api_url: e.target.value })}
+              readOnly={isTrueAdmin} placeholder="https://sua-evolution-api.com" className={`${inputClass} focus:ring-cyan-500/50 ${isTrueAdmin ? 'opacity-60 cursor-default' : ''}`} />
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <div>
               <label className="text-xs font-medium text-slate-400 mb-1.5 block">API Key <span className="text-red-400">*</span></label>
               <div className="relative">
-                <input type={showEvolutionKey ? 'text' : 'password'} value={settings.evolution_api_key || ''} onChange={(e) => setSettings({ ...settings, evolution_api_key: e.target.value })}
-                  placeholder="sua-api-key-aqui" className={`${inputClass} pr-10 focus:ring-cyan-500/50`} />
+                <input type={showEvolutionKey ? 'text' : 'password'} value={settings.evolution_api_key || ''} onChange={(e) => !isTrueAdmin && setSettings({ ...settings, evolution_api_key: e.target.value })}
+                  readOnly={isTrueAdmin} placeholder="sua-api-key-aqui" className={`${inputClass} pr-10 focus:ring-cyan-500/50 ${isTrueAdmin ? 'opacity-60 cursor-default' : ''}`} />
                 <button type="button" onClick={() => setShowEvolutionKey(!showEvolutionKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
                   {showEvolutionKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -402,8 +431,8 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             </div>
             <div>
               <label className="text-xs font-medium text-slate-400 mb-1.5 block">Instance Name <span className="text-red-400">*</span></label>
-              <input type="text" value={settings.evolution_instance || ''} onChange={(e) => setSettings({ ...settings, evolution_instance: e.target.value })}
-                placeholder="nome-da-instancia" className={`${inputClass} focus:ring-cyan-500/50`} />
+              <input type="text" value={settings.evolution_instance || ''} onChange={(e) => !isTrueAdmin && setSettings({ ...settings, evolution_instance: e.target.value })}
+                readOnly={isTrueAdmin} placeholder="nome-da-instancia" className={`${inputClass} focus:ring-cyan-500/50 ${isTrueAdmin ? 'opacity-60 cursor-default' : ''}`} />
             </div>
           </div>
         </div>
@@ -412,9 +441,11 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           <Button onClick={handleTestEvolution} disabled={testingEvolution || !settings.evolution_api_url || !settings.evolution_api_key} variant="ghost" className="text-cyan-400 hover:text-cyan-300 border border-cyan-500/30">
             {testingEvolution ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando...</> : <><Wifi className="w-4 h-4 mr-2" />Testar Conexão</>}
           </Button>
-          <Button onClick={handleConfigureWebhook} disabled={configuringWebhook || !evolutionConfigured} variant="ghost" className="text-emerald-400 hover:text-emerald-300 border border-emerald-500/30">
-            {configuringWebhook ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Configurando...</> : <><RefreshCw className="w-4 h-4 mr-2" />Configurar Webhook</>}
-          </Button>
+          {!isTrueAdmin && (
+            <Button onClick={handleConfigureWebhook} disabled={configuringWebhook || !evolutionConfigured} variant="ghost" className="text-emerald-400 hover:text-emerald-300 border border-emerald-500/30">
+              {configuringWebhook ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Configurando...</> : <><RefreshCw className="w-4 h-4 mr-2" />Configurar Webhook</>}
+            </Button>
+          )}
         </div>
 
         <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
@@ -427,6 +458,7 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── ELEVENLABS ── */}
       <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">

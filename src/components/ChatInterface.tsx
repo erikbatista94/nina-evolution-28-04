@@ -13,6 +13,7 @@ import { useConversations } from '../hooks/useConversations';
 import { toast } from 'sonner';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
 import { useAuth } from '@/hooks/useAuth';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 import { api } from '@/services/api';
 import { TagSelector } from './TagSelector';
 import { Popover, PopoverContent, PopoverTrigger } from './ui/popover';
@@ -36,6 +37,7 @@ const ChatInterface: React.FC = () => {
   const { conversations, loading, sendMessage, sendFileMessage, sendAudioMessage, updateStatus, markAsRead, assignConversation, realtimeConnected, refetch, setNotifSound, setNotifPush, setSelectedChatForNotif } = useConversations();
   const { sdrName, companyName, isAdmin } = useCompanySettings();
   const { user } = useAuth();
+  const { isMember, isSuperAdmin, selectedCompanyId, setSelectedCompanyId } = useCompanyContext();
   const { alerts: slaAlerts } = useAlerts();
   const slaByConversation = React.useMemo(() => {
     const map = new Map<string, 'respond_now' | 'loss_risk' | 'stalled'>();
@@ -58,8 +60,10 @@ const ChatInterface: React.FC = () => {
   const [notesValue, setNotesValue] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'mine'>(() => {
+    if (localStorage.getItem('gg-user-role') === 'user') return 'mine';
     return (localStorage.getItem('chat-view-filter') as 'all' | 'mine') || 'all';
   });
+  const [companies, setCompanies] = useState<{ id: string; name: string }[]>([]);
   const [assignedFilter, setAssignedFilter] = useState<string>('all');
   const [temperatureFilter, setTemperatureFilter] = useState<'all' | 'quente' | 'morno' | 'frio'>('all');
   const [pendingStatusChange, setPendingStatusChange] = useState<ConversationStatus | null>(null);
@@ -205,6 +209,22 @@ const ChatInterface: React.FC = () => {
   useEffect(() => {
     setSelectedChatForNotif(selectedChatId);
   }, [selectedChatId, setSelectedChatForNotif]);
+
+  // Force member to "mine" view
+  useEffect(() => {
+    if (isMember) {
+      setViewFilter('mine');
+      localStorage.setItem('chat-view-filter', 'mine');
+    }
+  }, [isMember]);
+
+  // Load companies list for super_admin filter
+  useEffect(() => {
+    if (!isSuperAdmin) return;
+    supabase.from('companies').select('id, name').eq('is_active', true).order('name').then(({ data }) => {
+      if (data) setCompanies(data);
+    });
+  }, [isSuperAdmin]);
 
   // Load tag definitions and team members
   useEffect(() => {
@@ -817,6 +837,9 @@ const ChatInterface: React.FC = () => {
         if (temperatureFilter === 'frio' && score >= 30) return false;
       }
     }
+    if (isSuperAdmin && selectedCompanyId) {
+      if (chat.companyId !== selectedCompanyId) return false;
+    }
     if (viewFilter === 'mine') {
       return chat.assignedUserId === user?.id;
     }
@@ -1144,28 +1167,47 @@ const ChatInterface: React.FC = () => {
 
         {/* View Filter Tabs */}
         <div className="px-4 py-2 border-b border-slate-800/50 flex flex-col gap-2">
-          <div className="flex gap-1 bg-slate-950/50 rounded-lg p-0.5">
-            <button
-              onClick={() => handleViewFilterChange('all')}
-              className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-                viewFilter === 'all'
-                  ? 'bg-slate-700 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Geral
-            </button>
-            <button
-              onClick={() => handleViewFilterChange('mine')}
-              className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
-                viewFilter === 'mine'
-                  ? 'bg-cyan-600 text-white shadow-sm'
-                  : 'text-slate-400 hover:text-slate-300'
-              }`}
-            >
-              Minhas ({myConversationsCount})
-            </button>
-          </div>
+          {/* Super admin: company selector */}
+          {isSuperAdmin && companies.length > 0 && (
+            <Select value={selectedCompanyId || 'all'} onValueChange={v => setSelectedCompanyId(v === 'all' ? null : v)}>
+              <SelectTrigger className="h-8 text-xs bg-slate-950/50 border-slate-800">
+                <Building2 className="w-3.5 h-3.5 mr-1.5 text-violet-400" />
+                <SelectValue placeholder="Todas as empresas" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas as empresas</SelectItem>
+                {companies.map(c => (
+                  <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {/* Member: fixed to "mine", no toggle */}
+          {!isMember && (
+            <div className="flex gap-1 bg-slate-950/50 rounded-lg p-0.5">
+              <button
+                onClick={() => handleViewFilterChange('all')}
+                className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
+                  viewFilter === 'all'
+                    ? 'bg-slate-700 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                Geral
+              </button>
+              <button
+                onClick={() => handleViewFilterChange('mine')}
+                className={`flex-1 text-xs font-medium px-3 py-1.5 rounded-md transition-all ${
+                  viewFilter === 'mine'
+                    ? 'bg-cyan-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-300'
+                }`}
+              >
+                Minhas ({myConversationsCount})
+              </button>
+            </div>
+          )}
 
           {/* Manager: filter by team member */}
           {isAdmin && viewFilter === 'all' && (
