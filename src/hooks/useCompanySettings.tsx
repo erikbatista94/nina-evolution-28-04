@@ -35,7 +35,8 @@ export const CompanySettingsProvider: React.FC<{ children: React.ReactNode }> = 
         .eq('user_id', user.id)
         .maybeSingle();
       
-      setIsAdmin(roleData?.role === 'admin');
+      // super_admin also has admin privileges within the app shell
+      setIsAdmin(roleData?.role === 'admin' || roleData?.role === 'super_admin');
       
       // Fetch global nina_settings (no user_id filter)
       const { data, error } = await supabase
