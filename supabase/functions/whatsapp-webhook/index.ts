@@ -93,9 +93,23 @@ serve(async (req) => {
         });
       }
 
-      // Find owner by instance
+      // Find owner + company by instance: prefer the multi-tenant `instances` table.
       let ownerId: string | null = null;
+      let companyId: string | null = null;
       if (instance) {
+        const { data: inst } = await supabase
+          .from('instances')
+          .select('user_id, company_id')
+          .eq('evolution_instance', instance)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (inst) {
+          ownerId = inst.user_id || null;
+          companyId = inst.company_id || null;
+        }
+      }
+      // Legacy fallback: nina_settings.evolution_instance (pre multi-tenant)
+      if (!ownerId && instance) {
         const { data: ownerSettings } = await supabase
           .from('nina_settings')
           .select('user_id')
@@ -106,11 +120,12 @@ serve(async (req) => {
       if (!ownerId) {
         const { data: adminRole } = await supabase
           .from('user_roles')
-          .select('user_id')
+          .select('user_id, company_id')
           .eq('role', 'admin')
           .limit(1)
           .maybeSingle();
         ownerId = adminRole?.user_id || null;
+        if (!companyId) companyId = (adminRole as any)?.company_id || null;
       }
 
       // ---- STATUS UPDATE ----
