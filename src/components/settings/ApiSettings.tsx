@@ -71,7 +71,7 @@ export interface ApiSettingsRef {
 const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
   const { companyName } = useCompanySettings();
   const { user } = useAuth();
-  const { isSuperAdmin, isAdmin: isTrueAdmin } = useCompanyContext();
+  const { isSuperAdmin, isAdmin: isTrueAdmin, companyId } = useCompanyContext();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -104,6 +104,83 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
     transcription: string; contact_id: string; conversation_id: string; message_id: string; queued_for_nina: boolean;
   } | null>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
+
+  interface CompanyInstance {
+    id: string;
+    name: string;
+    evolution_api_url: string;
+    evolution_api_key: string;
+    evolution_instance: string;
+    connection_status: string | null;
+    is_active: boolean;
+    last_connected_at?: string | null;
+  }
+  const [companyInstances, setCompanyInstances] = useState<CompanyInstance[]>([]);
+  const [loadingInstances, setLoadingInstances] = useState(false);
+  const [testingInstanceId, setTestingInstanceId] = useState<string | null>(null);
+  const [webhookInstanceId, setWebhookInstanceId] = useState<string | null>(null);
+
+  const loadCompanyInstances = async () => {
+    if (!companyId) { setCompanyInstances([]); return; }
+    setLoadingInstances(true);
+    try {
+      const { data, error } = await supabase
+        .from('instances' as any)
+        .select('id, name, evolution_api_url, evolution_api_key, evolution_instance, connection_status, is_active, last_connected_at')
+        .eq('company_id', companyId)
+        .eq('is_active', true)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setCompanyInstances((data as any) || []);
+    } catch (err) {
+      console.error('[ApiSettings] Error loading instances:', err);
+    } finally {
+      setLoadingInstances(false);
+    }
+  };
+
+  useEffect(() => { if (!isSuperAdmin) loadCompanyInstances(); }, [companyId, isSuperAdmin]);
+
+  const handleTestInstance = async (inst: CompanyInstance) => {
+    setTestingInstanceId(inst.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-test', {
+        body: { url: inst.evolution_api_url, apiKey: inst.evolution_api_key, instance: inst.evolution_instance },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        const state = data.instanceState || 'open';
+        toast.success(`${inst.name}: conectado (${state})`);
+        await supabase.from('instances' as any).update({
+          connection_status: 'connected', last_connected_at: new Date().toISOString(),
+        }).eq('id', inst.id);
+      } else {
+        toast.error(`${inst.name}: ${data?.error || 'Falha na conexão'}`);
+        await supabase.from('instances' as any).update({ connection_status: 'disconnected' }).eq('id', inst.id);
+      }
+      await loadCompanyInstances();
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao testar');
+    } finally {
+      setTestingInstanceId(null);
+    }
+  };
+
+  const handleConfigureInstanceWebhook = async (inst: CompanyInstance) => {
+    setWebhookInstanceId(inst.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-configure-webhook', {
+        body: { url: inst.evolution_api_url, apiKey: inst.evolution_api_key, instance: inst.evolution_instance, webhookUrl },
+      });
+      if (error) throw error;
+      if (data?.ok) toast.success(`${inst.name}: webhook configurado`);
+      else toast.error(data?.error || 'Falha ao configurar webhook');
+    } catch (err: any) {
+      toast.error(err.message || 'Erro');
+    } finally {
+      setWebhookInstanceId(null);
+    }
+  };
 
   const [settings, setSettings] = useState<NinaSettings>({
     evolution_api_url: null, evolution_api_key: null, evolution_instance: null,
