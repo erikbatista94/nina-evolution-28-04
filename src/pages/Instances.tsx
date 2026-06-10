@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Zap, Plus, Loader2, X, Eye, EyeOff, Wifi, WifiOff, Webhook, Pencil, Trash2, QrCode, RefreshCw } from 'lucide-react';
+import { Zap, Plus, Loader2, X, Eye, EyeOff, Wifi, WifiOff, Webhook, Pencil, Trash2, QrCode, RefreshCw, History } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/Button';
@@ -29,6 +29,7 @@ const Instances: React.FC = () => {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [backfillId, setBackfillId] = useState<string | null>(null);
   const [qrModal, setQrModal] = useState<{ instance: Instance; qr: string | null; loading: boolean; message?: string } | null>(null);
   const [form, setForm] = useState({
     company_id: '', user_id: '', name: '',
@@ -133,6 +134,26 @@ const Instances: React.FC = () => {
     } catch (err: any) { toast.error(err.message || 'Erro'); }
   };
 
+  const backfill = async (i: Instance) => {
+    if (!confirm(`Importar histórico de conversas da instância "${i.name}"? Isso pode levar alguns minutos.`)) return;
+    setBackfillId(i.id);
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-backfill-history', {
+        body: { url: i.evolution_api_url, apiKey: i.evolution_api_key, instance: i.evolution_instance, limit: 50, messagesPerChat: 50 },
+      });
+      if (error) throw error;
+      if (data?.ok) {
+        toast.success(`Importado: ${data.imported_conversations} conversas, ${data.imported_messages} mensagens`);
+      } else {
+        toast.error(data?.error || 'Falha ao importar histórico');
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao importar histórico');
+    } finally {
+      setBackfillId(null);
+    }
+  };
+
   const connectQr = async (i: Instance) => {
     setQrModal({ instance: i, qr: null, loading: true });
     try {
@@ -234,6 +255,10 @@ const Instances: React.FC = () => {
                         {testingId === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
                       </button>
                       <button onClick={() => setupWebhook(i)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400" title="Configurar webhook"><Webhook className="w-4 h-4" /></button>
+                      <button onClick={() => backfill(i)} disabled={backfillId === i.id}
+                        className="p-1.5 hover:bg-slate-800 rounded text-blue-400" title="Importar histórico de conversas">
+                        {backfillId === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <History className="w-4 h-4" />}
+                      </button>
                       <button onClick={() => openEdit(i)} className="p-1.5 hover:bg-slate-800 rounded text-slate-400" title="Editar"><Pencil className="w-4 h-4" /></button>
                       <button onClick={() => remove(i)} className="p-1.5 hover:bg-red-900/30 rounded text-red-400" title="Remover"><Trash2 className="w-4 h-4" /></button>
                     </div>
