@@ -77,7 +77,10 @@ Deno.serve(async (req) => {
     // Generate temp password
     const temporaryPassword = generateTempPassword();
 
-    // Create user via Admin API
+    // Create user via Admin API — if email already exists, reuse the existing auth user
+    let newUserId: string;
+    let userAlreadyExisted = false;
+
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password: temporaryPassword,
@@ -86,11 +89,36 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      console.error('Error creating user:', createError);
-      return new Response(JSON.stringify({ error: createError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+      const isDuplicate =
+        (createError as any).code === 'email_exists' ||
+        createError.status === 422 ||
+        /already/i.test(createError.message || '');
 
-    const newUserId = newUser.user.id;
+      if (!isDuplicate) {
+        console.error('Error creating user:', createError);
+        return new Response(JSON.stringify({ error: createError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Look up existing user by email and reset their password to the new temp one
+      const { data: list, error: listError } = await adminClient.auth.admin.listUsers({ page: 1, perPage: 200 });
+      if (listError) {
+        return new Response(JSON.stringify({ error: 'User exists but lookup failed: ' + listError.message }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      const existing = list.users.find((u) => (u.email || '').toLowerCase() === email.toLowerCase());
+      if (!existing) {
+        return new Response(JSON.stringify({ error: 'User reported as existing but not found' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      newUserId = existing.id;
+      userAlreadyExisted = true;
+
+      await adminClient.auth.admin.updateUserById(newUserId, {
+        password: temporaryPassword,
+        email_confirm: true,
+        user_metadata: { full_name: name },
+      });
+    } else {
+      newUserId = newUser.user.id;
+    }
 
     // Set force_password_change on profile (trigger handle_new_user already created profiles entry)
     // Small delay to allow trigger to execute
@@ -130,9 +158,16 @@ Deno.serve(async (req) => {
     if (function_id) teamMemberData.function_id = function_id;
     if (whatsapp_number) teamMemberData.whatsapp_number = whatsapp_number;
 
-    const { error: memberError } = await adminClient
+    // Upsert team_members: if there's already a row for this user_id (e.g. user existed), update it.
+    const { data: existingMember } = await adminClient
       .from('team_members')
-      .insert(teamMemberData);
+      .select('id')
+      .eq('user_id', newUserId)
+      .maybeSingle();
+
+    const { error: memberError } = existingMember
+      ? await adminClient.from('team_members').update(teamMemberData).eq('id', existingMember.id)
+      : await adminClient.from('team_members').insert(teamMemberData);
 
     if (memberError) {
       console.error('Error creating team member:', memberError);
@@ -141,6 +176,7 @@ Deno.serve(async (req) => {
         success: true, 
         user_id: newUserId, 
         temporary_password: temporaryPassword,
+        user_already_existed: userAlreadyExisted,
         warning: 'User created but team_members entry failed: ' + memberError.message
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -148,7 +184,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ 
       success: true, 
       user_id: newUserId, 
-      temporary_password: temporaryPassword 
+      temporary_password: temporaryPassword,
+      user_already_existed: userAlreadyExisted
     }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error) {
