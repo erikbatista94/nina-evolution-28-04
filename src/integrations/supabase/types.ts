@@ -929,6 +929,7 @@ export type Database = {
           delivered_at: string | null
           from_type: Database["public"]["Enums"]["message_from"]
           id: string
+          instance_id: string | null
           media_type: string | null
           media_url: string | null
           metadata: Json | null
@@ -949,6 +950,7 @@ export type Database = {
           delivered_at?: string | null
           from_type: Database["public"]["Enums"]["message_from"]
           id?: string
+          instance_id?: string | null
           media_type?: string | null
           media_url?: string | null
           metadata?: Json | null
@@ -969,6 +971,7 @@ export type Database = {
           delivered_at?: string | null
           from_type?: Database["public"]["Enums"]["message_from"]
           id?: string
+          instance_id?: string | null
           media_type?: string | null
           media_url?: string | null
           metadata?: Json | null
@@ -988,6 +991,13 @@ export type Database = {
             columns: ["conversation_id"]
             isOneToOne: false
             referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "messages_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "instances"
             referencedColumns: ["id"]
           },
           {
