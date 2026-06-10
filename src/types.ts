@@ -350,6 +350,7 @@ export interface UIMessage {
   whatsappMessageId: string | null;
   senderUserId: string | null;
   senderName: string | null;
+  instanceId: string | null;
 }
 
 // ============= Utility Functions =============
