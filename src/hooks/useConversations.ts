@@ -429,7 +429,8 @@ export function useConversations() {
       mediaUrl: null,
       whatsappMessageId: null,
       senderUserId: currentUser?.id || null,
-      senderName: null
+      senderName: null,
+      instanceId: null
     };
 
     setConversations(prev => {
@@ -490,7 +491,8 @@ export function useConversations() {
       mediaUrl: URL.createObjectURL(file),
       whatsappMessageId: null,
       senderUserId: currentUser?.id || null,
-      senderName: null
+      senderName: null,
+      instanceId: null
     };
 
     setConversations(prev => prev.map(conv => {
@@ -622,7 +624,8 @@ export function useConversations() {
       senderUserId: currentUser?.id || null,
       senderName: null,
       mediaUrl: null,
-      whatsappMessageId: null
+      whatsappMessageId: null,
+      instanceId: null
     };
 
     setConversations(prev => prev.map(conv => {
