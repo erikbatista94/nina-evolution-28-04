@@ -730,7 +730,7 @@ const ChatInterface: React.FC = () => {
           status: 'pending',
           location: contactData?.address_full || null,
           metadata: { source: 'chat_manual', conversation_id: activeChat.id }
-        })
+        } as any)
         .select()
         .single();
 
