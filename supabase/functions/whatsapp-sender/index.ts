@@ -118,24 +118,64 @@ serve(async (req) => {
         try {
           const { data: conversation } = await supabase
             .from('conversations')
-            .select('user_id')
+            .select('user_id, company_id, contact_id')
             .eq('id', item.conversation_id)
             .single();
 
           if (!conversation) throw new Error('Conversation not found');
           const userId = conversation.user_id;
 
-          const cacheKey = userId || 'global';
+          // Resolve company_id from conversation, falling back to the contact
+          let companyId: string | null = (conversation as any).company_id || null;
+          if (!companyId && (conversation as any).contact_id) {
+            const { data: ct } = await supabase
+              .from('contacts')
+              .select('company_id')
+              .eq('id', (conversation as any).contact_id)
+              .maybeSingle();
+            companyId = (ct as any)?.company_id || null;
+          }
+
+          const cacheKey = companyId ? `c:${companyId}` : (userId ? `u:${userId}` : 'global');
           let settings = settingsCache[cacheKey];
           if (!settings) {
-            let settingsData = null;
-            if (userId) {
-              const { data } = await supabase
-                .from('nina_settings')
+            let settingsData: any = null;
+
+            // 1. Prefer multi-tenant `instances` table by company_id
+            if (companyId) {
+              const { data: inst } = await supabase
+                .from('instances')
+                .select('evolution_api_url, evolution_api_key, evolution_instance')
+                .eq('company_id', companyId)
+                .eq('is_active', true)
+                .order('updated_at', { ascending: false })
+                .limit(1)
+                .maybeSingle();
+              if (inst) settingsData = inst;
+            }
+
+            // 2. Fallback: any active instance for this user
+            if (!settingsData && userId) {
+              const { data: inst } = await supabase
+                .from('instances')
                 .select('evolution_api_url, evolution_api_key, evolution_instance')
                 .eq('user_id', userId)
+                .eq('is_active', true)
+                .limit(1)
                 .maybeSingle();
-              settingsData = data;
+              if (inst) settingsData = inst;
+            }
+
+            // 3. Legacy fallback: nina_settings (pre multi-tenant migration)
+            if (userId) {
+              if (!settingsData) {
+                const { data } = await supabase
+                  .from('nina_settings')
+                  .select('evolution_api_url, evolution_api_key, evolution_instance')
+                  .eq('user_id', userId)
+                  .maybeSingle();
+                settingsData = data;
+              }
             }
             if (!settingsData) {
               const { data } = await supabase
@@ -155,7 +195,7 @@ serve(async (req) => {
               settingsData = data;
             }
             if (!settingsData?.evolution_api_url || !settingsData?.evolution_api_key || !settingsData?.evolution_instance) {
-              throw new Error('Evolution API not configured');
+              throw new Error('Evolution API not configured (no instance for company/user and no legacy nina_settings)');
             }
             settings = settingsData;
             settingsCache[cacheKey] = settings;
