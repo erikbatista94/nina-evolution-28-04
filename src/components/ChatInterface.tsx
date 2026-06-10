@@ -1682,6 +1682,11 @@ const ChatInterface: React.FC = () => {
                                     : 'Agente'}
                                 </span>
                               )}
+                              {msg.instanceId && (
+                                <span className="text-[10px] text-slate-400 font-medium px-1.5 py-0.5 rounded-full bg-slate-700/50 border border-slate-600/50">
+                                  📱 {instancesList.find(i => i.id === msg.instanceId)?.name || instancesList.find(i => i.id === msg.instanceId)?.evolution_instance || 'Instância'}
+                                </span>
+                              )}
                               <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>
                               {isOutgoing && (
                                 msg.status === 'read' ? <CheckCheck className="w-3.5 h-3.5 text-cyan-500" /> : 
