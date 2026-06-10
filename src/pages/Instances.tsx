@@ -305,6 +305,44 @@ const Instances: React.FC = () => {
           </form>
         </div>
       )}
+
+      {qrModal && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-2xl p-6 w-full max-w-md">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <QrCode className="w-5 h-5 text-emerald-400" /> Conectar WhatsApp
+              </h3>
+              <button onClick={() => setQrModal(null)} className="text-slate-500 hover:text-white">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+            <div className="text-sm text-slate-400 mb-4">
+              Instância: <span className="font-mono text-slate-200">{qrModal.instance.evolution_instance}</span>
+            </div>
+            <div className="flex flex-col items-center justify-center bg-slate-950 border border-slate-800 rounded-xl p-6 min-h-[320px]">
+              {qrModal.loading ? (
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+              ) : qrModal.qr ? (
+                <>
+                  <img src={qrModal.qr} alt="QR Code" className="w-64 h-64 rounded-lg bg-white p-2" />
+                  <p className="text-xs text-slate-400 mt-4 text-center">
+                    Abra o WhatsApp &gt; Aparelhos conectados &gt; Conectar aparelho
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-slate-400 text-center">{qrModal.message || 'Sem QR code'}</p>
+              )}
+            </div>
+            <div className="flex gap-2 mt-4">
+              <Button variant="outline" className="flex-1" onClick={() => setQrModal(null)}>Fechar</Button>
+              <Button className="flex-1 gap-2" onClick={() => connectQr(qrModal.instance)} disabled={qrModal.loading}>
+                <RefreshCw className="w-4 h-4" /> Atualizar QR
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
