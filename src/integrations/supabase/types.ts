@@ -17,7 +17,7 @@ export type Database = {
       appointments: {
         Row: {
           attendees: string[] | null
-          company_id: string | null
+          company_id: string
           contact_id: string | null
           created_at: string
           date: string
@@ -38,7 +38,7 @@ export type Database = {
         }
         Insert: {
           attendees?: string[] | null
-          company_id?: string | null
+          company_id: string
           contact_id?: string | null
           created_at?: string
           date: string
@@ -59,7 +59,7 @@ export type Database = {
         }
         Update: {
           attendees?: string[] | null
-          company_id?: string | null
+          company_id?: string
           contact_id?: string | null
           created_at?: string
           date?: string
@@ -382,7 +382,7 @@ export type Database = {
         Row: {
           assigned_team: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id: string | null
-          company_id: string | null
+          company_id: string
           contact_id: string
           created_at: string
           human_status: string | null
@@ -401,7 +401,7 @@ export type Database = {
         Insert: {
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
-          company_id?: string | null
+          company_id: string
           contact_id: string
           created_at?: string
           human_status?: string | null
@@ -420,7 +420,7 @@ export type Database = {
         Update: {
           assigned_team?: Database["public"]["Enums"]["team_assignment"] | null
           assigned_user_id?: string | null
-          company_id?: string | null
+          company_id?: string
           contact_id?: string
           created_at?: string
           human_status?: string | null
@@ -520,7 +520,7 @@ export type Database = {
       deals: {
         Row: {
           company: string | null
-          company_id: string | null
+          company_id: string
           conditions: string | null
           contact_id: string | null
           created_at: string | null
@@ -546,7 +546,7 @@ export type Database = {
         }
         Insert: {
           company?: string | null
-          company_id?: string | null
+          company_id: string
           conditions?: string | null
           contact_id?: string | null
           created_at?: string | null
@@ -572,7 +572,7 @@ export type Database = {
         }
         Update: {
           company?: string | null
-          company_id?: string | null
+          company_id?: string
           conditions?: string | null
           contact_id?: string | null
           created_at?: string | null
