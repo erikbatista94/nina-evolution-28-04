@@ -11,6 +11,8 @@ import Kanban from './components/Kanban';
 import AlertsPanel from './components/AlertsPanel';
 import Reports from './components/Reports';
 import Auth from './pages/Auth';
+import ForgotPassword from './pages/ForgotPassword';
+import UpdatePassword from './pages/UpdatePassword';
 import ProtectedRoute from './components/ProtectedRoute';
 import AdminRoute from './components/AdminRoute';
 import SuperAdminRoute from './components/SuperAdminRoute';
