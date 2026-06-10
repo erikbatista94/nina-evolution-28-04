@@ -718,7 +718,7 @@ export const api = {
         meeting_url: appointment.meeting_url,
         status: 'scheduled',
         user_id: userId
-      })
+      } as any)
       .select()
       .single();
 

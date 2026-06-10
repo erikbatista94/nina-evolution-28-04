@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { Activity, CheckCircle2, XCircle, AlertTriangle, RefreshCw, UserX, Clock, Send } from 'lucide-react';
+import { Activity, CheckCircle2, XCircle, AlertTriangle, RefreshCw, UserX, Clock, Send, ShieldAlert } from 'lucide-react';
 import { toast } from 'sonner';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 
 interface SyncEvent {
   id: string;
@@ -28,6 +29,26 @@ const FlowCRMHealthPanel: React.FC = () => {
   const [recentEvents, setRecentEvents] = useState<SyncEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [resending, setResending] = useState<Record<string, boolean>>({});
+  const { role } = useCompanyContext();
+  const [orphans, setOrphans] = useState<Record<string, number> | null>(null);
+
+  const loadOrphans = useCallback(async () => {
+    if (role !== 'super_admin') return;
+    const tables = ['contacts', 'conversations', 'deals', 'appointments', 'teams', 'team_members'] as const;
+    const result: Record<string, number> = {};
+    await Promise.all(
+      tables.map(async (t) => {
+        const { count } = await supabase
+          .from(t as any)
+          .select('id', { count: 'exact', head: true })
+          .is('company_id', null);
+        result[t] = count ?? 0;
+      })
+    );
+    setOrphans(result);
+  }, [role]);
+
+  useEffect(() => { loadOrphans(); }, [loadOrphans]);
 
   const handleResend = useCallback(async (ev: SyncEvent) => {
     const ed = ev.event_data ?? {};
@@ -146,6 +167,30 @@ const FlowCRMHealthPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
+      {role === 'super_admin' && orphans && (
+        (() => {
+          const total = Object.values(orphans).reduce((a, b) => a + b, 0);
+          if (total === 0) return null;
+          return (
+            <div className="rounded-xl border border-rose-500/40 bg-rose-500/10 p-4">
+              <div className="flex items-center gap-2 text-rose-300 font-semibold">
+                <ShieldAlert className="w-4 h-4" />
+                Registros órfãos sem company_id ({total})
+              </div>
+              <div className="mt-2 grid grid-cols-2 md:grid-cols-3 gap-2 text-xs text-slate-300">
+                {Object.entries(orphans).filter(([, c]) => c > 0).map(([t, c]) => (
+                  <div key={t} className="flex items-center justify-between bg-slate-900/50 rounded px-2 py-1">
+                    <span className="text-slate-400">{t}</span>
+                    <span className="text-rose-300 font-mono">{c}</span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-slate-400 mt-2">Esses registros não pertencem a nenhuma empresa e ficarão invisíveis para admins de tenant. Atribua-os a uma empresa para corrigir.</p>
+            </div>
+          );
+        })()
+      )}
+
       <div className="flex items-center justify-between">
         <div>
           <h3 className="text-xl font-semibold text-white flex items-center gap-2">
