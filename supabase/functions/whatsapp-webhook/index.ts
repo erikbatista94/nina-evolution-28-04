@@ -93,9 +93,23 @@ serve(async (req) => {
         });
       }
 
-      // Find owner by instance
+      // Find owner + company by instance: prefer the multi-tenant `instances` table.
       let ownerId: string | null = null;
+      let companyId: string | null = null;
       if (instance) {
+        const { data: inst } = await supabase
+          .from('instances')
+          .select('user_id, company_id')
+          .eq('evolution_instance', instance)
+          .eq('is_active', true)
+          .maybeSingle();
+        if (inst) {
+          ownerId = inst.user_id || null;
+          companyId = inst.company_id || null;
+        }
+      }
+      // Legacy fallback: nina_settings.evolution_instance (pre multi-tenant)
+      if (!ownerId && instance) {
         const { data: ownerSettings } = await supabase
           .from('nina_settings')
           .select('user_id')
@@ -106,11 +120,12 @@ serve(async (req) => {
       if (!ownerId) {
         const { data: adminRole } = await supabase
           .from('user_roles')
-          .select('user_id')
+          .select('user_id, company_id')
           .eq('role', 'admin')
           .limit(1)
           .maybeSingle();
         ownerId = adminRole?.user_id || null;
+        if (!companyId) companyId = (adminRole as any)?.company_id || null;
       }
 
       // ---- STATUS UPDATE ----
@@ -198,6 +213,7 @@ serve(async (req) => {
                 name: contactName,
                 call_name: contactName?.split(' ')[0] || null,
                 user_id: null,
+                company_id: companyId,
               })
               .select()
               .single();
@@ -230,7 +246,7 @@ serve(async (req) => {
           if (!conversation) {
             const { data: newConv, error: convError } = await supabase
               .from('conversations')
-              .insert({ contact_id: contact.id, status: 'nina', is_active: true, user_id: null })
+              .insert({ contact_id: contact.id, status: 'nina', is_active: true, user_id: null, company_id: companyId })
               .select()
               .single();
             if (convError) { console.error('[Webhook] conv err', convError); continue; }
