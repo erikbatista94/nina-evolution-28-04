@@ -237,6 +237,11 @@ const ChatInterface: React.FC = () => {
     api.fetchTeam().then(setTeamMembers).catch(err => {
       console.error('Error loading team members:', err);
     });
+
+    supabase.from('instances')
+      .select('id, name, evolution_instance')
+      .eq('is_active', true)
+      .then(({ data }) => setInstancesList((data as any) || []));
   }, []);
 
   // Auto-select first conversation or from URL param
