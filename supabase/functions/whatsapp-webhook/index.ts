@@ -271,6 +271,7 @@ serve(async (req) => {
               status: 'sent',
               media_type: mediaType,
               sent_at: new Date(Number(timestamp) * 1000).toISOString(),
+              instance_id: instanceRowId,
               metadata: {
                 original_type: evMsg?.messageType || messageType,
                 evolution_message: m,
