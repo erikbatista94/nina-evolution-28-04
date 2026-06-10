@@ -451,79 +451,61 @@ const ApiSettings = forwardRef<ApiSettingsRef>((props, ref) => {
             <Zap className="w-5 h-5 text-cyan-400" />
             <h3 className="font-semibold text-white">Evolution API</h3>
           </div>
-          <div className={`flex items-center gap-2 px-3 py-1 rounded-full text-xs font-medium ${evolutionStatus?.ok ? 'bg-emerald-500/10 text-emerald-400' : evolutionConfigured ? 'bg-emerald-500/10 text-emerald-400' : 'bg-amber-500/10 text-amber-400'}`}>
-            <span className={`h-2 w-2 rounded-full ${evolutionStatus?.ok || evolutionConfigured ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
-            {evolutionStatus?.ok ? 'Conectado' : evolutionConfigured ? 'Configurado' : 'Aguardando'}
-          </div>
+          <button onClick={loadCompanyInstances} className="text-xs text-slate-400 hover:text-slate-200 inline-flex items-center gap-1">
+            <RefreshCw className={`w-3 h-3 ${loadingInstances ? 'animate-spin' : ''}`} /> Recarregar
+          </button>
         </div>
 
-        {evolutionStatus && (
-          <div className={`mb-4 px-4 py-3 rounded-xl text-sm border ${evolutionStatus.ok ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300' : 'bg-red-500/10 border-red-500/30 text-red-300'}`}>
-            {evolutionStatus.ok ? '✅' : '❌'} {evolutionStatus.message}
+        <p className="text-sm text-slate-400 mb-4">
+          Instâncias WhatsApp da sua empresa. {isTrueAdmin ? 'Gerenciamento centralizado pelo super administrador.' : 'Você pode testar conexão e reconfigurar o webhook.'}
+        </p>
+
+        {loadingInstances ? (
+          <div className="flex justify-center py-8"><Loader2 className="w-5 h-5 animate-spin text-cyan-400" /></div>
+        ) : companyInstances.length === 0 ? (
+          <div className="text-center py-8 text-sm text-slate-500 border border-dashed border-slate-800 rounded-lg">
+            Nenhuma instância ativa configurada para sua empresa.
+            <br />
+            <span className="text-xs">Solicite ao super administrador a criação de uma instância.</span>
+          </div>
+        ) : (
+          <div className="space-y-3 mb-4">
+            {companyInstances.map((inst) => {
+              const connected = inst.connection_status === 'connected';
+              return (
+                <div key={inst.id} className="rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+                  <div className="flex items-start justify-between gap-3 mb-3">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-medium text-white">{inst.name}</span>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold border ${connected ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20'}`}>
+                          {connected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+                          {connected ? 'CONECTADO' : 'DESCONECTADO'}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 mt-1 font-mono truncate">
+                        {inst.evolution_instance} · {inst.evolution_api_url}
+                      </div>
+                      {inst.last_connected_at && (
+                        <div className="text-[10px] text-slate-600 mt-0.5">
+                          Última conexão: {new Date(inst.last_connected_at).toLocaleString('pt-BR')}
+                        </div>
+                      )}
+                    </div>
+                    <div className="flex gap-2 flex-shrink-0">
+                      <Button onClick={() => handleTestInstance(inst)} disabled={testingInstanceId === inst.id} variant="ghost" size="sm" className="text-cyan-400 hover:text-cyan-300 border border-cyan-500/30">
+                        {testingInstanceId === inst.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><Wifi className="w-3.5 h-3.5 mr-1" />Testar</>}
+                      </Button>
+                      <Button onClick={() => handleConfigureInstanceWebhook(inst)} disabled={webhookInstanceId === inst.id} variant="ghost" size="sm" className="text-emerald-400 hover:text-emerald-300 border border-emerald-500/30">
+                        {webhookInstanceId === inst.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <><RefreshCw className="w-3.5 h-3.5 mr-1" />Webhook</>}
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
-
-        <details className="mb-4">
-          <summary className="text-xs text-cyan-400 cursor-pointer hover:text-cyan-300 flex items-center gap-2 py-2">
-            <HelpCircle className="w-4 h-4" /> Como obter as credenciais da Evolution API?
-          </summary>
-          <div className="mt-2 p-4 rounded-lg bg-slate-950 border border-slate-800 text-xs space-y-2">
-            <ol className="list-decimal list-inside space-y-1.5 text-slate-400">
-              <li>Acesse o painel da sua instância Evolution API (self-hosted ou cloud)</li>
-              <li>Copie a <strong className="text-white">URL base</strong> (ex: <code className="text-cyan-400">https://evo.seudominio.com</code>)</li>
-              <li>Em Configurações, copie a <strong className="text-white">Global API Key</strong></li>
-              <li>Copie o <strong className="text-white">nome da instância</strong> WhatsApp criada</li>
-              <li>Salve e clique em <strong className="text-white">Testar Conexão</strong></li>
-              <li>Clique em <strong className="text-white">Configurar Webhook</strong> para apontar automaticamente</li>
-            </ol>
-            <p className="text-slate-500 pt-2 border-t border-slate-700">
-              📚 <a href="https://doc.evolution-api.com" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:underline">Documentação oficial da Evolution API</a>
-            </p>
-          </div>
-        </details>
-
-        {isTrueAdmin && (
-          <div className="mb-4 px-4 py-2 rounded-lg bg-amber-500/10 border border-amber-500/20 text-xs text-amber-400 flex items-center gap-2">
-            <WifiOff className="w-4 h-4 flex-shrink-0" />
-            Configuração gerenciada pelo super administrador. Somente leitura.
-          </div>
-        )}
-
-        <div className="space-y-4 mb-4">
-          <div>
-            <label className="text-xs font-medium text-slate-400 mb-1.5 block">Base URL <span className="text-red-400">*</span></label>
-            <input type="url" value={settings.evolution_api_url || ''} onChange={(e) => !isTrueAdmin && setSettings({ ...settings, evolution_api_url: e.target.value })}
-              readOnly={isTrueAdmin} placeholder="https://sua-evolution-api.com" className={`${inputClass} focus:ring-cyan-500/50 ${isTrueAdmin ? 'opacity-60 cursor-default' : ''}`} />
-          </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <label className="text-xs font-medium text-slate-400 mb-1.5 block">API Key <span className="text-red-400">*</span></label>
-              <div className="relative">
-                <input type={showEvolutionKey ? 'text' : 'password'} value={settings.evolution_api_key || ''} onChange={(e) => !isTrueAdmin && setSettings({ ...settings, evolution_api_key: e.target.value })}
-                  readOnly={isTrueAdmin} placeholder="sua-api-key-aqui" className={`${inputClass} pr-10 focus:ring-cyan-500/50 ${isTrueAdmin ? 'opacity-60 cursor-default' : ''}`} />
-                <button type="button" onClick={() => setShowEvolutionKey(!showEvolutionKey)} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
-                  {showEvolutionKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-medium text-slate-400 mb-1.5 block">Instance Name <span className="text-red-400">*</span></label>
-              <input type="text" value={settings.evolution_instance || ''} onChange={(e) => !isTrueAdmin && setSettings({ ...settings, evolution_instance: e.target.value })}
-                readOnly={isTrueAdmin} placeholder="nome-da-instancia" className={`${inputClass} focus:ring-cyan-500/50 ${isTrueAdmin ? 'opacity-60 cursor-default' : ''}`} />
-            </div>
-          </div>
-        </div>
-
-        <div className="flex flex-wrap gap-3 mb-4">
-          <Button onClick={handleTestEvolution} disabled={testingEvolution || !settings.evolution_api_url || !settings.evolution_api_key} variant="ghost" className="text-cyan-400 hover:text-cyan-300 border border-cyan-500/30">
-            {testingEvolution ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Testando...</> : <><Wifi className="w-4 h-4 mr-2" />Testar Conexão</>}
-          </Button>
-          {!isTrueAdmin && (
-            <Button onClick={handleConfigureWebhook} disabled={configuringWebhook || !evolutionConfigured} variant="ghost" className="text-emerald-400 hover:text-emerald-300 border border-emerald-500/30">
-              {configuringWebhook ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Configurando...</> : <><RefreshCw className="w-4 h-4 mr-2" />Configurar Webhook</>}
-            </Button>
-          )}
-        </div>
 
         <div className="p-3 rounded-lg bg-slate-950/70 border border-slate-800">
           <p className="text-xs text-slate-500 mb-2">URL do Webhook:</p>
