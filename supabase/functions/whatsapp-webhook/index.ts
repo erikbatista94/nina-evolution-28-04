@@ -96,14 +96,16 @@ serve(async (req) => {
       // Find owner + company by instance: prefer the multi-tenant `instances` table.
       let ownerId: string | null = null;
       let companyId: string | null = null;
+      let instanceRowId: string | null = null;
       if (instance) {
         const { data: inst } = await supabase
           .from('instances')
-          .select('user_id, company_id')
+          .select('id, user_id, company_id')
           .eq('evolution_instance', instance)
           .eq('is_active', true)
           .maybeSingle();
         if (inst) {
+          instanceRowId = inst.id || null;
           ownerId = inst.user_id || null;
           companyId = inst.company_id || null;
         }
@@ -269,6 +271,7 @@ serve(async (req) => {
               status: 'sent',
               media_type: mediaType,
               sent_at: new Date(Number(timestamp) * 1000).toISOString(),
+              instance_id: instanceRowId,
               metadata: {
                 original_type: evMsg?.messageType || messageType,
                 evolution_message: m,

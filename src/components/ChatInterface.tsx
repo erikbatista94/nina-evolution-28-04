@@ -57,6 +57,7 @@ const ChatInterface: React.FC = () => {
   const [availableTags, setAvailableTags] = useState<TagDefinition[]>([]);
   const [isTagSelectorOpen, setIsTagSelectorOpen] = useState(false);
   const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [instancesList, setInstancesList] = useState<Array<{ id: string; name: string; evolution_instance: string }>>([]);
   const [notesValue, setNotesValue] = useState('');
   const [isSavingNotes, setIsSavingNotes] = useState(false);
   const [viewFilter, setViewFilter] = useState<'all' | 'mine'>(() => {
@@ -236,6 +237,11 @@ const ChatInterface: React.FC = () => {
     api.fetchTeam().then(setTeamMembers).catch(err => {
       console.error('Error loading team members:', err);
     });
+
+    supabase.from('instances')
+      .select('id, name, evolution_instance')
+      .eq('is_active', true)
+      .then(({ data }) => setInstancesList((data as any) || []));
   }, []);
 
   // Auto-select first conversation or from URL param
@@ -1674,6 +1680,11 @@ const ChatInterface: React.FC = () => {
                                   {msg.senderUserId 
                                     ? (teamMembers.find(m => m.id === msg.senderUserId || (m as any).user_id === msg.senderUserId)?.name || 'Agente')
                                     : 'Agente'}
+                                </span>
+                              )}
+                              {msg.instanceId && (
+                                <span className="text-[10px] text-slate-400 font-medium px-1.5 py-0.5 rounded-full bg-slate-700/50 border border-slate-600/50">
+                                  📱 {instancesList.find(i => i.id === msg.instanceId)?.name || instancesList.find(i => i.id === msg.instanceId)?.evolution_instance || 'Instância'}
                                 </span>
                               )}
                               <span className="text-[10px] text-slate-500 font-medium">{msg.timestamp}</span>

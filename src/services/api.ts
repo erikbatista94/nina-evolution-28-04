@@ -1407,7 +1407,7 @@ export const api = {
     // Get conversation to find contact_id
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('contact_id')
+      .select('contact_id, company_id')
       .eq('id', conversationId)
       .single();
 
@@ -1419,6 +1419,17 @@ export const api = {
     // Get current user for sender tracking
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
+    // Resolve company's active instance for this conversation
+    const { data: instRow } = await supabase
+      .from('instances')
+      .select('id')
+      .eq('company_id', (conversation as any).company_id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+    const instanceRowId = instRow?.id || null;
+
     // First create the message record with status 'processing'
     const { data: msgData, error: msgError } = await supabase
       .from('messages')
@@ -1429,7 +1440,8 @@ export const api = {
         from_type: 'human',
         status: 'processing',
         sent_at: new Date().toISOString(),
-        sender_user_id: currentUser?.id || null
+        sender_user_id: currentUser?.id || null,
+        instance_id: instanceRowId
       } as any)
       .select('id')
       .single();
@@ -1493,7 +1505,7 @@ export const api = {
     // Get conversation to find contact_id
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('contact_id')
+      .select('contact_id, company_id')
       .eq('id', conversationId)
       .single();
 
@@ -1526,6 +1538,13 @@ export const api = {
     // Get current user for sender tracking
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
+    const { data: instRow } = await supabase
+      .from('instances').select('id')
+      .eq('company_id', (conversation as any).company_id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    const instanceRowId = instRow?.id || null;
+
     // Create message record
     const { data: msgData, error: msgError } = await supabase
       .from('messages')
@@ -1538,7 +1557,8 @@ export const api = {
         media_url: publicUrl,
         media_type: file.type,
         sent_at: new Date().toISOString(),
-        sender_user_id: currentUser?.id || null
+        sender_user_id: currentUser?.id || null,
+        instance_id: instanceRowId
       } as any)
       .select('id')
       .single();
@@ -1590,7 +1610,7 @@ export const api = {
     // Get conversation to find contact_id
     const { data: conversation, error: convError } = await supabase
       .from('conversations')
-      .select('contact_id')
+      .select('contact_id, company_id')
       .eq('id', conversationId)
       .single();
 
@@ -1623,6 +1643,13 @@ export const api = {
     // Get current user
     const { data: { user: currentUser } } = await supabase.auth.getUser();
 
+    const { data: instRow } = await supabase
+      .from('instances').select('id')
+      .eq('company_id', (conversation as any).company_id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: true }).limit(1).maybeSingle();
+    const instanceRowId = instRow?.id || null;
+
     // Create message record
     const { data: msgData, error: msgError } = await supabase
       .from('messages')
@@ -1635,7 +1662,8 @@ export const api = {
         media_url: publicUrl,
         media_type: audioBlob.type,
         sent_at: new Date().toISOString(),
-        sender_user_id: currentUser?.id || null
+        sender_user_id: currentUser?.id || null,
+        instance_id: instanceRowId
       } as any)
       .select('id')
       .single();

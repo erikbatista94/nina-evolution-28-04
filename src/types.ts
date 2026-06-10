@@ -350,6 +350,7 @@ export interface UIMessage {
   whatsappMessageId: string | null;
   senderUserId: string | null;
   senderName: string | null;
+  instanceId: string | null;
 }
 
 // ============= Utility Functions =============
@@ -406,7 +407,8 @@ export function transformDBToUIMessage(msg: DBMessage): UIMessage {
     mediaUrl: msg.media_url,
     whatsappMessageId: msg.whatsapp_message_id,
     senderUserId: (msg as any).sender_user_id || null,
-    senderName: null
+    senderName: null,
+    instanceId: (msg as any).instance_id || null
   };
 }
 

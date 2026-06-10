@@ -48,10 +48,11 @@ serve(async (req) => {
     // Find owner/company
     const { data: inst } = await supabase
       .from('instances')
-      .select('user_id, company_id')
+      .select('id, user_id, company_id')
       .eq('evolution_instance', instance)
       .maybeSingle();
     const companyId = inst?.company_id || null;
+    const instanceRowId = inst?.id || null;
 
     // 1. Fetch chats
     const chatsRes = await fetch(`${base}/chat/findChats/${instance}`, {
@@ -148,6 +149,7 @@ serve(async (req) => {
           status: 'sent',
           media_type: mediaType,
           sent_at: new Date(ts * 1000).toISOString(),
+          instance_id: instanceRowId,
           metadata: { backfill: true, evolution_message: evMsg?.message || {} },
         });
         if (!me) importedMessages++;
