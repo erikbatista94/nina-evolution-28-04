@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Zap, Plus, Loader2, X, Eye, EyeOff, Wifi, WifiOff, Webhook, Pencil, Trash2 } from 'lucide-react';
+import { Zap, Plus, Loader2, X, Eye, EyeOff, Wifi, WifiOff, Webhook, Pencil, Trash2, QrCode, RefreshCw } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/Button';
@@ -29,6 +29,7 @@ const Instances: React.FC = () => {
   const [showKey, setShowKey] = useState(false);
   const [saving, setSaving] = useState(false);
   const [testingId, setTestingId] = useState<string | null>(null);
+  const [qrModal, setQrModal] = useState<{ instance: Instance; qr: string | null; loading: boolean; message?: string } | null>(null);
   const [form, setForm] = useState({
     company_id: '', user_id: '', name: '',
     evolution_api_url: '', evolution_api_key: '', evolution_instance: '',
@@ -132,6 +133,35 @@ const Instances: React.FC = () => {
     } catch (err: any) { toast.error(err.message || 'Erro'); }
   };
 
+  const connectQr = async (i: Instance) => {
+    setQrModal({ instance: i, qr: null, loading: true });
+    try {
+      const { data, error } = await supabase.functions.invoke('evolution-connect', {
+        body: { url: i.evolution_api_url, apiKey: i.evolution_api_key, instance: i.evolution_instance },
+      });
+      if (error) throw error;
+      if (data?.connected) {
+        toast.success('Instância já conectada');
+        setQrModal({ instance: i, qr: null, loading: false, message: 'Já conectada' });
+        await supabase.from('instances' as any).update({
+          connection_status: 'connected', last_connected_at: new Date().toISOString(),
+        }).eq('id', i.id);
+        load();
+        return;
+      }
+      if (data?.ok && data?.qrcode) {
+        const qr = data.qrcode.startsWith('data:') ? data.qrcode : `data:image/png;base64,${data.qrcode}`;
+        setQrModal({ instance: i, qr, loading: false, message: data.created ? 'Instância criada. Escaneie o QR code.' : 'Escaneie o QR code com o WhatsApp.' });
+      } else {
+        toast.error(data?.error || 'Não foi possível obter o QR code');
+        setQrModal({ instance: i, qr: null, loading: false, message: data?.error || 'Falha' });
+      }
+    } catch (err: any) {
+      toast.error(err.message || 'Erro ao conectar');
+      setQrModal({ instance: i, qr: null, loading: false, message: err.message });
+    }
+  };
+
   const filtered = filterCompany === 'all' ? instances : instances.filter(i => i.company_id === filterCompany);
   const memberById = (uid: string | null) => members.find(m => m.user_id === uid)?.name || '-';
   const companyById = (cid: string) => companies.find(c => c.id === cid)?.name || '-';
@@ -195,6 +225,10 @@ const Instances: React.FC = () => {
                   <td className="px-4 py-3 text-slate-400">{memberById(i.user_id)}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">
+                      <button onClick={() => connectQr(i)}
+                        className="p-1.5 hover:bg-slate-800 rounded text-emerald-400" title="Conectar via QR code">
+                        <QrCode className="w-4 h-4" />
+                      </button>
                       <button onClick={() => test(i)} disabled={testingId === i.id}
                         className="p-1.5 hover:bg-slate-800 rounded text-slate-400" title="Testar">
                         {testingId === i.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wifi className="w-4 h-4" />}
