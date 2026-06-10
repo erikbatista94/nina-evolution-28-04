@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell, BarChart3, Building2, Zap, Crown } from 'lucide-react';
+import { LayoutDashboard, MessageSquare, Users, Settings as SettingsIcon, LogOut, ShieldCheck, Calendar, Kanban, Bell, BarChart3, Building2, Zap, Crown, KeyRound } from 'lucide-react';
 import { useAlerts } from '@/hooks/useAlerts';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -27,6 +27,7 @@ const allMenuItems = [
 const superAdminMenuItems = [
   { id: 'companies', label: 'Empresas', icon: Building2 },
   { id: 'instances', label: 'Instâncias', icon: Zap },
+  { id: 'reset-password', label: 'Reset Senha', icon: KeyRound },
 ];
 
 const Logo = ({ companyName }: { companyName: string }) => {
