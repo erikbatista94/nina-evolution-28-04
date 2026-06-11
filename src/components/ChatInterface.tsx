@@ -848,8 +848,10 @@ const ChatInterface: React.FC = () => {
       if (chat.companyId !== selectedCompanyId) return false;
     }
     if (instanceFilter !== 'all') {
-      const hasInstance = chat.messages.some(m => m.instanceId === instanceFilter);
-      if (!hasInstance) return false;
+      const matches = chat.instanceId
+        ? chat.instanceId === instanceFilter
+        : chat.messages.some(m => m.instanceId === instanceFilter);
+      if (!matches) return false;
     }
     if (viewFilter === 'mine') {
       return chat.assignedUserId === user?.id;
