@@ -131,31 +131,44 @@ const AgentSettings = forwardRef<AgentSettingsRef, {}>((props, ref) => {
   const handleSave = async () => {
     setSaving(true);
     try {
-      // Update global settings (no user_id filter needed - RLS handles admin check)
-      const { error } = await supabase
-        .from('nina_settings')
-        .update({
-          system_prompt_override: settings.system_prompt_override,
-          is_active: settings.is_active,
-          auto_response_enabled: settings.auto_response_enabled,
-          ai_model_mode: settings.ai_model_mode,
-          message_breaking_enabled: settings.message_breaking_enabled,
-          business_hours_start: settings.business_hours_start,
-          business_hours_end: settings.business_hours_end,
-          business_days: settings.business_days,
-          company_name: settings.company_name,
-          sdr_name: settings.sdr_name,
-          ai_scheduling_enabled: settings.ai_scheduling_enabled,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', settings.id!);
+      const payload = {
+        system_prompt_override: settings.system_prompt_override,
+        is_active: settings.is_active,
+        auto_response_enabled: settings.auto_response_enabled,
+        ai_model_mode: settings.ai_model_mode,
+        message_breaking_enabled: settings.message_breaking_enabled,
+        business_hours_start: settings.business_hours_start,
+        business_hours_end: settings.business_hours_end,
+        business_days: settings.business_days,
+        company_name: settings.company_name,
+        sdr_name: settings.sdr_name,
+        ai_scheduling_enabled: settings.ai_scheduling_enabled,
+        updated_at: new Date().toISOString(),
+      };
 
-      if (error) throw error;
+      if (settings.id) {
+        const { data, error } = await supabase
+          .from('nina_settings')
+          .update(payload)
+          .eq('id', settings.id)
+          .select()
+          .maybeSingle();
+        if (error) throw error;
+        if (!data) throw new Error('Nenhum registro atualizado. Verifique permissões.');
+      } else {
+        const { data, error } = await supabase
+          .from('nina_settings')
+          .insert(payload)
+          .select()
+          .single();
+        if (error) throw error;
+        setSettings(prev => ({ ...prev, id: data.id }));
+      }
 
       toast.success('Configurações do agente salvas com sucesso!');
     } catch (error) {
       console.error('Error saving agent settings:', error);
-      toast.error('Erro ao salvar configurações do agente');
+      toast.error('Erro ao salvar: ' + (error instanceof Error ? error.message : 'desconhecido'));
     } finally {
       setSaving(false);
     }
