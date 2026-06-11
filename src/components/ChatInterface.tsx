@@ -1242,6 +1242,28 @@ const ChatInterface: React.FC = () => {
             </Select>
           )}
 
+          {/* Instance filter */}
+          {instancesList.length > 0 && (
+            <div className="px-3 pb-2">
+              <Select value={instanceFilter} onValueChange={setInstanceFilter}>
+                <SelectTrigger className="h-8 text-xs bg-slate-800/50 border-slate-700/50 text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <span>📱</span>
+                    <SelectValue placeholder="Todas as instâncias" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as instâncias</SelectItem>
+                  {instancesList.map(i => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.name || i.evolution_instance}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* Temperature filter chips + mark all as read */}
           <div className="flex gap-1 px-3 pb-2 items-center">
             {([
