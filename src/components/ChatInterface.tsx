@@ -94,6 +94,7 @@ const ChatInterface: React.FC = () => {
     return Notification.permission;
   });
   const [statusFilter, setStatusFilter] = useState<'all' | 'nina' | 'human' | 'paused'>('all');
+  const [instanceFilter, setInstanceFilter] = useState<string>('all');
   // Budget state
   const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
   const [budgetValue, setBudgetValue] = useState('');
@@ -845,6 +846,10 @@ const ChatInterface: React.FC = () => {
     }
     if (isSuperAdmin && selectedCompanyId) {
       if (chat.companyId !== selectedCompanyId) return false;
+    }
+    if (instanceFilter !== 'all') {
+      const hasInstance = chat.messages.some(m => m.instanceId === instanceFilter);
+      if (!hasInstance) return false;
     }
     if (viewFilter === 'mine') {
       return chat.assignedUserId === user?.id;
