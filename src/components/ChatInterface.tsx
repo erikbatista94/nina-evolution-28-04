@@ -94,6 +94,7 @@ const ChatInterface: React.FC = () => {
     return Notification.permission;
   });
   const [statusFilter, setStatusFilter] = useState<'all' | 'nina' | 'human' | 'paused'>('all');
+  const [instanceFilter, setInstanceFilter] = useState<string>('all');
   // Budget state
   const [activeDeal, setActiveDeal] = useState<{ id: string; value: number; proposal_status: string; stage: string } | null>(null);
   const [budgetValue, setBudgetValue] = useState('');
@@ -846,6 +847,10 @@ const ChatInterface: React.FC = () => {
     if (isSuperAdmin && selectedCompanyId) {
       if (chat.companyId !== selectedCompanyId) return false;
     }
+    if (instanceFilter !== 'all') {
+      const hasInstance = chat.messages.some(m => m.instanceId === instanceFilter);
+      if (!hasInstance) return false;
+    }
     if (viewFilter === 'mine') {
       return chat.assignedUserId === user?.id;
     }
@@ -1235,6 +1240,28 @@ const ChatInterface: React.FC = () => {
                 }
               </SelectContent>
             </Select>
+          )}
+
+          {/* Instance filter */}
+          {instancesList.length > 0 && (
+            <div className="px-3 pb-2">
+              <Select value={instanceFilter} onValueChange={setInstanceFilter}>
+                <SelectTrigger className="h-8 text-xs bg-slate-800/50 border-slate-700/50 text-slate-300">
+                  <div className="flex items-center gap-2">
+                    <span>📱</span>
+                    <SelectValue placeholder="Todas as instâncias" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todas as instâncias</SelectItem>
+                  {instancesList.map(i => (
+                    <SelectItem key={i.id} value={i.id}>
+                      {i.name || i.evolution_instance}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           )}
 
           {/* Temperature filter chips + mark all as read */}
