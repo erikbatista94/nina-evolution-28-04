@@ -278,6 +278,7 @@ export interface DBConversation {
   assigned_user_id: string | null;
   assigned_team: string | null;
   company_id?: string | null;
+  instance_id?: string | null;
   tags: string[];
   metadata: Record<string, any>;
   nina_context: Record<string, any>;
@@ -324,6 +325,7 @@ export interface UIConversation {
   assignedUserId: string | null;
   assignedUserName: string | null;
   companyId?: string | null;
+  instanceId: string | null;
   lastMessage: string;
   lastMessageTime: string;
   lastMessageRawTime: string;
@@ -380,6 +382,7 @@ export function transformDBToUIConversation(
     assignedUserId: conv.assigned_user_id,
     assignedUserName: null, // Will be populated if needed
     companyId: conv.company_id || null,
+    instanceId: (conv as any).instance_id || null,
     lastMessage: lastMsg?.content || '',
     lastMessageTime: formatRelativeTime(conv.last_message_at),
     lastMessageRawTime: conv.last_message_at,
