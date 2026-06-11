@@ -387,6 +387,7 @@ export type Database = {
           created_at: string
           human_status: string | null
           id: string
+          instance_id: string | null
           is_active: boolean
           last_human_interaction_at: string | null
           last_message_at: string
@@ -406,6 +407,7 @@ export type Database = {
           created_at?: string
           human_status?: string | null
           id?: string
+          instance_id?: string | null
           is_active?: boolean
           last_human_interaction_at?: string | null
           last_message_at?: string
@@ -425,6 +427,7 @@ export type Database = {
           created_at?: string
           human_status?: string | null
           id?: string
+          instance_id?: string | null
           is_active?: boolean
           last_human_interaction_at?: string | null
           last_message_at?: string
@@ -456,6 +459,13 @@ export type Database = {
             columns: ["contact_id"]
             isOneToOne: false
             referencedRelation: "contacts_with_stats"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_instance_id_fkey"
+            columns: ["instance_id"]
+            isOneToOne: false
+            referencedRelation: "instances"
             referencedColumns: ["id"]
           },
         ]

@@ -237,18 +237,19 @@ serve(async (req) => {
             await supabase.from('contacts').update(updates).eq('id', contact.id);
           }
 
-          // 2. Get or create conversation
+          // 2. Get or create conversation (scoped per instance)
           let { data: conversation } = await supabase
             .from('conversations')
             .select('*')
             .eq('contact_id', contact.id)
             .eq('is_active', true)
+            .eq('instance_id', instanceRowId)
             .maybeSingle();
 
           if (!conversation) {
             const { data: newConv, error: convError } = await supabase
               .from('conversations')
-              .insert({ contact_id: contact.id, status: 'nina', is_active: true, user_id: null, company_id: companyId })
+              .insert({ contact_id: contact.id, status: 'nina', is_active: true, user_id: null, company_id: companyId, instance_id: instanceRowId })
               .select()
               .single();
             if (convError) { console.error('[Webhook] conv err', convError); continue; }

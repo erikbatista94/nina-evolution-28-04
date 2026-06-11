@@ -99,12 +99,17 @@ serve(async (req) => {
         importedContacts++;
       }
 
-      // Get/create conversation
+      // Get/create conversation scoped per instance
       let { data: conversation } = await supabase
-        .from('conversations').select('*').eq('contact_id', contact.id).eq('is_active', true).maybeSingle();
+        .from('conversations').select('*')
+        .eq('contact_id', contact.id)
+        .eq('is_active', true)
+        .eq('instance_id', instanceRowId)
+        .maybeSingle();
       if (!conversation) {
         const { data: nc, error: ee } = await supabase.from('conversations').insert({
-          contact_id: contact.id, status: 'human', is_active: true, user_id: null, company_id: companyId,
+          contact_id: contact.id, status: 'human', is_active: true, user_id: null,
+          company_id: companyId, instance_id: instanceRowId,
         }).select().single();
         if (ee) { console.error('[Backfill] conv:', ee); continue; }
         conversation = nc;
