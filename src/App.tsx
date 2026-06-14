@@ -19,6 +19,7 @@ import SuperAdminRoute from './components/SuperAdminRoute';
 import Companies from './pages/Companies';
 import Instances from './pages/Instances';
 import ResetUserPassword from './pages/ResetUserPassword';
+import Users from './pages/Users';
 
 import { CompanySettingsProvider } from './hooks/useCompanySettings';
 import { AuthProvider } from './hooks/useAuth';
@@ -78,6 +79,7 @@ const App: React.FC = () => {
               <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
               <Route path="/companies" element={<SuperAdminRoute><Companies /></SuperAdminRoute>} />
               <Route path="/instances" element={<SuperAdminRoute><Instances /></SuperAdminRoute>} />
+              <Route path="/users" element={<SuperAdminRoute><Users /></SuperAdminRoute>} />
               <Route path="/reset-password" element={<SuperAdminRoute><ResetUserPassword /></SuperAdminRoute>} />
             </Route>
             

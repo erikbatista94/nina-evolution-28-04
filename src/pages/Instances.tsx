@@ -67,14 +67,14 @@ const Instances: React.FC = () => {
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!form.company_id || !form.name || !form.evolution_api_url || !form.evolution_api_key || !form.evolution_instance) {
-      toast.error('Preencha todos os campos obrigatórios'); return;
+    if (!form.company_id || !form.user_id || !form.name || !form.evolution_api_url || !form.evolution_api_key || !form.evolution_instance) {
+      toast.error('Preencha todos os campos obrigatórios (incluindo o usuário responsável)'); return;
     }
     setSaving(true);
     try {
       const payload = {
         company_id: form.company_id,
-        user_id: form.user_id || null,
+        user_id: form.user_id,
         name: form.name,
         evolution_api_url: form.evolution_api_url.replace(/\/+$/, ''),
         evolution_api_key: form.evolution_api_key,
@@ -292,12 +292,17 @@ const Instances: React.FC = () => {
                   className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm" />
               </div>
               <div>
-                <label className="text-xs text-slate-400">Funcionário (opcional)</label>
+                <label className="text-xs text-slate-400">Funcionário responsável *</label>
                 <select value={form.user_id} onChange={(e) => setForm(f => ({ ...f, user_id: e.target.value }))} disabled={!form.company_id}
                   className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm disabled:opacity-50">
-                  <option value="">— sem vínculo —</option>
+                  <option value="">Selecione um usuário…</option>
                   {availableMembers.map(m => <option key={m.id} value={m.user_id!}>{m.name}</option>)}
                 </select>
+                {form.company_id && availableMembers.length === 0 && (
+                  <p className="text-xs text-amber-400 mt-1">
+                    Nenhum usuário cadastrado nesta empresa. Crie em "Usuários" primeiro.
+                  </p>
+                )}
               </div>
               <div>
                 <label className="text-xs text-slate-400">Evolution API URL *</label>
