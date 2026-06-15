@@ -221,13 +221,6 @@ serve(async (req) => {
               .single();
             if (contactError) { console.error('[Webhook] contact err', contactError); continue; }
             contact = newContact;
-            EdgeRuntime.waitUntil(
-              fetch(`${supabaseUrl}/functions/v1/flowcrm-sync`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${supabaseServiceKey}` },
-                body: JSON.stringify({ event: 'lead', contact_id: contact.id }),
-              }).catch(err => console.error('[Webhook] FlowCRM:', err))
-            );
           } else {
             const updates: any = { last_activity: new Date().toISOString() };
             if (contactName && !contact.name) {

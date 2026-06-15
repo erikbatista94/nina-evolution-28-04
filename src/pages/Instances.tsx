@@ -3,6 +3,7 @@ import { Zap, Plus, Loader2, X, Eye, EyeOff, Wifi, WifiOff, Webhook, Pencil, Tra
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { Button } from '@/components/Button';
+import { useCompanyContext } from '@/hooks/useCompanyContext';
 
 interface Instance {
   id: string;
@@ -19,6 +20,7 @@ interface Company { id: string; name: string }
 interface TeamMember { id: string; name: string; user_id: string | null; company_id: string | null }
 
 const Instances: React.FC = () => {
+  const { isSuperAdmin, companyId } = useCompanyContext();
   const [instances, setInstances] = useState<Instance[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
@@ -38,8 +40,10 @@ const Instances: React.FC = () => {
 
   const load = async () => {
     setLoading(true);
+    let instQuery = supabase.from('instances' as any).select('*').order('created_at', { ascending: false });
+    if (!isSuperAdmin && companyId) instQuery = instQuery.eq('company_id', companyId);
     const [{ data: insts }, { data: comps }, { data: tms }] = await Promise.all([
-      supabase.from('instances' as any).select('*').order('created_at', { ascending: false }),
+      instQuery,
       supabase.from('companies' as any).select('id, name').order('name'),
       supabase.from('team_members').select('id, name, user_id, company_id'),
     ]);
@@ -48,11 +52,11 @@ const Instances: React.FC = () => {
     setMembers((tms as any) || []);
     setLoading(false);
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isSuperAdmin, companyId]);
 
   const openCreate = () => {
     setEditing(null);
-    setForm({ company_id: '', user_id: '', name: '', evolution_api_url: '', evolution_api_key: '', evolution_instance: '' });
+    setForm({ company_id: !isSuperAdmin && companyId ? companyId : '', user_id: '', name: '', evolution_api_url: '', evolution_api_key: '', evolution_instance: '' });
     setShowModal(true);
   };
   const openEdit = (i: Instance) => {
@@ -198,13 +202,15 @@ const Instances: React.FC = () => {
           <p className="text-sm text-slate-400 mt-1">Conexões WhatsApp por cliente</p>
         </div>
         <div className="flex gap-3">
-          <select
-            value={filterCompany} onChange={(e) => setFilterCompany(e.target.value)}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm"
-          >
-            <option value="all">Todas as empresas</option>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          {isSuperAdmin && (
+            <select
+              value={filterCompany} onChange={(e) => setFilterCompany(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm"
+            >
+              <option value="all">Todas as empresas</option>
+              {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
           <Button onClick={openCreate} className="gap-2"><Plus className="w-4 h-4" /> Nova Instância</Button>
         </div>
       </div>
@@ -281,7 +287,8 @@ const Instances: React.FC = () => {
               <div>
                 <label className="text-xs text-slate-400">Empresa *</label>
                 <select value={form.company_id} onChange={(e) => setForm(f => ({ ...f, company_id: e.target.value, user_id: '' }))}
-                  className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm">
+                  disabled={!isSuperAdmin}
+                  className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm disabled:opacity-60">
                   <option value="">Selecione…</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>

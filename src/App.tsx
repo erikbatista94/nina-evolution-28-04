@@ -27,11 +27,9 @@ import { Toaster } from 'sonner';
 import KeyboardShortcutsModal from './components/KeyboardShortcutsModal';
 import GlobalSearch from './components/GlobalSearch';
 import { useUnreadTabTitle } from './hooks/useUnreadTabTitle';
-import { useFlowCRMSyncToast } from './hooks/useFlowCRMSyncToast';
 
 const AppLayout: React.FC = () => {
   useUnreadTabTitle();
-  useFlowCRMSyncToast();
   return (
     <div className="flex h-screen w-full bg-background text-foreground overflow-hidden">
       <KeyboardShortcutsModal />
@@ -78,8 +76,8 @@ const App: React.FC = () => {
               <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
               <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
               <Route path="/companies" element={<SuperAdminRoute><Companies /></SuperAdminRoute>} />
-              <Route path="/instances" element={<SuperAdminRoute><Instances /></SuperAdminRoute>} />
-              <Route path="/users" element={<SuperAdminRoute><Users /></SuperAdminRoute>} />
+              <Route path="/instances" element={<AdminRoute><Instances /></AdminRoute>} />
+              <Route path="/users" element={<AdminRoute><Users /></AdminRoute>} />
               <Route path="/reset-password" element={<SuperAdminRoute><ResetUserPassword /></SuperAdminRoute>} />
             </Route>
             

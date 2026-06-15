@@ -1,11 +1,10 @@
 import React, { useRef, useState } from 'react';
-import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock, Swords, FileText, Activity, Users } from 'lucide-react';
+import { Shield, Bot, Plug, Loader2, Save, BookOpen, Lock, Swords, FileText, Users } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from './ui/tabs';
 import AgentSettings, { AgentSettingsRef } from './settings/AgentSettings';
 import ApiSettings, { ApiSettingsRef } from './settings/ApiSettings';
 import ObjectionsPlaybook from './settings/ObjectionsPlaybook';
 import TemplatesManager from './settings/TemplatesManager';
-import FlowCRMHealthPanel from './settings/FlowCRMHealthPanel';
 import LeadDistributionAudit from './settings/LeadDistributionAudit';
 import SystemRoadmap from './SystemRoadmap';
 import { useCompanySettings } from '@/hooks/useCompanySettings';
@@ -88,12 +87,6 @@ const Settings: React.FC = () => {
               </TabsTrigger>
             )}
             {isAdmin && (
-              <TabsTrigger value="flowcrm" className="gap-2">
-                <Activity className="w-4 h-4" />
-                FlowCRM
-              </TabsTrigger>
-            )}
-            {isAdmin && (
               <TabsTrigger value="distribution" className="gap-2">
                 <Users className="w-4 h-4" />
                 Distribuição
@@ -163,14 +156,6 @@ const Settings: React.FC = () => {
           <TabsContent value="templates">
             <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
               <TemplatesManager />
-            </div>
-          </TabsContent>
-        )}
-
-        {isAdmin && (
-          <TabsContent value="flowcrm">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-6">
-              <FlowCRMHealthPanel />
             </div>
           </TabsContent>
         )}
