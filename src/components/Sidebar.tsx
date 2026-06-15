@@ -21,13 +21,13 @@ const allMenuItems = [
   { id: 'scheduling', label: 'Agendamentos', icon: Calendar, adminOnly: false },
   { id: 'team', label: 'Equipe', icon: ShieldCheck, adminOnly: false },
   { id: 'reports', label: 'Relatórios', icon: BarChart3, adminOnly: true },
+  { id: 'users', label: 'Usuários', icon: UserCog, adminOnly: true },
+  { id: 'instances', label: 'Instâncias', icon: Zap, adminOnly: true },
   { id: 'settings', label: 'Configurações', icon: SettingsIcon, adminOnly: true },
 ];
 
 const superAdminMenuItems = [
   { id: 'companies', label: 'Empresas', icon: Building2 },
-  { id: 'users', label: 'Usuários', icon: UserCog },
-  { id: 'instances', label: 'Instâncias', icon: Zap },
   { id: 'reset-password', label: 'Reset Senha', icon: KeyRound },
 ];
 

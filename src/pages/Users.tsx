@@ -18,7 +18,7 @@ interface Member {
 }
 
 const Users: React.FC = () => {
-  const { isSuperAdmin } = useCompanyContext();
+  const { isSuperAdmin, companyId } = useCompanyContext();
   const [members, setMembers] = useState<Member[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(true);
@@ -42,16 +42,19 @@ const Users: React.FC = () => {
     ]);
     const roleMap = new Map<string, string | null>();
     ((roles as any) || []).forEach((r: any) => roleMap.set(r.user_id, r.company_id));
-    const withCompany = ((tms as any) || []).map((m: any) => ({
+    let withCompany = ((tms as any) || []).map((m: any) => ({
       ...m,
       company_id: m.user_id ? roleMap.get(m.user_id) ?? null : null,
     }));
+    if (!isSuperAdmin && companyId) {
+      withCompany = withCompany.filter((m: any) => m.company_id === companyId);
+    }
     setMembers(withCompany);
     setCompanies((comps as any) || []);
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => { load(); }, [isSuperAdmin, companyId]);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
