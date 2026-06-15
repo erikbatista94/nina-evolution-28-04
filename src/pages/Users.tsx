@@ -164,29 +164,27 @@ const Users: React.FC = () => {
     return acc;
   }, {});
 
-  if (!isSuperAdmin) {
-    return <div className="p-8 text-slate-400">Acesso restrito a super administradores.</div>;
-  }
-
   return (
     <div className="p-8 h-full overflow-y-auto bg-slate-950 text-slate-50 custom-scrollbar">
       <div className="flex items-center justify-between mb-8">
         <div>
           <h2 className="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
-            <UsersIcon className="w-8 h-8 text-primary" /> Usuários por Empresa
+            <UsersIcon className="w-8 h-8 text-primary" /> {isSuperAdmin ? 'Usuários por Empresa' : 'Usuários da Empresa'}
           </h2>
-          <p className="text-sm text-slate-400 mt-1">Gerencie usuários de todas as empresas</p>
+          <p className="text-sm text-slate-400 mt-1">{isSuperAdmin ? 'Gerencie usuários de todas as empresas' : 'Gerencie os atendentes da sua empresa'}</p>
         </div>
         <div className="flex gap-3">
-          <select
-            value={filterCompany} onChange={(e) => setFilterCompany(e.target.value)}
-            className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm"
-          >
-            <option value="all">Todas as empresas</option>
-            {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            <option value="unassigned">— Sem empresa —</option>
-          </select>
-          <Button onClick={() => setShowCreate(true)} className="gap-2">
+          {isSuperAdmin && (
+            <select
+              value={filterCompany} onChange={(e) => setFilterCompany(e.target.value)}
+              className="px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-sm"
+            >
+              <option value="all">Todas as empresas</option>
+              {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="unassigned">— Sem empresa —</option>
+            </select>
+          )}
+          <Button onClick={() => { setForm(f => ({ ...f, company_id: !isSuperAdmin && companyId ? companyId : '' })); setShowCreate(true); }} className="gap-2">
             <Plus className="w-4 h-4" /> Novo Usuário
           </Button>
         </div>
@@ -281,7 +279,8 @@ const Users: React.FC = () => {
               <div>
                 <label className="text-xs text-slate-400">Empresa *</label>
                 <select value={form.company_id} onChange={(e) => setForm(f => ({ ...f, company_id: e.target.value }))}
-                  className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm">
+                  disabled={!isSuperAdmin}
+                  className="w-full mt-1 px-3 py-2 bg-slate-950 border border-slate-800 rounded-lg text-sm disabled:opacity-60">
                   <option value="">Selecione…</option>
                   {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                 </select>
