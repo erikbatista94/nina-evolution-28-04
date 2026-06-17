@@ -95,10 +95,12 @@ const SidebarContent = () => {
   const handleLogout = async () => {
     try {
       await signOut();
-      toast.success('Logout realizado com sucesso');
-      navigate('/auth', { replace: true });
     } catch (error) {
-      toast.error('Erro ao fazer logout');
+      console.warn('logout error:', error);
+    } finally {
+      toast.success('Logout realizado com sucesso');
+      // Hard redirect to ensure all in-memory state is reset
+      window.location.href = '/auth';
     }
   };
 
