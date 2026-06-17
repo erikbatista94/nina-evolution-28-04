@@ -72,7 +72,7 @@ const App: React.FC = () => {
               <Route path="/alerts" element={<AlertsPanel />} />
               <Route path="/contacts" element={<Contacts />} />
               <Route path="/scheduling" element={<Scheduling />} />
-              <Route path="/team" element={<Team />} />
+              <Route path="/team" element={<AdminRoute><Team /></AdminRoute>} />
               <Route path="/reports" element={<AdminRoute><Reports /></AdminRoute>} />
               <Route path="/settings" element={<AdminRoute><Settings /></AdminRoute>} />
               <Route path="/companies" element={<SuperAdminRoute><Companies /></SuperAdminRoute>} />
