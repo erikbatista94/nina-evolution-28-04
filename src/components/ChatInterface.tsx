@@ -1245,7 +1245,7 @@ const ChatInterface: React.FC = () => {
           )}
 
           {/* Instance filter */}
-          {instancesList.length > 0 && (
+          {isAdmin && instancesList.length > 0 && (
             <div className="px-3 pb-2">
               <Select value={instanceFilter} onValueChange={setInstanceFilter}>
                 <SelectTrigger className="h-8 text-xs bg-slate-800/50 border-slate-700/50 text-slate-300">
@@ -1801,19 +1801,6 @@ const ChatInterface: React.FC = () => {
 
              {/* Input Area */}
             <div className="p-4 bg-slate-900/90 border-t border-slate-800 backdrop-blur-sm z-10">
-              {/* 24h Window Warning Banner */}
-              {windowStatus.status === 'closed' && (
-                <div className="mb-3 px-4 py-2.5 bg-red-500/10 border border-red-500/30 rounded-xl flex items-center gap-2 text-sm text-red-300">
-                  <AlertTriangle className="w-4 h-4 flex-shrink-0 text-red-400" />
-                  <span className="flex-1"><strong>Janela de 24h expirada.</strong> Mensagem comum não será entregue.</span>
-                  <button
-                    onClick={() => setShowTemplateModal(true)}
-                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-medium rounded-lg transition-colors whitespace-nowrap"
-                  >
-                    📩 Reengajar
-                  </button>
-                </div>
-              )}
               {windowStatus.status === 'expiring' && (
                 <div className="mb-3 px-4 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl flex items-center gap-2 text-xs text-amber-300">
                   <Clock className="w-3.5 h-3.5 flex-shrink-0" />
