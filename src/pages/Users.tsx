@@ -6,6 +6,7 @@ import { Button } from '@/components/Button';
 import { useCompanyContext } from '@/hooks/useCompanyContext';
 
 interface Company { id: string; name: string }
+interface Instance { id: string; name: string; company_id: string; user_id: string | null }
 interface Member {
   id: string;
   user_id: string | null;
@@ -15,12 +16,14 @@ interface Member {
   status: string;
   company_id: string | null;
   whatsapp_number: string | null;
+  instance_id: string | null;
 }
 
 const Users: React.FC = () => {
   const { isSuperAdmin, companyId } = useCompanyContext();
   const [members, setMembers] = useState<Member[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
+  const [instances, setInstances] = useState<Instance[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterCompany, setFilterCompany] = useState<string>('all');
   const [search, setSearch] = useState('');
@@ -35,22 +38,27 @@ const Users: React.FC = () => {
 
   const load = async () => {
     setLoading(true);
-    const [{ data: tms }, { data: comps }, { data: roles }] = await Promise.all([
+    const [{ data: tms }, { data: comps }, { data: roles }, { data: insts }] = await Promise.all([
       supabase.from('team_members').select('id, user_id, name, email, role, status, whatsapp_number'),
       supabase.from('companies' as any).select('id, name').order('name'),
       supabase.from('user_roles').select('user_id, company_id'),
+      supabase.from('instances').select('id, name, company_id, user_id').order('name'),
     ]);
     const roleMap = new Map<string, string | null>();
     ((roles as any) || []).forEach((r: any) => roleMap.set(r.user_id, r.company_id));
+    const instByUser = new Map<string, string>();
+    ((insts as any) || []).forEach((i: any) => { if (i.user_id) instByUser.set(i.user_id, i.id); });
     let withCompany = ((tms as any) || []).map((m: any) => ({
       ...m,
       company_id: m.user_id ? roleMap.get(m.user_id) ?? null : null,
+      instance_id: m.user_id ? instByUser.get(m.user_id) ?? null : null,
     }));
     if (!isSuperAdmin && companyId) {
       withCompany = withCompany.filter((m: any) => m.company_id === companyId);
     }
     setMembers(withCompany);
     setCompanies((comps as any) || []);
+    setInstances((insts as any) || []);
     setLoading(false);
   };
 
@@ -110,6 +118,25 @@ const Users: React.FC = () => {
       await supabase.from('user_roles').update({ role: appRole as any }).eq('user_id', m.user_id);
     }
     toast.success('Role atualizada');
+    load();
+  };
+
+  const changeInstance = async (m: Member, newInstanceId: string) => {
+    if (!m.user_id) { toast.error('Usuário sem auth user_id'); return; }
+    // Clear this user from any instance they were previously assigned to
+    const { error: clearErr } = await supabase
+      .from('instances')
+      .update({ user_id: null })
+      .eq('user_id', m.user_id);
+    if (clearErr) { toast.error('Erro ao limpar instância anterior'); return; }
+    if (newInstanceId) {
+      const { error } = await supabase
+        .from('instances')
+        .update({ user_id: m.user_id })
+        .eq('id', newInstanceId);
+      if (error) { toast.error('Erro ao atribuir instância'); return; }
+    }
+    toast.success('Instância atualizada');
     load();
   };
 
@@ -223,6 +250,7 @@ const Users: React.FC = () => {
                     <th className="px-4 py-2">WhatsApp</th>
                     <th className="px-4 py-2">Role</th>
                     <th className="px-4 py-2">Empresa</th>
+                    <th className="px-4 py-2">Instância WhatsApp</th>
                     <th className="px-4 py-2 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -245,6 +273,23 @@ const Users: React.FC = () => {
                           className="px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs">
                           <option value="">— sem empresa —</option>
                           {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={m.instance_id || ''}
+                          onChange={(e) => changeInstance(m, e.target.value)}
+                          className="px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs max-w-[180px]"
+                          title="Conversas dessa instância serão atribuídas automaticamente a este usuário"
+                        >
+                          <option value="">— nenhuma —</option>
+                          {instances
+                            .filter(i => !m.company_id || i.company_id === m.company_id)
+                            .map(i => (
+                              <option key={i.id} value={i.id}>
+                                {i.name}{i.user_id && i.user_id !== m.user_id ? ' (em uso)' : ''}
+                              </option>
+                            ))}
                         </select>
                       </td>
                       <td className="px-4 py-2 text-right">
