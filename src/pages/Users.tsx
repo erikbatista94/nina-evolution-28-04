@@ -250,6 +250,7 @@ const Users: React.FC = () => {
                     <th className="px-4 py-2">WhatsApp</th>
                     <th className="px-4 py-2">Role</th>
                     <th className="px-4 py-2">Empresa</th>
+                    <th className="px-4 py-2">Instância WhatsApp</th>
                     <th className="px-4 py-2 text-right">Ações</th>
                   </tr>
                 </thead>
@@ -272,6 +273,23 @@ const Users: React.FC = () => {
                           className="px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs">
                           <option value="">— sem empresa —</option>
                           {companies.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </td>
+                      <td className="px-4 py-2">
+                        <select
+                          value={m.instance_id || ''}
+                          onChange={(e) => changeInstance(m, e.target.value)}
+                          className="px-2 py-1 bg-slate-950 border border-slate-800 rounded text-xs max-w-[180px]"
+                          title="Conversas dessa instância serão atribuídas automaticamente a este usuário"
+                        >
+                          <option value="">— nenhuma —</option>
+                          {instances
+                            .filter(i => !m.company_id || i.company_id === m.company_id)
+                            .map(i => (
+                              <option key={i.id} value={i.id}>
+                                {i.name}{i.user_id && i.user_id !== m.user_id ? ' (em uso)' : ''}
+                              </option>
+                            ))}
                         </select>
                       </td>
                       <td className="px-4 py-2 text-right">
