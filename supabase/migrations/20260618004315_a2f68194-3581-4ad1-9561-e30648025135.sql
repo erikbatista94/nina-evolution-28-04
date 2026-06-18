@@ -1,0 +1,1 @@
+CREATE TRIGGER set_company_id_nina_settings BEFORE INSERT ON public.nina_settings FOR EACH ROW EXECUTE FUNCTION public.set_company_id_from_user();
